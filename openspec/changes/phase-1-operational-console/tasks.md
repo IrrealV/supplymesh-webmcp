@@ -36,9 +36,9 @@ PRs target `main` and merge sequentially; successor reviews use merged `main`. N
 
 ## Phase 2: Domain
 
-- [ ] 2.1 RED: add `spain-v1.test.ts`: repeatability, 15 identities/positions, label fallback, required fields/statuses, offline data, exact 3.9m/26t/closure/snow/deadline risks.
-- [ ] 2.2 GREEN: add `src/domain/{entities.ts,ports/ScenarioRepository.ts,operations/createOperationsApi.ts}` and `src/scenario/{fixtures/spain-v1.ts,geometry.ts,state/createZustandScenarioRepository.ts}`; shared query/rename/delete.
-- [ ] 2.3 RED/GREEN: create `src/scenario/persistence/overrideStorage.ts`; test validation, fallback, locale isolation, rename, atomic vehicle-plus-route delete.
+- [x] 2.1 RED: add `spain-v1.test.ts`: repeatability, 15 identities/positions, label fallback, required fields/statuses, offline data, exact 3.9m/26t/closure/snow/deadline risks.
+- [x] 2.2 GREEN: add `src/domain/{entities.ts,ports/ScenarioRepository.ts,operations/createOperationsApi.ts}` and `src/scenario/{fixtures/spain-v1.ts,geometry.ts,state/createZustandScenarioRepository.ts}`; shared query/rename/delete.
+- [x] 2.3 RED/GREEN: create `src/scenario/persistence/overrideStorage.ts`; test validation, fallback, locale isolation, rename, atomic vehicle-plus-route delete.
 
 ## Phase 3: Console/Map
 
