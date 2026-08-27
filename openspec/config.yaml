@@ -1,0 +1,40 @@
+schema: spec-driven
+
+context: |
+  Project: supplymesh-webmcp (provisional product name: SupplyMesh)
+  Stack: Not detected; project directory is empty.
+  Architecture: Not established; keep implementation independent of provisional branding.
+  Testing: No runner or quality tools detected; strict TDD disabled until a runner exists.
+  Persistence: Hybrid OpenSpec + Engram.
+
+strict_tdd: false
+
+testing:
+  runner: null
+  framework: null
+  unit: false
+  integration: false
+  e2e: false
+  coverage: false
+  linter: false
+  type_checker: false
+  formatter: false
+
+rules:
+  proposal:
+    - Define scope boundaries and include rollback considerations for risky changes.
+  specs:
+    - Use Given/When/Then scenarios and RFC 2119 keywords.
+  design:
+    - Document architecture decisions with rationale and preserve branding independence.
+  tasks:
+    - Group tasks by phase and keep each task completable in one session.
+  apply:
+    tdd: false
+    test_command: ""
+  verify:
+    test_command: ""
+    build_command: ""
+    coverage_threshold: 0
+  archive:
+    - Preserve the audit trail and warn before destructive merges.
