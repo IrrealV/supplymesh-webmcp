@@ -42,9 +42,9 @@ PRs target `main` and merge sequentially; successor reviews use merged `main`. N
 
 ## Phase 3: Console/Map
 
-- [ ] 3.1 Create `src/{main.tsx,app/{App.tsx,createApplication.ts},app/state/useUiCoordinationStore.ts,styles.css}`; isolate transient state; compose gate.
-- [ ] 3.2 RED/GREEN: create `src/features/{shell/OperationalShell.tsx,shell/Topbar.tsx,fleet/FilterRail.tsx}`; test chrome, catalog completeness/fallback/locale, rail state, deferred drawer.
-- [ ] 3.3 RED/GREEN: create `src/features/map/{FleetMap.tsx,layers/*,MapEventCoordinator.ts}`; test filter/clear, selection replacement/close, labels/OSM, manual/programmatic follow.
+- [x] 3.1 Create `src/{main.tsx,app/{App.tsx,createApplication.ts},app/state/useUiCoordinationStore.ts,styles.css}`; isolate transient state; compose gate.
+- [x] 3.2 RED/GREEN: create `src/features/{shell/OperationalShell.tsx,shell/Topbar.tsx,fleet/FilterRail.tsx}`; test chrome, catalog completeness/fallback/locale, rail state, deferred drawer.
+- [x] 3.3 RED/GREEN: create `src/features/map/{FleetMap.tsx,layers/*,MapEventCoordinator.ts}`; test filter/clear, selection replacement/close, labels/OSM, manual/programmatic follow.
 
 ## Phase 4: Inspection
 
