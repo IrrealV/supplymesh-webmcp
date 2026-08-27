@@ -31,8 +31,8 @@ PRs target `main` and merge sequentially; successor reviews use merged `main`. N
 
 ## Phase 1: Foundation
 
-- [ ] 1.1 Initialize Git; add Bun/Vite React/TS/Tailwind, ESLint, Vitest/Playwright config, `package.json`, `bun.lock`, `.gitignore`, `.env.example`.
-- [ ] 1.2 Add MIT `LICENSE`, `README.md`, `docs/{product-spec,ui-spec,architecture}.md`, scripts `lint/typecheck/test/build/check`; document boundaries, secrets, Bun/browser.
+- [x] 1.1 Initialize Git; add Bun/Vite React/TS/Tailwind, ESLint, Vitest/Playwright config, `package.json`, `bun.lock`, `.gitignore`, `.env.example`.
+- [x] 1.2 Add MIT `LICENSE`, `README.md`, `docs/{product-spec,ui-spec,architecture}.md`, scripts `lint/typecheck/test/build/check`; document boundaries, secrets, Bun/browser.
 
 ## Phase 2: Domain
 

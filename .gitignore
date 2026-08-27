@@ -1,1 +1,11 @@
 .atl/
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
