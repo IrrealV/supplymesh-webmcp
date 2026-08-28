@@ -1,4 +1,5 @@
 .atl/
+.codegraph/
 node_modules/
 dist/
 coverage/
