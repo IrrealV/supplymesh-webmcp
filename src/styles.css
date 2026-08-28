@@ -38,6 +38,8 @@ button { font: inherit; }
 .fleet-marker-muted { opacity: .38; }
 .fleet-marker-active { border-color: #075c4d; box-shadow: 0 0 0 2px rgb(15 118 110 / 23%); }
 .console-unavailable { align-items: center; display: flex; justify-content: center; min-height: 100dvh; }
+.webmcp-gate { align-items: center; display: grid; gap: 12px; justify-items: center; min-height: 100dvh; padding: 24px; text-align: center; }
+.webmcp-gate button { background: #165f50; border: 1px solid #165f50; color: #f7f8f5; padding: 7px 12px; }
 .vehicle-drawer { background: #f7f8f5; border-left: 1px solid #bfcac3; box-sizing: border-box; height: calc(100dvh - 49px); overflow-y: auto; position: fixed; right: 0; top: 49px; width: 360px; z-index: 800; }
 .drawer-header { align-items: center; border-bottom: 1px solid #c6cfca; display: flex; justify-content: space-between; padding: 14px 16px; }
 .drawer-header strong, .drawer-header span { display: block; }.drawer-header span, dt { color: #5a6963; font-size: 12px; }.drawer-close { background: transparent; border: 0; color: #32433d; padding: 5px; }
