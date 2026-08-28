@@ -2,9 +2,9 @@
 
 ## Current status
 
-This work unit provides the Bun/Vite/React foundation only. Domain operations, scenario fixtures, UI coordination, maps, and the WebMCP adapter are deferred to later work units.
+Phase 1 is implemented, independently verified, and archived. It includes the Bun/Vite/React application, deterministic scenario, typed domain operations, UI coordination, map workspace, persistence adapters, and WebMCP compatibility bridge.
 
-## Planned boundaries
+## Current boundaries
 
 ```text
 fixtures + validated overrides -> Zustand scenario repository -> OperationsApi -> React
@@ -12,10 +12,12 @@ fixtures + validated overrides -> Zustand scenario repository -> OperationsApi -
 transient UI coordination -> selectors -> map, rail, and inspection presentation
 ```
 
-React components and WebMCP handlers will call the same typed `OperationsApi`; neither transport may mutate Zustand internals. The repository preserves a simulation-adapter seam without implementing a simulation engine. Browser-specific storage, Leaflet behavior, and `document.modelContext.registerTool` live behind narrow adapters.
+React components and WebMCP handlers call the same typed `OperationsApi`; neither transport mutates Zustand internals. The repository preserves a simulation-adapter seam without implementing a simulation engine. Browser-specific storage, Leaflet behavior, and `document.modelContext.registerTool` live behind narrow adapters.
 
-The WebMCP gate will mount the console only after capability detection and minimal tool registration. Its development bypass is restricted to `import.meta.env.DEV && VITE_WEBMCP_DEVELOPMENT_BYPASS === "true"`; production remains gated. Failure exposes only an accessible explanation and Retry, not diagnostics or secrets.
+The WebMCP gate mounts the console only after capability detection and registration of exactly `scenario_current`, `fleet_status`, `vehicle_get`, and `vehicle_rename`. Its local bypass is restricted to `import.meta.env.DEV && VITE_WEBMCP_LOCAL_BYPASS === "true"`; production builds cannot bypass the gate. Failure exposes only an accessible explanation and Retry, not diagnostics or secrets.
+
+The local seam and production gate are verified. [Genuine native WebMCP validation](webmcp-native-validation.md) also succeeded in system Chromium 151.0.7922.169 with the official `--enable-features=WebMCP` flag, without a polyfill, mock, local seam, route interception, init script, or bypass. This proves the native registration, execution, UI-state parity, error, and cleanup paths under the feature flag; it does not imply default WebMCP availability in ordinary Chromium.
 
 ## Deferred capabilities
 
-Fleet Edit Mode, `create_vehicle`, and `assign_route` are intentional Phase 2 direction. This foundation provides no UI, operation, or WebMCP tool for them.
+Fleet Edit Mode, vehicle creation, route assignment, `create_vehicle`, and `assign_route` are intentional Phase 2 direction. Phase 1 provides no UI, operation, or WebMCP tool for them.

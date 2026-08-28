@@ -1,5 +1,12 @@
 import type { Feature, LineString, Point, Polygon } from "geojson";
 
+export const VEHICLE_LABEL_LENGTH_MAX = 64;
+
+export function isVehicleLabelValid(label: string): boolean {
+  const normalizedLength = label.trim().length;
+  return normalizedLength > 0 && normalizedLength <= VEHICLE_LABEL_LENGTH_MAX;
+}
+
 export const VehicleStatuses = {
   driving: "driving",
   resting: "resting",

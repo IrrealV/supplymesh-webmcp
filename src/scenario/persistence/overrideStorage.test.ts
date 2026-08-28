@@ -54,6 +54,22 @@ describe("scenario overrides", () => {
     expect(storage.getItem("locale:v1")).toBe("es");
   });
 
+  it("falls back from a persisted label longer than 64 characters", () => {
+    const storage = new MemoryStorage();
+    const fixtureVehicle = createZustandScenarioRepository(storage).scenarioCurrent().vehicles[0];
+    storage.setItem("locale:v1", "es");
+    storage.setItem(SCENARIO_OVERRIDES_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      labels: { [fixtureVehicle.internalId]: "x".repeat(65) },
+      deletedVehicleIds: [],
+    }));
+
+    const reloadedVehicle = createZustandScenarioRepository(storage).vehicleGet(fixtureVehicle.internalId);
+
+    expect(reloadedVehicle?.label).toBe(fixtureVehicle.label);
+    expect(storage.getItem("locale:v1")).toBe("es");
+  });
+
   it("validates and persists label edits through the shared operations API", () => {
     const storage = new MemoryStorage();
     const api = createOperationsApi(createZustandScenarioRepository(storage));

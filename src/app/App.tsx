@@ -15,7 +15,7 @@ export function App() {
   useEffect(() => { document.documentElement.lang = locale; }, [locale]);
   const copy = catalog(locale);
 
-  return <WebMcpGate explicitFlag={import.meta.env.VITE_WEBMCP_LOCAL_BYPASS} onScenarioChange={publishScenario} operations={operations}>
+  return <WebMcpGate explicitFlag={import.meta.env.VITE_WEBMCP_LOCAL_BYPASS} locale={locale} onScenarioChange={publishScenario} operations={operations}>
     {!result.ok ? <main className="console-unavailable">{copy.consoleUnavailable}</main> : <OperationalShell locale={locale} onLocaleChange={setLocale} onScenarioChange={publishScenario} operations={operations} scenario={result.data} />}
   </WebMcpGate>;
 }
