@@ -3,12 +3,18 @@ import { useEffect, useMemo } from "react";
 import { MapContainer, Marker, Polygon, Polyline, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import { useUiCoordinationStore } from "../../app/state/useUiCoordinationStore";
 import { getVehicleDisplayName, type OperatingRegion, type Vehicle } from "../../domain/entities";
+import { catalog, interpolate, type Locale } from "../../preferences/i18n/catalog";
 import { MapEventCoordinator } from "./MapEventCoordinator";
 import { deriveMapLayers } from "./layers";
 
-function markerIcon(vehicle: Vehicle, isEmphasized: boolean) {
+function escapeMarkerHtml(value: string): string {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+}
+
+function markerIcon(vehicle: Vehicle, isEmphasized: boolean, selectLabel: string) {
   const label = getVehicleDisplayName(vehicle);
-  return divIcon({ className: "fleet-marker-wrap", html: `<button aria-label="Select ${label}" class="fleet-marker ${isEmphasized ? "fleet-marker-active" : "fleet-marker-muted"}">${label}</button>`, iconAnchor: [42, 15] });
+  const className = isEmphasized ? "fleet-marker-active" : "fleet-marker-muted";
+  return divIcon({ className: "fleet-marker-wrap", html: `<button aria-label="${escapeMarkerHtml(selectLabel)}" class="fleet-marker ${className}" type="button">${escapeMarkerHtml(label)}</button>`, iconAnchor: [42, 15] });
 }
 
 function MapFocus({ selectedVehicle, coordinator }: { selectedVehicle: Vehicle | undefined; coordinator: MapEventCoordinator }) {
@@ -33,16 +39,17 @@ function MapEvents({ coordinator }: { coordinator: MapEventCoordinator }) {
   return null;
 }
 
-export function FleetMap({ scenario }: { scenario: OperatingRegion }) {
+export function FleetMap({ locale, scenario }: { locale: Locale; scenario: OperatingRegion }) {
   const activeFilter = useUiCoordinationStore((state) => state.activeFilter);
   const selectedVehicleId = useUiCoordinationStore((state) => state.selectedVehicleId);
   const selectVehicle = useUiCoordinationStore((state) => state.selectVehicle);
   const layers = useMemo(() => deriveMapLayers(scenario, activeFilter, selectedVehicleId), [activeFilter, scenario, selectedVehicleId]);
   const coordinator = useMemo(() => new MapEventCoordinator(), []);
   const selectedVehicle = scenario.vehicles.find((vehicle) => vehicle.internalId === selectedVehicleId);
+  const copy = catalog(locale);
 
   return (
-    <div className="map-frame" onKeyDown={() => useUiCoordinationStore.getState().cancelFollow()} onPointerDown={() => coordinator.shouldCancelFollowForManualInteraction() && useUiCoordinationStore.getState().cancelFollow()} onWheel={() => coordinator.shouldCancelFollowForManualInteraction() && useUiCoordinationStore.getState().cancelFollow()}>
+    <div aria-label={copy.currentRoute} className="map-frame" onKeyDown={() => useUiCoordinationStore.getState().cancelFollow()} onPointerDown={() => coordinator.shouldCancelFollowForManualInteraction() && useUiCoordinationStore.getState().cancelFollow()} onWheel={() => coordinator.shouldCancelFollowForManualInteraction() && useUiCoordinationStore.getState().cancelFollow()}>
       <MapContainer bounds={[[35.4, -9.7], [44.3, 3.6]]} className="fleet-map" zoomControl={false}>
         <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <MapEvents coordinator={coordinator} />
@@ -62,7 +69,7 @@ export function FleetMap({ scenario }: { scenario: OperatingRegion }) {
         })}
         {layers.vehicles.map(({ vehicle, isEmphasized }) => {
           const [longitude, latitude] = vehicle.position.geometry.coordinates;
-          return <Marker eventHandlers={{ click: () => selectVehicle(vehicle.internalId) }} icon={markerIcon(vehicle, isEmphasized)} key={vehicle.internalId} position={[latitude, longitude]} />;
+          return <Marker eventHandlers={{ click: () => selectVehicle(vehicle.internalId) }} icon={markerIcon(vehicle, isEmphasized, interpolate(copy.selectVehicle, { label: getVehicleDisplayName(vehicle) }))} keyboard={false} key={vehicle.internalId} position={[latitude, longitude]} />;
         })}
       </MapContainer>
     </div>
