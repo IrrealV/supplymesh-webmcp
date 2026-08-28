@@ -29,4 +29,4 @@ Phase 1 does not include authentication, a backend or database, simulation or mo
 
 ## Delivery expectations
 
-The local WebMCP seam, production gate, 32 Vitest tests, 4 Playwright tests, lint, typecheck, and builds passed. Real OpenAI Challenge-browser validation remains an external pre-release requirement: fresh Playwright Chromium 151.0.7922.34 and system Chromium 151.0.7922.169 checks both returned `typeof document.modelContext === "undefined"` without mocks, local seams, init scripts, or bypasses. Real Challenge-browser success is not claimed.
+The local WebMCP seam, production gate, 32 Vitest tests, 4 Playwright tests, lint, typecheck, and builds passed. [Genuine native WebMCP validation](webmcp-native-validation.md) also passed in system Chromium 151.0.7922.169 with the official `--enable-features=WebMCP` flag and no polyfill, mock, local seam, route interception, init script, or bypass. This is evidence for the native feature-flag path, not a claim that ordinary Chromium enables WebMCP by default.

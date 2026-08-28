@@ -29,6 +29,6 @@ Copy `.env.example` to `.env.local` only for local development. Set `VITE_WEBMCP
 
 The console uses deterministic offline fixtures, React, and a minimal WebMCP bridge backed by the same application operations. Phase 1 exposes exactly four WebMCP tools: `scenario_current`, `fleet_status`, `vehicle_get`, and `vehicle_rename`.
 
-Fleet Edit Mode, vehicle creation, route assignment, `create_vehicle`, and `assign_route` remain unavailable Phase 2 work. Real OpenAI Challenge-browser validation is still an external pre-release requirement: fresh checks in Playwright Chromium 151.0.7922.34 and system Chromium 151.0.7922.169 both returned `typeof document.modelContext === "undefined"` without mocks, local seams, init scripts, or bypasses. This repository does not claim real Challenge-browser success.
+Fleet Edit Mode, vehicle creation, route assignment, `create_vehicle`, and `assign_route` remain unavailable Phase 2 work. [Genuine native WebMCP validation](docs/webmcp-native-validation.md) succeeded in system Chromium 151.0.7922.169 with the official `--enable-features=WebMCP` flag and no polyfill, mock, local seam, route interception, init script, or bypass. This validates the native integration under the feature flag; it does not claim that ordinary Chromium enables WebMCP by default.
 
 See [the product contract](docs/product-spec.md), [UI contract](docs/ui-spec.md), and [architecture](docs/architecture.md). Licensed under [MIT](LICENSE).

@@ -16,7 +16,7 @@ React components and WebMCP handlers call the same typed `OperationsApi`; neithe
 
 The WebMCP gate mounts the console only after capability detection and registration of exactly `scenario_current`, `fleet_status`, `vehicle_get`, and `vehicle_rename`. Its local bypass is restricted to `import.meta.env.DEV && VITE_WEBMCP_LOCAL_BYPASS === "true"`; production builds cannot bypass the gate. Failure exposes only an accessible explanation and Retry, not diagnostics or secrets.
 
-The local seam and production gate are verified, but real OpenAI Challenge-browser validation remains an external pre-release requirement. Fresh checks in Playwright Chromium 151.0.7922.34 and system Chromium 151.0.7922.169 found `document.modelContext` unavailable without any mock, seam, init script, or bypass; real Challenge-browser success is not claimed.
+The local seam and production gate are verified. [Genuine native WebMCP validation](webmcp-native-validation.md) also succeeded in system Chromium 151.0.7922.169 with the official `--enable-features=WebMCP` flag, without a polyfill, mock, local seam, route interception, init script, or bypass. This proves the native registration, execution, UI-state parity, error, and cleanup paths under the feature flag; it does not imply default WebMCP availability in ordinary Chromium.
 
 ## Deferred capabilities
 
