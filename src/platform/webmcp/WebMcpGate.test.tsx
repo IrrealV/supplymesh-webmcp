@@ -37,7 +37,7 @@ describe("WebMcpGate", () => {
       registrations.push({ tool, signal });
     });
 
-    render(<WebMcpGate explicitFlag="false" operations={createOperations()}><div>Operational console</div></WebMcpGate>);
+    render(<WebMcpGate explicitFlag="false" locale="en" operations={createOperations()}><div>Operational console</div></WebMcpGate>);
 
     await screen.findByText("Operational console");
     expect(registrations).toHaveLength(4);
@@ -46,7 +46,7 @@ describe("WebMcpGate", () => {
   });
 
   it("should block unsupported access with only an accessible explanation and retry", async () => {
-    render(<WebMcpGate explicitFlag="false" operations={createOperations()}><div>Operational console</div></WebMcpGate>);
+    render(<WebMcpGate explicitFlag="false" locale="en" operations={createOperations()}><div>Operational console</div></WebMcpGate>);
 
     expect((await screen.findByRole("alert")).textContent).toBe("WebMCP is required to access this console.");
     expect(screen.getByRole("button", { name: "Retry" })).not.toBeNull();
@@ -65,7 +65,7 @@ describe("WebMcpGate", () => {
       }
     });
     const user = userEvent.setup();
-    render(<WebMcpGate explicitFlag="false" operations={createOperations()}><div>Operational console</div></WebMcpGate>);
+    render(<WebMcpGate explicitFlag="false" locale="en" operations={createOperations()}><div>Operational console</div></WebMcpGate>);
 
     await user.click(await screen.findByRole("button", { name: "Retry" }));
 
@@ -80,7 +80,7 @@ describe("WebMcpGate", () => {
     setModelContext((tool, { signal }) => {
       registrations.push({ tool, signal });
     });
-    render(<WebMcpGate explicitFlag="false" operations={createOperations()}><div>Operational console</div></WebMcpGate>);
+    render(<WebMcpGate explicitFlag="false" locale="en" operations={createOperations()}><div>Operational console</div></WebMcpGate>);
 
     await waitFor(() => expect(registrations).toHaveLength(4));
     window.dispatchEvent(new Event("beforeunload"));

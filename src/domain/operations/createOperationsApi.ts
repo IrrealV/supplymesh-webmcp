@@ -1,4 +1,4 @@
-import type { DomainResult, FleetStatus, OperatingRegion, Vehicle, VehicleRenameCommand, VehicleStatus } from "../entities";
+import { isVehicleLabelValid, type DomainResult, type FleetStatus, type OperatingRegion, type Vehicle, type VehicleRenameCommand, type VehicleStatus } from "../entities";
 import type { ScenarioRepository } from "../ports/ScenarioRepository";
 
 export type OperationsApi = {
@@ -30,7 +30,7 @@ export function createOperationsApi(repository: ScenarioRepository): OperationsA
     vehicleGet: (vehicleId) => vehicleResult(repository.vehicleGet(vehicleId), vehicleId),
     vehicleRename: ({ vehicleId, label }) => {
       const normalizedLabel = label.trim();
-      if (normalizedLabel.length === 0 || normalizedLabel.length > 64) {
+      if (!isVehicleLabelValid(normalizedLabel)) {
         return failure("invalid-label", "Vehicle labels must contain between 1 and 64 characters.");
       }
       return vehicleResult(repository.vehicleRename(vehicleId, normalizedLabel), vehicleId);

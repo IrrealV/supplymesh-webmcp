@@ -10,10 +10,12 @@ async function installModelContextSeam(page: Page): Promise<void> {
 }
 
 test("should block the console when the WebMCP capability is unavailable", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("locale:v1", "es"));
   await page.goto("/");
 
-  await expect(page.getByRole("alert")).toHaveText("WebMCP is required to access this console.");
-  await expect(page.getByRole("button", { name: "Retry" })).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveText("Se requiere WebMCP para acceder a esta consola.");
+  await expect(page.getByRole("button", { name: "Reintentar" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "es");
   await expect(page.getByText("SupplyMesh")).toHaveCount(0);
   await expect(page.getByText(/continue manually|skip|disable ai/i)).toHaveCount(0);
 });

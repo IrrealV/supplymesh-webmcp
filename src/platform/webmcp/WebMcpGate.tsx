@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { OperatingRegion } from "../../domain/entities";
 import type { OperationsApi } from "../../domain/operations/createOperationsApi";
+import { catalog, type Locale } from "../../preferences/i18n/catalog";
 import { createOperationalTools } from "./registerOperationalTools";
 
 type WebMcpGateState = "checking" | "registering" | "ready" | "unsupported" | "failed";
@@ -8,13 +9,15 @@ type WebMcpGateState = "checking" | "registering" | "ready" | "unsupported" | "f
 type WebMcpGateProps = {
   children: ReactNode;
   explicitFlag: string | undefined;
+  locale: Locale;
   onScenarioChange?(scenario: OperatingRegion): void;
   operations: OperationsApi;
 };
 
-export function WebMcpGate({ children, explicitFlag, onScenarioChange, operations }: WebMcpGateProps) {
+export function WebMcpGate({ children, explicitFlag, locale, onScenarioChange, operations }: WebMcpGateProps) {
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<WebMcpGateState>("checking");
+  const copy = catalog(locale);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -64,13 +67,13 @@ export function WebMcpGate({ children, explicitFlag, onScenarioChange, operation
   }
 
   if (state === "checking" || state === "registering") {
-    return <main aria-live="polite" className="webmcp-gate">Checking WebMCP compatibility.</main>;
+    return <main aria-live="polite" className="webmcp-gate">{copy.webMcpChecking}</main>;
   }
 
   return (
     <main className="webmcp-gate">
-      <p role="alert">WebMCP is required to access this console.</p>
-      <button onClick={() => setAttempt((currentAttempt) => currentAttempt + 1)} type="button">Retry</button>
+      <p role="alert">{copy.webMcpRequired}</p>
+      <button onClick={() => setAttempt((currentAttempt) => currentAttempt + 1)} type="button">{copy.retry}</button>
     </main>
   );
 }
