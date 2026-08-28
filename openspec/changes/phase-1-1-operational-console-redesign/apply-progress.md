@@ -82,14 +82,16 @@ Reverting implementation commit `5c0a74b6294852c3389ce0b3a4b3684a642622bd` remov
 - [x] 2.2 ContextPanel overview/results/inspection priority with close focus restoration and deleted-card fallback to the restored results heading.
 - [x] 2.3 One coherent Unit 2 implementation commit boundary with managed desktop runtime proof; final PNG evidence remains Unit 5.
 
-### Unit 2 Candidate Binding
+### Unit 2 Implementation Attempt and Evidence Binding
 
 - Immediate predecessor/base: `9f1a7a5278dd6d880b34827d0bd27fafece5118a` (`feat/phase1-1-shell-coordination`).
-- Unit 2 implementation commit: `2513c7044ccd246a0601ffe7b4e59666cdc91da7`.
-- Candidate tree: `dea0d735410120d957a02cee3aa60926e16014f2`.
-- Diff revision: `sha256:29b832f41757a59d49a779add2860fd5e89593206255a55d7a948ad33ebce668`.
-- Evidence revision: `sha256:f61725d19c5847a62be058cf3aceef07bfc2c6d779c11c61087c2c2b3bb26216`.
-- Authored review size: **396 additions + 28 deletions = 424 changed lines**, below the hard 800-line limit.
+- Implementation commit: `2513c7044ccd246a0601ffe7b4e59666cdc91da7`; implementation tree: `dea0d735410120d957a02cee3aa60926e16014f2`.
+- Implementation diff revision: `sha256:29b832f41757a59d49a779add2860fd5e89593206255a55d7a948ad33ebce668`; implementation evidence revision: `sha256:f61725d19c5847a62be058cf3aceef07bfc2c6d779c11c61087c2c2b3bb26216`.
+- Native implementation-attempt charge for candidate `2513c704...`: **396 additions + 28 deletions = 424 changed lines**, below 800.
+- Evidence-only binding commit: `604c6c842bf568a324b4d9b0986a27a83991857c` (**3 additions + 3 deletions**); final tree through that binding: `af8d3b6e164cd5aba40e31f9686ccc1f9e4c3cf0`.
+- Final attempt evidence through binding: `sha256:86882407a662d2c7f7b08b08245a52de4806619eb8bd5cca6c41d5f1c96db872`.
+- Human-authored review total through `604c6c842...`: **399 additions + 31 deletions = 430 changed lines**, below 800.
+- The 424-line native attempt charge and 430-line human review total are distinct scopes and MUST NOT be used interchangeably.
 - Chain: `feat/phase1-1-filter-panels` targets immediate predecessor `feat/phase1-1-shell-coordination`; tracker remains `feat/phase1-1-operational-console-redesign` for issue #15.
 
 ### Unit 2 RED/GREEN Evidence
@@ -108,18 +110,37 @@ Reverting implementation commit `5c0a74b6294852c3389ce0b3a4b3684a642622bd` remov
 | Relevant Unit 1 regression | `bun run test -- src/app/state/useUiCoordinationStore.test.ts src/features/shell/OperationalShell.test.tsx src/features/fleet/FilterRail.test.tsx src/features/fleet/filtering.test.ts src/features/fleet/OperationalOverview.test.tsx src/features/fleet/FilterResults.test.tsx src/features/map/FleetMap.test.ts src/features/fleet/VehicleDrawer.test.tsx src/preferences/i18n/catalog.test.ts` → exit 0; 9 files, 32 tests. |
 | Full quality | `bun run check` → exit 0; ESLint and `tsc -b` clean, 13 Vitest files and 47 tests passed, Vite transformed 4,701 modules and built successfully. Existing >500 kB chunk advisory remained non-blocking. |
 | Runtime harness | Managed Vite with `VITE_WEBMCP_LOCAL_BYPASS=true` at `127.0.0.1:4173`; Chromium 1440×900 → PASS. Overview and All=15 were present; Weather produced 3 cards; Weather OR Critical produced 5 unique cards in exact priority; two removable chips rendered; result selection opened inspection and close restored card focus; seven compact controls exposed described counts and tooltip; expanded rail was 232px, panel 388.797px; prohibited chrome and console errors were zero; no PNG was created. Server stopped and port 4173 was free. |
+| Tablet correction harness | Managed Vite with the same bypass at `127.0.0.1:4173`; Chromium 900×900 → PASS. Weather produced 3 results; selecting `result-vehicle-004` opened the tablet inspection dialog; close restored Weather results and focus to that card. A storage-isolated deletion flow restored Weather context and focus to `context-panel-heading`; local storage was cleared before each flow and after deletion, reload restored fixture vehicle-004, screenshots and console errors were zero, processes stopped, and port 4173 was free. |
 | Threat matrix | N/A per design; no routing, shell-command, subprocess, VCS automation, executable-classification, or process-integration application boundary changed. |
 | Attempt settlement | Native Unit 2 attempt was already acquired by the orchestrator. Per explicit governance, this executor did not acquire, reset, or settle it. |
 | Rollback boundary | Revert the Unit 2 files listed below. This removes selectors/results/overview/rail presentation, ContextPanel restoration, typed panel copy, tests, CSS, and the minimal OR map-consumption adapter without removing Unit 1 shell/store behavior or touching domain, repository, fixtures/geometry, WebMCP, inspection internals, final evidence, or Phase 2. |
 
-### Exact Unit 2 Rollback Files
+### Exact Unit 2 Rollback Files (`9f1a7a5..604c6c8`)
 
-- `openspec/changes/phase-1-1-operational-console-redesign/{apply-progress.md,tasks.md}`
-- `src/features/fleet/{filtering,filtering.test,OperationalOverview,OperationalOverview.test,FilterResults,FilterResults.test,VehicleResultCard,FilterRail,FilterRail.test}.ts*`
-- `src/features/shell/{ContextPanel,OperationalShell,OperationalShell.test}.tsx`
+- `openspec/changes/phase-1-1-operational-console-redesign/apply-progress.md`
+- `openspec/changes/phase-1-1-operational-console-redesign/tasks.md`
+- `src/features/fleet/FilterRail.test.tsx`
+- `src/features/fleet/FilterRail.tsx`
+- `src/features/fleet/FilterResults.test.tsx`
+- `src/features/fleet/FilterResults.tsx`
+- `src/features/fleet/OperationalOverview.test.tsx`
+- `src/features/fleet/OperationalOverview.tsx`
+- `src/features/fleet/VehicleResultCard.tsx`
+- `src/features/fleet/filtering.test.ts`
+- `src/features/fleet/filtering.ts`
 - `src/features/map/FleetMap.tsx` (minimal multi-filter emphasis compatibility adapter only)
+- `src/features/shell/ContextPanel.tsx`
+- `src/features/shell/OperationalShell.test.tsx`
+- `src/features/shell/OperationalShell.tsx`
 - `src/preferences/i18n/catalog.ts` (typed Unit 2 panel/result copy only)
 - `src/styles.css` (Unit 2 overview/results/chip/card rules only)
+
+### Gatekeeper Correction Evidence
+
+- Correction evidence revision: `sha256:5987e3494966661e1ceb682e0c7c72597ed52133e49e2bf6abe9b6c8d77f0738`.
+- Cleanup: `managed tablet Vite/Chromium stopped; port 4173 free; localStorage reset before each flow and after deletion; fixture vehicle-004 restored after reload; screenshots created: 0`.
+- Process: `correction changed only cumulative apply-progress; no production/test/task behavior changed; no acquire/reset/settle, push, PR, review, or merge ran`.
+- Diagnosis: `gatekeeper findings reconciled: native implementation attempt charge is 424 lines, human review churn through evidence binding is 430 lines, immutable roles are explicit, tablet close/delete restoration passed, and rollback paths are exact`.
 
 ### Unit 2 Scope and Compatibility Guard
 
