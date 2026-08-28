@@ -27,9 +27,9 @@ Chain strategy: feature-branch-chain
 
 ## Phase 2: Filters and Context Panels (Unit 2; depends on 1)
 
-- [ ] 2.1 Add `filtering.test.ts`, `OperationalOverview.test.tsx`, and `FilterResults.test.tsx` RED tests; create `src/features/fleet/{filtering.ts,OperationalOverview.tsx,FilterResults.tsx,VehicleResultCard.tsx}` and modify `FilterRail.tsx` for derived OR counts, dedupe, exact priority, chips, and reset.
-- [ ] 2.2 Modify `ContextPanel.tsx` and shell tests for overview/results/selection priority, result-card selection, and close/delete focus restoration on desktop/tablet.
-- [ ] 2.3 Commit Unit 2 with filter/panel tests and dev-server filter harness; capture its two desktop states only in Unit 5.
+- [x] 2.1 Add `filtering.test.ts`, `OperationalOverview.test.tsx`, and `FilterResults.test.tsx` RED tests; create `src/features/fleet/{filtering.ts,OperationalOverview.tsx,FilterResults.tsx,VehicleResultCard.tsx}` and modify `FilterRail.tsx` for derived OR counts, dedupe, exact priority, chips, and reset.
+- [x] 2.2 Modify `ContextPanel.tsx` and shell tests for overview/results/selection priority, result-card selection, and close/delete focus restoration on desktop/tablet.
+- [x] 2.3 Commit Unit 2 with filter/panel tests and dev-server filter harness; capture its two desktop states only in Unit 5.
 
 ## Phase 3: Deterministic Map (Unit 3; depends on 1–2)
 

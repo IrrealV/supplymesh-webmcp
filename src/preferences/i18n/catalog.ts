@@ -12,3 +12,10 @@ const filterKeys: Record<FilterCategory, keyof Catalog> = { all: "all", resting:
 export function catalog(locale: Locale = "en"): Catalog { return catalogs[locale]; }
 export function filterLabel(category: FilterCategory, locale: Locale = "en"): string { return catalog(locale)[filterKeys[category]]; }
 export function interpolate(template: string, values: Record<string, string | number>): string { return Object.entries(values).reduce((message, [key, value]) => message.replaceAll(`{${key}}`, String(value)), template); }
+
+export type OperationalCopy = { activeFilters: string; lowClearance: string; operationalOverview: string; removeFilter: string; restDeadlineRisk: string; roadClosure: string; severeWeather: string; severityCritical: string; severityHigh: string; severityLow: string; severityMedium: string; weightRestriction: string };
+const operationalCatalogs: Record<Locale, OperationalCopy> = {
+  en: { activeFilters: "{count} active filters", lowClearance: "Low clearance", operationalOverview: "Operational overview", removeFilter: "Remove {filter}", restDeadlineRisk: "Driving and rest deadline", roadClosure: "Road closure", severeWeather: "Severe weather", severityCritical: "Critical", severityHigh: "High", severityLow: "Low", severityMedium: "Medium", weightRestriction: "Weight restriction" },
+  es: { activeFilters: "{count} filtros activos", lowClearance: "Gálibo reducido", operationalOverview: "Resumen operativo", removeFilter: "Quitar {filter}", restDeadlineRisk: "Límite de conducción y descanso", roadClosure: "Carretera cerrada", severeWeather: "Meteorología adversa", severityCritical: "Crítica", severityHigh: "Alta", severityLow: "Baja", severityMedium: "Media", weightRestriction: "Restricción de peso" },
+};
+export function operationalCopy(locale: Locale): OperationalCopy { return operationalCatalogs[locale]; }

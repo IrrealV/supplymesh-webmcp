@@ -26,15 +26,16 @@ export function FilterRail({ locale, scenario }: { locale: Locale; scenario: Ope
         {FilterCategories.map((category) => {
           const Icon = icons[category];
           const label = filterLabel(category, locale);
+          const count = filterCount(category, scenario);
           const isActive = category === "all" ? activeFilters.size === 0 : activeFilters.has(category);
           const activate = (): void => category === "all" ? clearFilters(`filter-${category}`) : toggleFilter(category, `filter-${category}`);
           return (
             <Tooltip.Root key={category}>
               <Tooltip.Trigger asChild>
-                <button aria-label={label} aria-pressed={isActive} className={`filter-control ${isActive ? "filter-control-active" : ""}`} id={`filter-${category}`} onClick={activate} type="button">
+                <button aria-describedby={`filter-${category}-count`} aria-label={label} aria-pressed={isActive} className={`filter-control ${isActive ? "filter-control-active" : ""}`} id={`filter-${category}`} onClick={activate} type="button">
                   <Icon aria-hidden="true" size={19} weight="bold" />
                   {isRailExpanded && <span>{label}</span>}
-                  <b>{filterCount(category, scenario)}</b>
+                  <b id={`filter-${category}-count`}>{count}</b>
                 </button>
               </Tooltip.Trigger>
               <Tooltip.Portal><Tooltip.Content className="rail-tooltip" side="right">{label}<Tooltip.Arrow className="rail-tooltip-arrow" /></Tooltip.Content></Tooltip.Portal>

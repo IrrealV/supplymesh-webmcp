@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { readFileSync } from "node:fs";
@@ -33,8 +33,8 @@ describe("OperationalShell", () => {
     expect(screen.getByRole("button", { name: "Account" })).not.toBeNull();
     expect(screen.getByRole("main")).not.toBeNull();
     expect(screen.getByRole("complementary", { name: "Fleet filters" })).not.toBeNull();
-    expect(screen.getByRole("complementary", { name: "All vehicles" }).getAttribute("data-context-mode")).toBe("overview");
-    expect(screen.getByRole("heading", { name: "All vehicles" })).not.toBeNull();
+    expect(screen.getByRole("complementary", { name: "Operational overview" }).getAttribute("data-context-mode")).toBe("overview");
+    expect(screen.getByRole("heading", { name: "Operational overview" })).not.toBeNull();
     expect(screen.getByTestId("fleet-map")).not.toBeNull();
     expect(screen.queryByText(/LIVE|WebMCP|Agent|Simulation|Chat/i)).toBeNull();
     expect(screen.queryByRole("complementary", { name: /inspection/i })).toBeNull();
@@ -66,6 +66,41 @@ describe("OperationalShell", () => {
 
     expect(useUiCoordinationStore.getState().selection).toEqual({ kind: "none" });
     expect(scenario.vehicles).toHaveLength(15);
+  });
+
+  it("should prioritize inspection then restore filtered results and card focus", async () => {
+    const user = userEvent.setup();
+    render(<OperationalShell locale="en" onLocaleChange={() => undefined} onScenarioChange={() => undefined} operations={createOperationsApi(createZustandScenarioRepository())} scenario={createSpainScenario()} />);
+
+    await user.click(screen.getByRole("button", { name: "Critical" }));
+    const result = screen.getByRole("button", { name: "Select Unit 204" });
+    await user.click(result);
+    expect(screen.getByRole("complementary", { name: "Vehicle inspection" })).not.toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Close inspection" }));
+    expect(screen.getByRole("heading", { name: "Critical" })).not.toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Select Unit 204" }));
+  });
+
+  it("should restore filtered context focus when deletion removes the invoking card", async () => {
+    const user = userEvent.setup();
+    const operations = createOperationsApi(createZustandScenarioRepository());
+    function ScenarioHarness() {
+      const initial = operations.scenarioCurrent();
+      if (!initial.ok) throw new Error("Expected scenario data.");
+      const [scenario, setScenario] = useState(initial.data);
+      return <OperationalShell locale="en" onLocaleChange={() => undefined} onScenarioChange={setScenario} operations={operations} scenario={scenario} />;
+    }
+    render(<ScenarioHarness />);
+
+    await user.click(screen.getByRole("button", { name: "Critical" }));
+    await user.click(screen.getByRole("button", { name: "Select Unit 204" }));
+    await user.click(screen.getByRole("button", { name: "Delete vehicle" }));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Select Unit 204" })).toBeNull());
+    expect(screen.getByRole("heading", { name: "Critical" })).toBe(document.activeElement);
+    expect(useUiCoordinationStore.getState().panelContext.mode).toBe("results");
   });
 
   it("should define the desktop grid, operational tokens, focus, and reduced-motion fallback", () => {

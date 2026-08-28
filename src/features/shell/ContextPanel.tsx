@@ -7,5 +7,5 @@ type ContextPanelProps = {
 };
 
 export function ContextPanel({ children, label, mode }: ContextPanelProps) {
-  return <aside aria-label={label} className="context-panel" data-context-mode={mode}>{children}</aside>;
+  return <aside aria-label={label} className="context-panel" data-context-mode={mode} id="context-panel" tabIndex={-1}>{children}</aside>;
 }

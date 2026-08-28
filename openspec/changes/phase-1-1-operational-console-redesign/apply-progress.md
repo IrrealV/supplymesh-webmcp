@@ -4,8 +4,8 @@
 
 - Mode: Standard; `strict_tdd: false` in `openspec/config.yaml`.
 - Delivery: `auto-chain`, `feature-branch-chain`.
-- Current boundary: Unit 1 `feat(console): coordinate shell` on `feat/phase1-1-shell-coordination`, targeting tracker `feat/phase1-1-operational-console-redesign`.
-- Completed tasks: 1.1–1.3 (3/16). Units 2–5 remain pending.
+- Current boundary: Unit 2 `feat(console): add OR result panels` on `feat/phase1-1-filter-panels`, targeting predecessor `feat/phase1-1-shell-coordination` at `9f1a7a5`.
+- Completed tasks: 1.1–2.3 (6/16). Units 3–5 remain pending.
 - Approved issue: #15. Planning baseline: `9009983`.
 
 ## Immutable Unit 1 Candidate Binding
@@ -76,9 +76,60 @@ Reverting implementation commit `5c0a74b6294852c3389ce0b3a4b3684a642622bd` remov
 - The existing filter rail, map, and inspection are only adapted to consume the new state and fit the shell framework. OR predicates/results remain Unit 2; focus consumption and route/map redesign remain Unit 3.
 - The orchestrator-owned native runtime attempt was not acquired, reset, or settled. Receipt-driven review is off and no review was started.
 
+## Work Unit 2 — OR Result Panels
+
+- [x] 2.1 Pure seven-category predicates, derived counts, All fallback, independent OR toggles, deduplication, exact priority, matching risk reasons/severity, overview, results, cards, rail counts/tooltips, and removable chips.
+- [x] 2.2 ContextPanel overview/results/inspection priority with close focus restoration and deleted-card fallback to the restored results heading.
+- [x] 2.3 One coherent Unit 2 implementation commit boundary with managed desktop runtime proof; final PNG evidence remains Unit 5.
+
+### Unit 2 Candidate Binding
+
+- Immediate predecessor/base: `9f1a7a5278dd6d880b34827d0bd27fafece5118a` (`feat/phase1-1-shell-coordination`).
+- Unit 2 implementation commit: `PENDING-SELF-BINDING`.
+- Candidate tree: `PENDING-SELF-BINDING`.
+- Diff revision: `PENDING-SELF-BINDING`.
+- Evidence revision: `sha256:f61725d19c5847a62be058cf3aceef07bfc2c6d779c11c61087c2c2b3bb26216`.
+- Authored review size: **396 additions + 28 deletions = 424 changed lines**, below the hard 800-line limit.
+- Chain: `feat/phase1-1-filter-panels` targets immediate predecessor `feat/phase1-1-shell-coordination`; tracker remains `feat/phase1-1-operational-console-redesign` for issue #15.
+
+### Unit 2 RED/GREEN Evidence
+
+| Stage | Exact result |
+|---|---|
+| RED | `bun run test -- src/features/fleet/filtering.test.ts src/features/fleet/OperationalOverview.test.tsx src/features/fleet/FilterResults.test.tsx src/features/fleet/FilterRail.test.tsx src/features/shell/OperationalShell.test.tsx` → exit 1; 5 files failed, 5 tests failed, 6 passed. Missing selectors/components, accessible rail counts, overview/results composition, and result selection/restoration were observed. |
+| GREEN | Same command → exit 0; 5 files passed, 15 tests passed. |
+| Direct test typecheck | `bunx tsc --noEmit --skipLibCheck --jsx react-jsx --moduleResolution bundler --module esnext --target esnext --types vitest/globals,node src/features/fleet/filtering.test.ts src/features/fleet/OperationalOverview.test.tsx src/features/fleet/FilterResults.test.tsx src/features/fleet/FilterRail.test.tsx src/features/shell/OperationalShell.test.tsx` → exit 0; no diagnostics. |
+
+### Unit 2 Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Focused test command | Unit 2 GREEN command above → exit 0; 5 files, 15 tests. |
+| Relevant Unit 1 regression | `bun run test -- src/app/state/useUiCoordinationStore.test.ts src/features/shell/OperationalShell.test.tsx src/features/fleet/FilterRail.test.tsx src/features/fleet/filtering.test.ts src/features/fleet/OperationalOverview.test.tsx src/features/fleet/FilterResults.test.tsx src/features/map/FleetMap.test.ts src/features/fleet/VehicleDrawer.test.tsx src/preferences/i18n/catalog.test.ts` → exit 0; 9 files, 32 tests. |
+| Full quality | `bun run check` → exit 0; ESLint and `tsc -b` clean, 13 Vitest files and 47 tests passed, Vite transformed 4,701 modules and built successfully. Existing >500 kB chunk advisory remained non-blocking. |
+| Runtime harness | Managed Vite with `VITE_WEBMCP_LOCAL_BYPASS=true` at `127.0.0.1:4173`; Chromium 1440×900 → PASS. Overview and All=15 were present; Weather produced 3 cards; Weather OR Critical produced 5 unique cards in exact priority; two removable chips rendered; result selection opened inspection and close restored card focus; seven compact controls exposed described counts and tooltip; expanded rail was 232px, panel 388.797px; prohibited chrome and console errors were zero; no PNG was created. Server stopped and port 4173 was free. |
+| Threat matrix | N/A per design; no routing, shell-command, subprocess, VCS automation, executable-classification, or process-integration application boundary changed. |
+| Attempt settlement | Native Unit 2 attempt was already acquired by the orchestrator. Per explicit governance, this executor did not acquire, reset, or settle it. |
+| Rollback boundary | Revert the Unit 2 files listed below. This removes selectors/results/overview/rail presentation, ContextPanel restoration, typed panel copy, tests, CSS, and the minimal OR map-consumption adapter without removing Unit 1 shell/store behavior or touching domain, repository, fixtures/geometry, WebMCP, inspection internals, final evidence, or Phase 2. |
+
+### Exact Unit 2 Rollback Files
+
+- `openspec/changes/phase-1-1-operational-console-redesign/{apply-progress.md,tasks.md}`
+- `src/features/fleet/{filtering,filtering.test,OperationalOverview,OperationalOverview.test,FilterResults,FilterResults.test,VehicleResultCard,FilterRail,FilterRail.test}.ts*`
+- `src/features/shell/{ContextPanel,OperationalShell,OperationalShell.test}.tsx`
+- `src/features/map/FleetMap.tsx` (minimal multi-filter emphasis compatibility adapter only)
+- `src/preferences/i18n/catalog.ts` (typed Unit 2 panel/result copy only)
+- `src/styles.css` (Unit 2 overview/results/chip/card rules only)
+
+### Unit 2 Scope and Compatibility Guard
+
+- `App -> OperationsApi -> ScenarioRepository` remains unchanged; all scenario mutation continues through `OperationsApi`.
+- Exactly four WebMCP tools remain unchanged. No `src/platform/webmcp/**`, domain, repository, fixture geometry, inspection redesign, final screenshot, WebMCP, or Phase 2 file is in the Unit 2 diff.
+- `FleetMap.tsx` only consumes the pure OR selector to preserve multi-filter marker/route emphasis compatibility. Unit 3 still owns route geometry, markers, layers, legend, focus/follow redesign, and its acceptance claims.
+- The first managed harness run exposed an ambiguous Playwright locator shared by a map marker and result card. The harness was scoped to the result-card ID and passed without a production change.
+
 ## Remaining Tasks
 
-- [ ] Unit 2 tasks 2.1–2.3: OR predicates, derived counts/results, overview/results components.
 - [ ] Unit 3 tasks 3.1–3.3: deterministic route geometry and map behavior.
 - [ ] Unit 4 tasks 4.1–4.3: inspection redesign and localization.
 - [ ] Unit 5 tasks 5.1–5.4: full regression, native WebMCP proof, screenshots, and release evidence.

@@ -4,6 +4,7 @@ import { MapContainer, Marker, Polygon, Polyline, TileLayer, useMap, useMapEvent
 import { useUiCoordinationStore } from "../../app/state/useUiCoordinationStore";
 import { getVehicleDisplayName, type OperatingRegion, type Vehicle } from "../../domain/entities";
 import { catalog, interpolate, type Locale } from "../../preferences/i18n/catalog";
+import { selectFilterResults } from "../fleet/filtering";
 import { MapEventCoordinator } from "./MapEventCoordinator";
 import { deriveMapLayers } from "./layers";
 
@@ -43,9 +44,9 @@ export function FleetMap({ locale, scenario }: { locale: Locale; scenario: Opera
   const activeFilters = useUiCoordinationStore((state) => state.activeFilters);
   const selection = useUiCoordinationStore((state) => state.selection);
   const selectVehicle = useUiCoordinationStore((state) => state.selectVehicle);
-  const activeFilter = [...activeFilters][0] ?? "";
   const selectedVehicleId = selection.kind === "vehicle" ? selection.vehicleId : "";
-  const layers = useMemo(() => deriveMapLayers(scenario, activeFilter, selectedVehicleId), [activeFilter, scenario, selectedVehicleId]);
+  const layers = useMemo(() => deriveMapLayers(scenario, "", selectedVehicleId), [scenario, selectedVehicleId]);
+  const matchingVehicleIds = useMemo(() => new Set(selectFilterResults(scenario, activeFilters).map(({ vehicle }) => vehicle.internalId)), [activeFilters, scenario]);
   const coordinator = useMemo(() => new MapEventCoordinator(), []);
   const selectedVehicle = scenario.vehicles.find((vehicle) => vehicle.internalId === selectedVehicleId);
   const copy = catalog(locale);
@@ -57,7 +58,7 @@ export function FleetMap({ locale, scenario }: { locale: Locale; scenario: Opera
         <MapEvents coordinator={coordinator} />
         <MapFocus coordinator={coordinator} selectedVehicle={selectedVehicle} />
         {scenario.routes.map((route) => {
-          const isEmphasized = route.vehicleId === selectedVehicleId || (selectedVehicleId === "" && layers.vehicles.find((entry) => entry.vehicle.internalId === route.vehicleId)?.isEmphasized);
+          const isEmphasized = route.vehicleId === selectedVehicleId || (selectedVehicleId === "" && matchingVehicleIds.has(route.vehicleId));
           return <Polyline key={route.id} pathOptions={{ color: "#0f766e", opacity: isEmphasized ? 0.76 : 0.15, weight: isEmphasized ? 3 : 2 }} positions={route.geometry.geometry.coordinates.map(([longitude, latitude]) => [latitude, longitude])} />;
         })}
         {layers.risks.map(({ risk, isEmphasized }) => {
@@ -69,8 +70,9 @@ export function FleetMap({ locale, scenario }: { locale: Locale; scenario: Opera
           const positions = risk.geometry.geometry.coordinates.map(([longitude, latitude]) => [latitude, longitude] as [number, number]);
           return <Polyline key={risk.id} pathOptions={pathOptions} positions={positions} />;
         })}
-        {layers.vehicles.map(({ vehicle, isEmphasized }) => {
+        {layers.vehicles.map(({ vehicle }) => {
           const [longitude, latitude] = vehicle.position.geometry.coordinates;
+          const isEmphasized = selectedVehicleId === vehicle.internalId || (selectedVehicleId === "" && matchingVehicleIds.has(vehicle.internalId));
           return <Marker eventHandlers={{ click: () => selectVehicle(vehicle.internalId) }} icon={markerIcon(vehicle, isEmphasized, interpolate(copy.selectVehicle, { label: getVehicleDisplayName(vehicle) }))} keyboard={false} key={vehicle.internalId} position={[latitude, longitude]} />;
         })}
       </MapContainer>
