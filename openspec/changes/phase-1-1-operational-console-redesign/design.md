@@ -2,63 +2,72 @@
 
 ## Technical Approach
 
-Redesign presentation/transient coordination; preserve `App -> OperationsApi -> ScenarioRepository`. Scene: a logistics operator uses a desktop/tablet in a bright control room, so navy chrome anchors a light desaturated Spain map and bounded panel. Use 1px dividers, tabular data, semantic colors; no gradients, glass, glow, decorative AI, or new dependency.
+Preserve `App -> OperationsApi -> ScenarioRepository`, UI-only Zustand, exact WebMCP, and approved navy/light operational visuals without gradients/glass/AI decoration. Replace manual corridors with checked-in generation-time ORS HGV output; runtime never contacts ORS.
 
 ## Architecture Decisions
 
 | Option | Tradeoff | Decision and rationale |
 |---|---|---|
-| Targeted redesign vs rewrite | Composition complexity vs contract risk | Preserve domain, API, WebMCP, and UI stack. |
-| UI store vs scenario mutation | Explicit transitions | Store UI only; mutate through `OperationsApi`. |
-| Authored vs runtime routes | Fixture maintenance vs determinism | Check in waypoints; validate with Turf. |
-| Existing stack vs new package | Local code vs dependency growth | Stack meets requirements. |
+| Manual/runtime routing vs fixtures | Quota/review | Choose offline ORS fixtures. |
+| Multiple outputs vs collection | Review/atomicity | One GeoJSON owns all generated data. |
+| Positions vs progress | Computation | `routeId`+`routeProgress` prevents drift. |
+| New libraries vs stack | Local validation | Bun/Turf/Vite/crypto suffice. |
 
-## Visual, Layout, and Interaction Contract
+## Visual and Application Contract
 
-Desktop (`>=1024px`) is `56px` topbar over `64px|232px rail + minmax(0,1fr) map + clamp(336px,27vw,400px) panel`; map stays largest. Topbar has only SupplyMesh, Radix Language (English/Español, no flags), Help, Account (36px); title includes SupplyMesh, never a timestamp. Activation expands the rail; Collapse preserves filters. Modes are Overview, OR Results, selection-priority Inspection. Body is fixed; rail/panel scroll with sticky heading/actions.
+Desktop: `56px` topbar over `64px|232px rail + minmax(0,1fr) map + clamp(336px,27vw,400px) panel`; Overview/Results/Inspection. Tablet (`768–1023px`): `56px + 56px/map`, overlay rail/results, trapped `min(560px,calc(100vw - 32px))` Inspection. Preserve accessibility, reduced motion, topbar/language, sorting, inspection/i18n, Spain map styling, and cancellable follow.
 
-Tablet (`768–1023px`) uses `56px + 56px/map`; expanded rail and overview/results are non-modal edge drawers; Inspection is a trapped `min(560px,calc(100vw - 32px))` dialog. Radix restores focus; desktop close/delete restores its invoker. Order: skip-link, header/nav, filter aside, map/legend, context aside. Focus is 2px blue/2px offset. Opacity/transform transitions last 180ms; reduced motion removes them and map flight.
+UI state retains filters/context/selection/follow/rail/map-focus; React mutations use `OperationsApi` only.
 
-Tokens: chrome `#0B1726/#122338`, panel `#F3F6F7`, ink `#172534`, route `#2563A6`, resting `#4D7C64`, warning `#A66A18`, critical `#B43B3B`, weather `#607B96`. OSM keeps attribution and uses `saturate(.28) contrast(.86) brightness(1.08)`.
+## ORS Generation Boundary
 
-## State and Data Flow
+Add `"routes:generate":"bun run --no-env-file scripts/generate-route-fixtures.ts"`; run `bun run routes:generate`. The entry requires `process.env.ORS_API_KEY`; it never reads/writes `.env`, logs/exposes secrets, or starts HTTP without the key.
 
-`UiCoordinationState` contains immutable `activeFilters: ReadonlySet<FleetFilter>`, `panelContext: {mode:"overview"|"results";returnFocusId:string}`, discriminated `selection`/`follow`, `railState:"compact"|"expanded"`, and `mapFocusTarget:{kind:"none"}|{kind:"vehicle"|"route";vehicleId:string;requestId:number}`. Actions toggle/clear filters, set rail, select/close, cancel/restore follow, focus route, and acknowledge focus; selectors derive mode/matches. Selection preserves context; close/delete restores it.
+`scripts/routes/manifest.ts` exports typed `RouteGenerationManifest={version,routes:[{routeId,origin:{id,coordinates:[lon,lat]},destination:{id,coordinates:[lon,lat]},request:{preference,options}}]}`: stable geometry-affecting configuration, no shape waypoints/alternatives. `scripts/routes/risk-snap-input.ts` holds risk/route IDs and approximate anchors.
 
-Predicates map statuses directly; weather matches `severe-snow`, driving/rest `rest-deadline`, and road issues height/weight/closure. Counts reuse predicates. Results union IDs, deduplicate, then sort critical, needs-attention, any risk, driving, resting, fleet number. Overview cards set one filter; All clears all. Cards show identity fallback, route, localized status/ETA/delay, matching reasons, highest severity.
+`scripts/routes/generator.ts` sequentially POSTs sorted routes to `https://api.openrouteservice.org/v2/directions/driving-hgv/geojson` with `Authorization: <ORS_API_KEY>`, JSON content, `{coordinates:[origin,destination],...request,instructions:false}`, and no alternatives. Honor `Retry-After`; retry 429/5xx thrice with bounded backoff; fail other status/JSON/schema errors. Require one three-plus-point `Feature<LineString>`, finite `[lon,lat]`, 2km endpoint tolerance, Spain bounds, positive summary.
 
-Map starts at `[[35.4,-9.7],[44.3,3.6]]`; states are `idle|programmatic-focus|programmatic-layout`. Selection/route focuses once at zoom 7–8 and enables follow; `invalidateSize` and programmatic moves preserve it. Drag, wheel, zoom-control, pinch, or keyboard cancel before movement; replacement starts new follow.
+Write only `src/scenario/fixtures/generated/spain-hgv.v1.geojson`; top-level `xSupplyMesh` records generated marker, versions, endpoint/profile, UTC `generatedAt`, and `sourceRevision`. Validate all in memory, write/fsync sibling temp, then rename; failure preserves the accepted file.
 
-## Components and File Changes
+### `sourceRevision` Canonical Contract
 
-| Files | Action | Responsibility |
+`sourceRevision` is the 64-character lowercase-hex `sha256(UTF-8(canonicalJSON(payload)))`, where `payload` is exactly `{fixtureSchemaVersion,provider:"openrouteservice",profile:"driving-hgv",manifest:{version,routes},routes}`. `manifest.routes` is sorted by `routeId`; each item contains `routeId`, origin/destination IDs and `[lon,lat]`, and geometry-affecting `preference/options`. Output `routes` is sorted by `routeId`; each item contains `routeId`, accepted LineString coordinates in route order, `{distanceMeters,durationSeconds}`, endpoint ID associations, and snapped point/segment references sorted by stable `riskId`, including start/end coordinate indices and exact coordinates.
+
+Canonical JSON recursively sorts object keys; arrays preserve semantic order except explicitly sorted manifest/output-route/risk-reference collections; UTF-8 has no BOM or insignificant whitespace. Every payload number is finite IEEE-754 at full parsed precision: no rounding. Serialize with ECMAScript `JSON.stringify` shortest round-trippable decimal, normalizing `-0` to `0`; coordinates remain exact and summaries remain ORS meters/seconds. Canonicalization never alters route shape.
+
+Exclude API key/Authorization/headers, raw response, provider timestamps, uncontrolled ORS engine/build metadata, `generatedAt`, prior `sourceRevision`, temp paths, and volatile provenance. `generatedAt` changes only with the hash; unchanged payload/hash performs a byte-for-byte no-op preserving timestamp/file bytes.
+
+Snap point restrictions to vertices and route risks to contiguous segment endpoints. Persist IDs, indices, exact coordinates; validate associations/index equality and reject drift.
+
+## Runtime Contracts and Files
+
+`src/scenario/fixtures/routes/{types,loadRouteFixtures}.ts` defines `RouteFixtureCollection`, `RouteFeature`, `RouteSummary`, `RiskSnap`, and validated static `?raw` loading. Runtime cannot reach scripts, ORS/client/key/fetch.
+
+`Vehicle` retains `routeId`, adds finite `[0,1]` `routeProgress`, and drops seeded position. Turf-based `pointAtRouteProgress()` traverses segment distances: first coordinate at `<=0`, last at `>=1`, otherwise the containing-segment point without rewriting geometry. Missing route, malformed geometry, invalid stored progress, or stale snap throws typed fixture error, never fallback. `spain-v1.ts` derives position/route/risks.
+
+Prior shell/filter/inspection/i18n/map changes remain. Add `scripts/routes/generator.test.ts`, raw typing config, and future `docs/route-fixtures.md` workflow; this phase edits only design.
+
+## Testing and Delivery
+
+Trace 53 scenarios: 16 shell/i18n, 13 map, 14 scenario/generation, 10 inspection. Mock-fetch generator tests cover exact request, failures/retries/redaction/atomicity. Canonical tests prove recursive ordering, volatile-field exclusion, input/coordinate/summary/snap changes alter the hash, and unchanged payload preserves bytes/timestamp. Fixture tests cover provenance/routes/endpoints/progress/snaps/offline load/unchanged geometry. Import/build guards reject ORS/key/fetch from runtime; Playwright allows only token-free OSM tiles after app assets.
+
+Preserve `scenario_current`, `fleet_status`, `vehicle_get`, `vehicle_rename` schemas/single-text `JSON.stringify(DomainResult)` envelopes, shared API, gate/cleanup/dev bypass, and native proof. Preserve exactly six screenshots: desktop overview; expanded Weather affected; selected route/risk; two active filters; tablet filter results; tablet vehicle detail.
+
+Forecast: Unit 1 shell/store; 2 filters/panels; 3A generator/schema/reviewed-fixture/progress/snaps/guards; 3B visual map; 4 inspection/i18n; 5 WebMCP/evidence. 3A MUST pass before 3B; each commit/PR is <800 authored lines and revertible. Feature-chain PRs target tracker/predecessor, never `main`/auto-merge. Abandoned unpublished old Unit 3 is not cherry-picked or delivery history.
+
+## Threat Matrix
+
+| Boundary | Applicability | Reason |
 |---|---|---|
-| `src/app/state/useUiCoordinationStore.ts` | Modify | UI coordination. |
-| `src/features/shell/{OperationalShell,Topbar,ContextPanel}.tsx`, `src/styles.css`, `index.html` | Modify/Create | Grid, modes, semantics, tokens. |
-| `src/features/fleet/{FilterRail,filtering,OperationalOverview,FilterResults,VehicleResultCard,VehicleInspection,formatters}.ts*` | Modify/Create/Rename | Filtering, cards, inspection. |
-| `src/features/map/{FleetMap,layers,MapEventCoordinator,VehicleMarkerLayer,MapLegend}.ts*` | Modify/Create | Viewport, layers, legend. |
-| `src/scenario/geometry.ts`, `src/scenario/fixtures/{spain-v1,spain-route-waypoints}.ts` | Modify/Create | Corridors/guards. |
-| `src/preferences/i18n/{catalog,en,es}.ts`, tests, `e2e/*` | Modify | Copy/acceptance. |
+| Documentation-like paths | N/A | Fixed TypeScript entry; no executable classification. |
+| Git repository selection | N/A | Generator runs no Git command. |
+| Commit state | N/A | No staging/commit automation. |
+| Push state | N/A | No push automation. |
+| PR commands | N/A | No PR command composition. |
 
-`ContextPanel` switches modes; Overview owns cards; Results owns chips/list. Inspection sections: Identity, Route/status, Cargo/specification, Timing, Risks. Locale-aware `Intl` formatters humanize values/fallbacks. Save is disabled when unchanged/invalid, reports localized `status`/`alert`, then refreshes through `OperationsApi`; View on route, Follow, and secondary confirmed Delete remain visible.
+## Migration / Rollback
 
-`VehicleMarkerLayer` creates separate Leaflet truck/label DOM markers with Phosphor SVG, keyboard semantics, status pin, and one-click selection. Selected/matched/normal/muted opacity is `1/1/.78/.28`; z-index is `1000/500/100/0`. Selected corridor is 4px blue, secondary routes 2px slate, affected segments amber/red, closure red dashed, and weather translucent with border/icon/label. Risks associate through symmetric vehicle `riskIds`/`affectedVehicleIds` and route waypoint subsequences. Validation rejects unknown/asymmetric links, out-of-Spain coordinates, endpoint mismatch, and two-point routes over 75km.
-
-## Compatibility and Testing
-
-Preserve `createOperationalTools`, `WebMcpGate`, `webMcpTypes`, and API contracts: `scenario_current`, `fleet_status`, `vehicle_get`, `vehicle_rename`; queries accept only `{}`; get requires only `vehicleId:string(minLength:1)`; rename only `vehicleId,label:string(minLength:1)`; all deny extras. Preserve one `JSON.stringify(DomainResult)` text item, shared outcomes, registration-before-render, AbortController cleanup, production gate, and development-only `VITE_WEBMCP_LOCAL_BYPASS`.
-
-Trace all 47 scenarios: 16 shell/i18n via store/component/a11y/locale E2E; 13 map via predicates/layers/coordinator and pointer/touch E2E; 8 fixture via corridor/association guards; 10 inspection via formatter/component/persistence. Native Chromium `--enable-features=WebMCP` runs without seam/bypass, restores renamed data, aborts registration, stops processes, and proves port cleanup.
-
-Playwright captures four `1440x900` desktop states (overview; expanded Weather affected; selected route/risk; two filters) and two `900x900` tablet states (results; detail), after fonts/tiles settle, with animations disabled. Store PNGs/notes in `docs/evidence/phase1-1/`. Rubric: proportions, state, map legibility, overflow/focus/localization, forbidden decoration; any critical miss blocks review.
-
-## Delivery, Threat Matrix, and Rollback
-
-Work units/commits: shell+store; filters+panels; fixtures+map; inspection+i18n; regressions+evidence. Each stays below 800 authored lines, passes tests, and is revertible; record commands, coverage, screenshots, native receipt, cleanup. Publish issue #15’s branch for review; never auto-merge.
-
-Threat Matrix: N/A — no application-routing, command-shell, subprocess, VCS/PR automation, executable classification, or process-integration boundary changes.
-
-No migration: retain `scenario-overrides:v1`/`locale:v1`; transient state resets. Roll back commits to `d0856b8`. Exclude Phase 2 simulation/movement/random-fleet/country-selection/vehicle-creation/Fleet-Edit-Mode/drag-drop/batch-actions/dynamic-or-live-routing-weather-traffic/backend-database-auth/driver-UI/chat/agent-behavior/rerouting/tools.
+No storage migration; retain existing keys. Roll back 3B before 3A and restore the last reviewed fixture. Regeneration review requires secret injection outside shell history, receipts, provenance/geometry diffs, and clean secret scan. Phase 2 alternatives/assignment/rerouting/live providers/simulation/backend/auth/driver/chat/agent remain excluded.
 
 ## Open Questions
 

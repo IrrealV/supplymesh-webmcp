@@ -1,6 +1,6 @@
 # Delta for Deterministic Fleet Scenario
 
-**Coverage**: 3 MODIFIED requirements; 8 scenarios.
+**Coverage**: 5 requirements (3 MODIFIED, 2 ADDED); 14 scenarios.
 
 ## MODIFIED Requirements
 
@@ -21,7 +21,7 @@ The system MUST model one geography-agnostic `OperatingRegion` configured as a p
 
 ### Requirement: Controlled Operational Data
 
-Each vehicle MUST include a plausible checked-in deterministic multi-point GeoJSON road-corridor route, origin, destination, current route, status, cargo/refrigeration/priority, dimensions/type/weight, driving/rest timing, ETA/delay, and relevant risk. Routes MUST NOT use long-distance two-point geometry or require runtime routing API, provider, secret, weather, or traffic input. Fixtures SHALL cover driving, resting, needs-attention, and critical states.
+Each vehicle MUST include a plausible checked-in deterministic multi-point GeoJSON road-corridor route, origin, destination, current route, status, cargo/refrigeration/priority, dimensions/type/weight, driving/rest timing, ETA/delay, and relevant risk. Each vehicle MUST store a stable `routeId` and bounded normalized `routeProgress`; runtime position MUST be derived deterministically from that route geometry and progress, with progress at or below zero at the origin and at or above one at the destination. Independent arbitrary position data MUST NOT contradict the route. Runtime MUST make zero routing requests and contain no API key, provider client, dynamic alternatives, rerouting, or Phase 2 route assignment. Fixtures SHALL cover driving, resting, needs-attention, and critical states.
 (Previously: Required plausible controlled route and operational fields.)
 
 #### Scenario: Inspect fleet coverage
@@ -39,9 +39,14 @@ Each vehicle MUST include a plausible checked-in deterministic multi-point GeoJS
 - WHEN routes are rendered repeatedly
 - THEN the same plausible multi-point corridors, never long-distance two-point routes, are available without secrets or runtime routing
 
+#### Scenario: Derive a position from route progress
+- GIVEN a vehicle references a fixture route and normalized progress
+- WHEN runtime resolves its current position
+- THEN the position is on that geometry and resolves to its endpoint at each bound
+
 ### Requirement: Static Risk Set
 
-The region MUST include controlled, plausibly corridor-aligned risk segments and markers for a 3.9 m height restriction, 26 t weight restriction, road closure, driving/rest deadline, severe-snow weather zone, and their severity. It MUST expose data sufficient for a route/risk legend and MUST NOT use live provider output.
+The region MUST include controlled, plausibly corridor-aligned risk segments and markers for a 3.9 m height restriction, 26 t weight restriction, road closure, driving/rest deadline, severe-snow weather zone, and their severity. Restriction coordinates and segments MUST snap to actual route polyline points or segments and retain deterministic vehicle associations. It MUST expose data sufficient for a route/risk legend and MUST NOT use live provider output.
 (Previously: Required the named static restrictions, closure, snow polygon, and deadline.)
 
 #### Scenario: Display risk fixtures
@@ -57,4 +62,39 @@ The region MUST include controlled, plausibly corridor-aligned risk segments and
 #### Scenario: Align risk to corridor
 - GIVEN a vehicle has a route risk
 - WHEN its route context is inspected
-- THEN the relevant fixture risk is plausibly associated with that corridor
+- THEN the relevant fixture risk snaps to its polyline point or segment and retains that vehicle association
+
+## ADDED Requirements
+
+### Requirement: Reproducible HGV Route Generation
+
+Route geometry MUST be precalculated by the OpenStreetMap-based openrouteservice `driving-hgv` router; manual, invented, generated interpolation/smoothing, and hand-drawn polylines are prohibited. A reproducible documented Bun/TypeScript generation script MUST use `ORS_API_KEY` only at generation time, send authenticated POST requests to `/v2/directions/driving-hgv/geojson` with `[longitude, latitude]` coordinates, and fail clearly for a missing key or malformed response. Generated fixtures MUST be reviewed, versioned, checked-in GeoJSON with stable route IDs, schema version, profile/source, generated-at/source-data provenance or reproducibility metadata, endpoint association, distance/duration summary, and validated geometry.
+
+#### Scenario: Generate an authenticated HGV route
+- GIVEN `ORS_API_KEY` and valid endpoint coordinates
+- WHEN the documented Bun/TypeScript generator runs
+- THEN it POSTs authenticated `[longitude, latitude]` coordinates to the HGV GeoJSON endpoint
+
+#### Scenario: Reject unusable generation input or output
+- GIVEN a missing `ORS_API_KEY` or malformed mocked router response
+- WHEN generation runs
+- THEN it fails clearly without writing an unvalidated route fixture
+
+#### Scenario: Review generated route fixtures
+- GIVEN generated GeoJSON is proposed for check-in
+- WHEN fixture validation runs
+- THEN every route has required stable identity, provenance, endpoints, summary, and valid geometry
+
+### Requirement: Route Fixture Verification and Documentation
+
+Verification MUST cover fixture schema/provenance, every expected route, non-two-point long geometry, endpoint and plausibility bounds, progress-derived positions, snapped restrictions, deterministic offline runtime loading, mocked generation-time HTTP missing-key/malformed-response failures, absence of runtime provider/network imports, and absence of secrets. Documentation MUST explain the regeneration command, `ORS_API_KEY` generation-only boundary, review expectations, and generated-file marking. Final visual and map tests MUST use only checked-in fixtures.
+
+#### Scenario: Verify runtime and fixture invariants
+- GIVEN checked-in routes and scenario fixtures
+- WHEN the verification suite runs
+- THEN it proves geometry, progress, snapped risks, offline load, all expected routes, no runtime provider/network imports, and no secrets
+
+#### Scenario: Verify generation boundary and evidence
+- GIVEN generation documentation and final map tests
+- WHEN reviewers inspect the workflow
+- THEN mocked generator failures, key boundary, generated-file review, and checked-in-fixture-only evidence are covered
