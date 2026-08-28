@@ -1,6 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useUiCoordinationStore } from "../../app/state/useUiCoordinationStore";
 import { createSpainScenario } from "../../scenario/fixtures/spain-v1";
@@ -9,30 +10,50 @@ import { createZustandScenarioRepository } from "../../scenario/state/createZust
 import { OperationalShell } from "./OperationalShell";
 import { Topbar } from "./Topbar";
 
+const styles = readFileSync("src/styles.css", "utf8");
+
 vi.mock("../map/FleetMap", () => ({ FleetMap: () => <div data-testid="fleet-map" /> }));
 
 function resetUi(): void {
-  useUiCoordinationStore.setState({ activeFilter: "", drawerOpen: false, isRailExpanded: false, isFollowing: false, selectedVehicleId: "" });
+  useUiCoordinationStore.setState(useUiCoordinationStore.getInitialState(), true);
 }
 
 describe("OperationalShell", () => {
   beforeEach(resetUi);
   afterEach(cleanup);
 
-  it("should render only approved topbar chrome without a drawer before selection", async () => {
+  it("should render approved landmarks and overview chrome before selection", async () => {
     const user = userEvent.setup();
     render(<OperationalShell locale="en" onLocaleChange={() => undefined} onScenarioChange={() => undefined} operations={createOperationsApi(createZustandScenarioRepository())} scenario={createSpainScenario()} />);
 
+    const banner = screen.getByRole("banner");
     expect(screen.getByText("SupplyMesh")).not.toBeNull();
+    expect(banner.querySelectorAll("button")).toHaveLength(3);
     expect(screen.getByRole("button", { name: "Help" })).not.toBeNull();
     expect(screen.getByRole("button", { name: "Account" })).not.toBeNull();
-    await user.click(screen.getByRole("button", { name: "Language" }));
-
-    expect(screen.getByText("English")).not.toBeNull();
-    expect(screen.getByText("Español")).not.toBeNull();
+    expect(screen.getByRole("main")).not.toBeNull();
+    expect(screen.getByRole("complementary", { name: "Fleet filters" })).not.toBeNull();
+    expect(screen.getByRole("complementary", { name: "All vehicles" }).getAttribute("data-context-mode")).toBe("overview");
+    expect(screen.getByRole("heading", { name: "All vehicles" })).not.toBeNull();
     expect(screen.getByTestId("fleet-map")).not.toBeNull();
     expect(screen.queryByText(/LIVE|WebMCP|Agent|Simulation|Chat/i)).toBeNull();
     expect(screen.queryByRole("complementary", { name: /inspection/i })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Language" }));
+    expect(screen.getByText("English")).not.toBeNull();
+    expect(screen.getByText("Español")).not.toBeNull();
+  });
+
+  it("should move keyboard focus from the skip link to the map workspace", async () => {
+    const user = userEvent.setup();
+    render(<OperationalShell locale="en" onLocaleChange={() => undefined} onScenarioChange={() => undefined} operations={createOperationsApi(createZustandScenarioRepository())} scenario={createSpainScenario()} />);
+
+    await user.tab();
+    const skipLink = screen.getByRole("link", { name: "Operational map workspace" });
+    expect(document.activeElement).toBe(skipLink);
+
+    await user.click(skipLink);
+    expect(document.activeElement).toBe(screen.getByRole("region", { name: "Operational map workspace" }));
   });
 
   it("should coordinate replacement selection and close without mutating scenario data", () => {
@@ -40,12 +61,19 @@ describe("OperationalShell", () => {
 
     useUiCoordinationStore.getState().selectVehicle("vehicle-001");
     useUiCoordinationStore.getState().selectVehicle("vehicle-002");
-    expect(useUiCoordinationStore.getState().selectedVehicleId).toBe("vehicle-002");
-    useUiCoordinationStore.getState().closeDrawer();
+    expect(useUiCoordinationStore.getState().selection).toEqual({ kind: "vehicle", vehicleId: "vehicle-002" });
+    useUiCoordinationStore.getState().closeSelection();
 
-    expect(useUiCoordinationStore.getState().selectedVehicleId).toBe("");
-    expect(useUiCoordinationStore.getState().drawerOpen).toBe(false);
+    expect(useUiCoordinationStore.getState().selection).toEqual({ kind: "none" });
     expect(scenario.vehicles).toHaveLength(15);
+  });
+
+  it("should define the desktop grid, operational tokens, focus, and reduced-motion fallback", () => {
+    expect(styles).toContain("--chrome: #0b1726");
+    expect(styles).toContain("--panel: #f3f6f7");
+    expect(styles).toContain("grid-template-columns: 64px minmax(0, 1fr) clamp(336px, 27vw, 400px)");
+    expect(styles).toContain("outline: 2px solid var(--focus)");
+    expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
   });
 
   it("should switch the visible language immediately", async () => {

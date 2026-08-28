@@ -40,9 +40,11 @@ function MapEvents({ coordinator }: { coordinator: MapEventCoordinator }) {
 }
 
 export function FleetMap({ locale, scenario }: { locale: Locale; scenario: OperatingRegion }) {
-  const activeFilter = useUiCoordinationStore((state) => state.activeFilter);
-  const selectedVehicleId = useUiCoordinationStore((state) => state.selectedVehicleId);
+  const activeFilters = useUiCoordinationStore((state) => state.activeFilters);
+  const selection = useUiCoordinationStore((state) => state.selection);
   const selectVehicle = useUiCoordinationStore((state) => state.selectVehicle);
+  const activeFilter = [...activeFilters][0] ?? "";
+  const selectedVehicleId = selection.kind === "vehicle" ? selection.vehicleId : "";
   const layers = useMemo(() => deriveMapLayers(scenario, activeFilter, selectedVehicleId), [activeFilter, scenario, selectedVehicleId]);
   const coordinator = useMemo(() => new MapEventCoordinator(), []);
   const selectedVehicle = scenario.vehicles.find((vehicle) => vehicle.internalId === selectedVehicleId);

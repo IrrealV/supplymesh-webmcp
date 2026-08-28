@@ -11,23 +11,27 @@ const icons = {
 } satisfies Record<FilterCategory, typeof Truck>;
 
 export function FilterRail({ locale, scenario }: { locale: Locale; scenario: OperatingRegion }) {
-  const activeFilter = useUiCoordinationStore((state) => state.activeFilter);
-  const isRailExpanded = useUiCoordinationStore((state) => state.isRailExpanded);
+  const activeFilters = useUiCoordinationStore((state) => state.activeFilters);
+  const railState = useUiCoordinationStore((state) => state.railState);
+  const clearFilters = useUiCoordinationStore((state) => state.clearFilters);
   const toggleFilter = useUiCoordinationStore((state) => state.toggleFilter);
-  const collapseRail = useUiCoordinationStore((state) => state.collapseRail);
+  const setRailState = useUiCoordinationStore((state) => state.setRailState);
   const copy = catalog(locale);
+  const isRailExpanded = railState === "expanded";
 
   return (
     <Tooltip.Provider delayDuration={0}>
       <aside aria-label={copy.fleetFilters} className={`filter-rail ${isRailExpanded ? "filter-rail-expanded" : ""}`}>
-        {isRailExpanded && <button aria-label={copy.collapseRail} className="rail-collapse" onClick={collapseRail} type="button"><CaretDoubleLeft aria-hidden="true" size={18} /></button>}
+        {isRailExpanded && <button aria-label={copy.collapseRail} className="rail-collapse" onClick={() => setRailState("compact")} type="button"><CaretDoubleLeft aria-hidden="true" size={18} /></button>}
         {FilterCategories.map((category) => {
           const Icon = icons[category];
           const label = filterLabel(category, locale);
+          const isActive = category === "all" ? activeFilters.size === 0 : activeFilters.has(category);
+          const activate = (): void => category === "all" ? clearFilters(`filter-${category}`) : toggleFilter(category, `filter-${category}`);
           return (
             <Tooltip.Root key={category}>
               <Tooltip.Trigger asChild>
-                <button aria-label={label} aria-pressed={activeFilter === category} className={`filter-control ${activeFilter === category ? "filter-control-active" : ""}`} onClick={() => toggleFilter(category)} type="button">
+                <button aria-label={label} aria-pressed={isActive} className={`filter-control ${isActive ? "filter-control-active" : ""}`} id={`filter-${category}`} onClick={activate} type="button">
                   <Icon aria-hidden="true" size={19} weight="bold" />
                   {isRailExpanded && <span>{label}</span>}
                   <b>{filterCount(category, scenario)}</b>

@@ -21,9 +21,9 @@ Chain strategy: feature-branch-chain
 
 ## Phase 1: Shell and Coordination (Unit 1; depends on baseline)
 
-- [ ] 1.1 Add `src/app/state/useUiCoordinationStore.test.ts` RED tests, then modify `useUiCoordinationStore.ts` for immutable OR-ready filters, panel context, selection/follow, focus requests, and restoration.
-- [ ] 1.2 Modify/create `src/features/shell/{OperationalShell,Topbar,ContextPanel}.tsx`, `src/styles.css`, `index.html`; prove landmarks, topbar-only content, tokens, desktop grid, focus, and reduced motion.
-- [ ] 1.3 Commit Unit 1 with its tests; preserve `App -> OperationsApi -> ScenarioRepository` and exclude all Phase 2 capabilities.
+- [x] 1.1 Add `src/app/state/useUiCoordinationStore.test.ts` RED tests, then modify `useUiCoordinationStore.ts` for immutable OR-ready filters, panel context, selection/follow, focus requests, and restoration.
+- [x] 1.2 Modify/create `src/features/shell/{OperationalShell,Topbar,ContextPanel}.tsx`, `src/styles.css`, `index.html`; prove landmarks, topbar-only content, tokens, desktop grid, focus, and reduced motion.
+- [x] 1.3 Commit Unit 1 with its tests; preserve `App -> OperationsApi -> ScenarioRepository` and exclude all Phase 2 capabilities.
 
 ## Phase 2: Filters and Context Panels (Unit 2; depends on 1)
 
