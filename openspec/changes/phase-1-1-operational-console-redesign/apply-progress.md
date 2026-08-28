@@ -85,9 +85,9 @@ Reverting implementation commit `5c0a74b6294852c3389ce0b3a4b3684a642622bd` remov
 ### Unit 2 Candidate Binding
 
 - Immediate predecessor/base: `9f1a7a5278dd6d880b34827d0bd27fafece5118a` (`feat/phase1-1-shell-coordination`).
-- Unit 2 implementation commit: `PENDING-SELF-BINDING`.
-- Candidate tree: `PENDING-SELF-BINDING`.
-- Diff revision: `PENDING-SELF-BINDING`.
+- Unit 2 implementation commit: `2513c7044ccd246a0601ffe7b4e59666cdc91da7`.
+- Candidate tree: `dea0d735410120d957a02cee3aa60926e16014f2`.
+- Diff revision: `sha256:29b832f41757a59d49a779add2860fd5e89593206255a55d7a948ad33ebce668`.
 - Evidence revision: `sha256:f61725d19c5847a62be058cf3aceef07bfc2c6d779c11c61087c2c2b3bb26216`.
 - Authored review size: **396 additions + 28 deletions = 424 changed lines**, below the hard 800-line limit.
 - Chain: `feat/phase1-1-filter-panels` targets immediate predecessor `feat/phase1-1-shell-coordination`; tracker remains `feat/phase1-1-operational-console-redesign` for issue #15.
