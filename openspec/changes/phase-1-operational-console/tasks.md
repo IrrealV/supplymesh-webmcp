@@ -48,9 +48,9 @@ PRs target `main` and merge sequentially; successor reviews use merged `main`. N
 
 ## Phase 4: Inspection
 
-- [ ] 4.1 Create `src/preferences/i18n/{catalog,en,es,localeStorage}.ts` with complete English/Español copy and independent `locale:v1`.
-- [ ] 4.2 RED/GREEN: create `src/features/fleet/VehicleDrawer.tsx` for complete inspection, localized fallback, shared rename, immediate marker refresh/reload.
-- [ ] 4.3 RED/GREEN: create `src/features/fleet/DeleteVehicleDialog.tsx`; test named consequence, cancel no-op, atomic confirm/UI clear, and `Follow <label>`.
+- [x] 4.1 Create `src/preferences/i18n/{catalog,en,es,localeStorage}.ts` with complete English/Español copy and independent `locale:v1`.
+- [x] 4.2 RED/GREEN: create `src/features/fleet/VehicleDrawer.tsx` for complete inspection, localized fallback, shared rename, immediate marker refresh/reload.
+- [x] 4.3 RED/GREEN: create `src/features/fleet/DeleteVehicleDialog.tsx`; test named consequence, cancel no-op, atomic confirm/UI clear, and `Follow <label>`.
 
 ## Phase 5: WebMCP
 

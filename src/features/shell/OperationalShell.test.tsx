@@ -1,9 +1,13 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useUiCoordinationStore } from "../../app/state/useUiCoordinationStore";
 import { createSpainScenario } from "../../scenario/fixtures/spain-v1";
+import { createOperationsApi } from "../../domain/operations/createOperationsApi";
+import { createZustandScenarioRepository } from "../../scenario/state/createZustandScenarioRepository";
 import { OperationalShell } from "./OperationalShell";
+import { Topbar } from "./Topbar";
 
 vi.mock("../map/FleetMap", () => ({ FleetMap: () => <div data-testid="fleet-map" /> }));
 
@@ -17,7 +21,7 @@ describe("OperationalShell", () => {
 
   it("should render only approved topbar chrome without a drawer before selection", async () => {
     const user = userEvent.setup();
-    render(<OperationalShell scenario={createSpainScenario()} />);
+    render(<OperationalShell locale="en" onLocaleChange={() => undefined} onScenarioChange={() => undefined} operations={createOperationsApi(createZustandScenarioRepository())} scenario={createSpainScenario()} />);
 
     expect(screen.getByText("SupplyMesh")).not.toBeNull();
     expect(screen.getByRole("button", { name: "Help" })).not.toBeNull();
@@ -36,10 +40,23 @@ describe("OperationalShell", () => {
 
     useUiCoordinationStore.getState().selectVehicle("vehicle-001");
     useUiCoordinationStore.getState().selectVehicle("vehicle-002");
+    expect(useUiCoordinationStore.getState().selectedVehicleId).toBe("vehicle-002");
     useUiCoordinationStore.getState().closeDrawer();
 
     expect(useUiCoordinationStore.getState().selectedVehicleId).toBe("");
     expect(useUiCoordinationStore.getState().drawerOpen).toBe(false);
     expect(scenario.vehicles).toHaveLength(15);
+  });
+
+  it("should switch the visible language immediately", async () => {
+    const user = userEvent.setup();
+    function LocalizedTopbar() { const [locale, setLocale] = useState<"en" | "es">("en"); return <Topbar locale={locale} onLocaleChange={setLocale} />; }
+    render(<LocalizedTopbar />);
+
+    await user.click(screen.getByRole("button", { name: "Language" }));
+    await user.click(screen.getByRole("menuitem", { name: "Español" }));
+
+    expect(screen.getByRole("button", { name: "Ayuda" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Idioma" })).not.toBeNull();
   });
 });

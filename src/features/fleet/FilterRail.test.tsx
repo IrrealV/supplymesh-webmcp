@@ -18,7 +18,7 @@ describe("FilterRail", () => {
 
   it("should render seven compact categories with deterministic counts and tooltips", async () => {
     const user = userEvent.setup();
-    render(<FilterRail scenario={scenario} />);
+    render(<FilterRail locale="en" scenario={scenario} />);
 
     const controls = screen.getAllByRole("button");
     await user.hover(controls[1]);
@@ -31,7 +31,7 @@ describe("FilterRail", () => {
 
   it("should expand and toggle the active filter while preserving compact collapse behavior", async () => {
     const user = userEvent.setup();
-    render(<FilterRail scenario={scenario} />);
+    render(<FilterRail locale="en" scenario={scenario} />);
 
     await user.click(screen.getAllByRole("button")[2]);
 

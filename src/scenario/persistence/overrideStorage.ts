@@ -38,7 +38,7 @@ export function saveScenarioOverrides(storage: StorageLike, overrides: ScenarioO
 
 export function browserStorage(): StorageLike {
   try {
-    return globalThis.localStorage;
+    return globalThis.localStorage ?? { getItem: () => null, setItem: () => undefined };
   } catch {
     return { getItem: () => null, setItem: () => undefined };
   }
