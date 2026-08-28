@@ -54,9 +54,9 @@ PRs target `main` and merge sequentially; successor reviews use merged `main`. N
 
 ## Phase 5: WebMCP
 
-- [ ] 5.1 RED: add `src/platform/webmcp/*.test.*`: exact four schemas/JSON envelope, UI/tool query/rename parity, diagnostics, cancellation, retry, unload.
-- [ ] 5.2 GREEN: create `src/platform/webmcp/{webMcpTypes.ts,registerOperationalTools.ts,WebMcpGate.tsx}` with one controller, ready-only mount, accessible Retry gate.
-- [ ] 5.3 Add `production-gate.spec.ts` RED/GREEN proving `import.meta.env.DEV && explicitFlag === "true"` only bypasses development; production remains blocked.
+- [x] 5.1 RED: add `src/platform/webmcp/*.test.*`: exact four schemas/JSON envelope, UI/tool query/rename parity, diagnostics, cancellation, retry, unload.
+- [x] 5.2 GREEN: create `src/platform/webmcp/{webMcpTypes.ts,registerOperationalTools.ts,WebMcpGate.tsx}` with one controller, ready-only mount, accessible Retry gate.
+- [x] 5.3 Add `production-gate.spec.ts` RED/GREEN proving `import.meta.env.DEV && explicitFlag === "true"` only bypasses development; production remains blocked.
 
 ## Phase 6: Delivery
 
