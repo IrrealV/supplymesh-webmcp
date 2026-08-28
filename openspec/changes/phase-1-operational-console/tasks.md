@@ -60,6 +60,6 @@ PRs target `main` and merge sequentially; successor reviews use merged `main`. N
 
 ## Phase 6: Delivery
 
-- [ ] 6.1 Add desktop/tablet `e2e/operational-console.spec.ts`: gate, drawer, filter/follow, rename/reload, locale, deletion, prohibited chrome.
-- [ ] 6.2 Run `bun run lint && bun run typecheck && bun test && bun run build`; record fixture/GeoJSON size and clean `git status`.
-- [ ] 6.3 Check tracked secrets; publish public MIT `supplymesh-webmcp` with `gh`, verify status, and push chain slices.
+- [x] 6.1 Add desktop/tablet `e2e/operational-console.spec.ts`: gate, drawer, filter/follow, rename/reload, locale, deletion, prohibited chrome.
+- [x] 6.2 Run `bun run lint && bun run typecheck && bun test && bun run build`; record fixture/GeoJSON size and clean `git status`.
+- [x] 6.3 Check tracked secrets and private environment; verify public MIT `supplymesh-webmcp`, approved issue #11, and merged chain read-only without publishing or pushing.
