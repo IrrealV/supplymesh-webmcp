@@ -1,0 +1,1 @@
+{"version":1,"relation":{"vehicleId":"vehicle-011","currentRouteId":"route-011","avoidsRiskId":"restriction-height-3.9","alternativeRouteId":"alternative-route-011-clearance-v1"},"avoidance":{"shape":"geodesic-circle","radiusMeters":250,"steps":64}}
