@@ -1,26 +1,67 @@
+import type { MouseEvent } from "react";
 import { useUiCoordinationStore } from "../../app/state/useUiCoordinationStore";
-import type { OperationsApi } from "../../domain/operations/createOperationsApi";
 import type { OperatingRegion } from "../../domain/entities";
-import { catalog, type Locale } from "../../preferences/i18n/catalog";
+import type { OperationsApi } from "../../domain/operations/createOperationsApi";
+import { catalog, operationalCopy, type Locale } from "../../preferences/i18n/catalog";
 import { FilterRail } from "../fleet/FilterRail";
-import { VehicleDrawer } from "../fleet/VehicleDrawer";
+import { FilterResults } from "../fleet/FilterResults";
+import { OperationalOverview } from "../fleet/OperationalOverview";
+import { VehicleInspection } from "../fleet/VehicleInspection";
 import { FleetMap } from "../map/FleetMap";
+import { ContextPanel } from "./ContextPanel";
 import { Topbar } from "./Topbar";
 
-export function OperationalShell({ locale, onLocaleChange, onScenarioChange, operations, scenario }: { locale: Locale; onLocaleChange(locale: Locale): void; onScenarioChange(scenario: OperatingRegion): void; operations: OperationsApi; scenario: OperatingRegion }) {
-  const drawerOpen = useUiCoordinationStore((state) => state.drawerOpen);
-  const isFollowing = useUiCoordinationStore((state) => state.isFollowing);
-  const selectedVehicleId = useUiCoordinationStore((state) => state.selectedVehicleId);
-  const selectedVehicle = scenario.vehicles.find((vehicle) => vehicle.internalId === selectedVehicleId);
+type OperationalShellProps = {
+  locale: Locale;
+  onLocaleChange(locale: Locale): void;
+  onScenarioChange(scenario: OperatingRegion): void;
+  operations: OperationsApi;
+  scenario: OperatingRegion;
+};
+
+export function OperationalShell({ locale, onLocaleChange, onScenarioChange, operations, scenario }: OperationalShellProps) {
+  const follow = useUiCoordinationStore((state) => state.follow);
+  const panelContext = useUiCoordinationStore((state) => state.panelContext);
+  const railState = useUiCoordinationStore((state) => state.railState);
+  const selection = useUiCoordinationStore((state) => state.selection);
+  const selectedVehicle = selection.kind === "vehicle" ? scenario.vehicles.find((vehicle) => vehicle.internalId === selection.vehicleId) : undefined;
   const copy = catalog(locale);
+  const panelCopy = operationalCopy(locale);
+
+  function focusMap(event: MouseEvent<HTMLAnchorElement>): void {
+    event.preventDefault();
+    document.getElementById("operational-map")?.focus();
+  }
+
+  function closeInspection(): void {
+    const returnFocusId = useUiCoordinationStore.getState().closeSelection();
+    requestAnimationFrame(() => (document.getElementById(returnFocusId) ?? document.getElementById("context-panel-heading") ?? document.getElementById("context-panel"))?.focus());
+  }
+
+  function closeResults(): void {
+    const activeFilter = useUiCoordinationStore.getState().activeFilters.values().next().value;
+    const returnFocusId = activeFilter === undefined ? panelContext.returnFocusId : `filter-${activeFilter}`;
+    useUiCoordinationStore.getState().clearFilters(returnFocusId);
+    requestAnimationFrame(() => (document.getElementById(returnFocusId) ?? document.getElementById("context-panel"))?.focus());
+  }
+
   return (
-    <main className="console-shell">
+    <div className="console-shell">
+      <a className="skip-link" href="#operational-map" onClick={focusMap}>{copy.operationalMap}</a>
       <Topbar locale={locale} onLocaleChange={onLocaleChange} />
-      <section aria-label={copy.operationalMap} className="console-workspace">
+      <main className={`console-workspace ${railState === "expanded" ? "rail-is-expanded" : ""}`}>
         <FilterRail locale={locale} scenario={scenario} />
-        <FleetMap locale={locale} scenario={scenario} />
-        {drawerOpen && selectedVehicle !== undefined && <VehicleDrawer isFollowing={isFollowing} key={selectedVehicle.internalId} locale={locale} onClose={() => useUiCoordinationStore.getState().closeDrawer()} onRestoreFollow={() => useUiCoordinationStore.getState().restoreFollow()} onScenarioChange={onScenarioChange} operations={operations} scenario={scenario} vehicle={selectedVehicle} />}
-      </section>
-    </main>
+        <section aria-label={copy.operationalMap} className="map-workspace" id="operational-map" role="region" tabIndex={-1}>
+          <FleetMap locale={locale} scenario={scenario} />
+        </section>
+        {selectedVehicle === undefined ? (
+          <ContextPanel closeLabel={copy.closeResults} label={panelContext.mode === "overview" ? panelCopy.operationalOverview : copy.fleetFilters} mode={panelContext.mode} onClose={closeResults}>
+            {panelContext.mode === "overview" ? <OperationalOverview locale={locale} scenario={scenario} /> : <FilterResults locale={locale} scenario={scenario} />}
+          </ContextPanel>
+        ) : (
+          <VehicleInspection isFollowing={follow.kind === "vehicle" && follow.vehicleId === selectedVehicle.internalId} key={selectedVehicle.internalId} locale={locale} onClose={closeInspection} onRestoreFollow={() => useUiCoordinationStore.getState().restoreFollow()} onScenarioChange={onScenarioChange} onViewRoute={() => useUiCoordinationStore.getState().focusRoute(selectedVehicle.internalId)} operations={operations} scenario={scenario} vehicle={selectedVehicle} />
+        )}
+      </main>
+    </div>
   );
 }

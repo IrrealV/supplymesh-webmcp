@@ -1,20 +1,20 @@
 export class MapEventCoordinator {
-  private isProgrammaticFocus = false;
+  private programmaticChanges = 0;
 
-  beginProgrammaticFocus(): void {
-    this.isProgrammaticFocus = true;
+  beginProgrammaticChange(): void {
+    this.programmaticChanges += 1;
   }
 
-  settleProgrammaticFocus(): void {
-    this.isProgrammaticFocus = false;
+  settleProgrammaticChange(): void {
+    this.programmaticChanges = Math.max(0, this.programmaticChanges - 1);
   }
 
   shouldCancelFollowForViewportMove(): boolean {
-    return !this.isProgrammaticFocus;
+    return this.programmaticChanges === 0;
   }
 
-  shouldCancelFollowForManualInteraction(): boolean {
-    this.isProgrammaticFocus = false;
+  recordManualInteraction(): boolean {
+    this.programmaticChanges = 0;
     return true;
   }
 }

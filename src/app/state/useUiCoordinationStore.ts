@@ -2,31 +2,79 @@ import { create } from "zustand";
 
 export const FilterCategories = ["all", "resting", "needs-attention", "critical", "weather-affected", "driving-rest-risk", "road-restriction-issues"] as const;
 export type FilterCategory = (typeof FilterCategories)[number];
+export type FleetFilter = Exclude<FilterCategory, "all">;
+export type PanelContext = { mode: "overview" | "results"; returnFocusId: string };
+export type Selection = { kind: "none" } | { kind: "vehicle"; vehicleId: string };
+export type Follow = { kind: "none" } | { kind: "vehicle"; vehicleId: string };
+export type MapFocusTarget = { kind: "none" } | { kind: "vehicle" | "route"; requestId: number; vehicleId: string };
+export type RailState = "compact" | "expanded";
 
 type UiCoordinationState = {
-  activeFilter: FilterCategory | "";
-  drawerOpen: boolean;
-  isRailExpanded: boolean;
-  isFollowing: boolean;
-  selectedVehicleId: string;
-  selectVehicle(vehicleId: string): void;
-  closeDrawer(): void;
-  toggleFilter(category: FilterCategory): void;
-  collapseRail(): void;
+  activeFilters: ReadonlySet<FleetFilter>;
+  focusRequestId: number;
+  follow: Follow;
+  mapFocusTarget: MapFocusTarget;
+  panelContext: PanelContext;
+  railState: RailState;
+  selection: Selection;
+  acknowledgeMapFocus(requestId: number): void;
   cancelFollow(): void;
+  clearFilters(returnFocusId: string): void;
+  closeSelection(): string;
+  focusRoute(vehicleId: string): void;
   restoreFollow(): void;
+  selectVehicle(vehicleId: string, returnFocusId?: string): void;
+  setRailState(railState: RailState): void;
+  toggleFilter(filter: FleetFilter, returnFocusId: string): void;
 };
 
-export const useUiCoordinationStore = create<UiCoordinationState>()((set) => ({
-  activeFilter: "",
-  drawerOpen: false,
-  isRailExpanded: false,
-  isFollowing: false,
-  selectedVehicleId: "",
-  selectVehicle: (selectedVehicleId) => set({ selectedVehicleId, drawerOpen: true, isFollowing: true }),
-  closeDrawer: () => set({ selectedVehicleId: "", drawerOpen: false, isFollowing: false }),
-  toggleFilter: (category) => set((state) => ({ activeFilter: state.activeFilter === category ? "" : category, isRailExpanded: true })),
-  collapseRail: () => set({ isRailExpanded: false }),
-  cancelFollow: () => set({ isFollowing: false }),
-  restoreFollow: () => set({ isFollowing: true }),
+const noFollow: Follow = { kind: "none" };
+const noFocus: MapFocusTarget = { kind: "none" };
+const noSelection: Selection = { kind: "none" };
+
+export const useUiCoordinationStore = create<UiCoordinationState>()((set, get) => ({
+  activeFilters: new Set<FleetFilter>(),
+  focusRequestId: 0,
+  follow: noFollow,
+  mapFocusTarget: noFocus,
+  panelContext: { mode: "overview", returnFocusId: "operational-map" },
+  railState: "compact",
+  selection: noSelection,
+  acknowledgeMapFocus: (requestId) => set((state) => state.mapFocusTarget.kind !== "none" && state.mapFocusTarget.requestId === requestId ? { mapFocusTarget: noFocus } : {}),
+  cancelFollow: () => set({ follow: noFollow }),
+  clearFilters: (returnFocusId) => set({ activeFilters: new Set<FleetFilter>(), panelContext: { mode: "overview", returnFocusId } }),
+  closeSelection: () => {
+    const returnFocusId = get().panelContext.returnFocusId;
+    set({ follow: noFollow, mapFocusTarget: noFocus, selection: noSelection });
+    return returnFocusId;
+  },
+  focusRoute: (vehicleId) => set((state) => {
+    const requestId = state.focusRequestId + 1;
+    return { focusRequestId: requestId, mapFocusTarget: { kind: "route", requestId, vehicleId } };
+  }),
+  restoreFollow: () => set((state) => ({ follow: state.selection.kind === "vehicle" ? { kind: "vehicle", vehicleId: state.selection.vehicleId } : noFollow })),
+  selectVehicle: (vehicleId, returnFocusId) => set((state) => {
+    const requestId = state.focusRequestId + 1;
+    return {
+      focusRequestId: requestId,
+      follow: { kind: "vehicle", vehicleId },
+      mapFocusTarget: { kind: "vehicle", requestId, vehicleId },
+      panelContext: { ...state.panelContext, returnFocusId: returnFocusId ?? state.panelContext.returnFocusId },
+      selection: { kind: "vehicle", vehicleId },
+    };
+  }),
+  setRailState: (railState) => set({ railState }),
+  toggleFilter: (filter, returnFocusId) => set((state) => {
+    const activeFilters = new Set(state.activeFilters);
+    if (activeFilters.has(filter)) {
+      activeFilters.delete(filter);
+    } else {
+      activeFilters.add(filter);
+    }
+    return {
+      activeFilters,
+      panelContext: { mode: activeFilters.size === 0 ? "overview" : "results", returnFocusId },
+      railState: "expanded",
+    };
+  }),
 }));
