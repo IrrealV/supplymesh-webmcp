@@ -1,33 +1,42 @@
-# Phase 1.1 visual evidence verdict
+# Phase 1.1 final visual evidence
 
-**Verdict: PASS.** All six images are genuine application output at the required viewports. The correction preserves every fixture coordinate and all 15 truck/label pairs while removing tested label intersections and compacting aggregate risk context.
+**Verdict: PASS.** The six captures are genuine output from the final SupplyMesh application state. They reflect the completed desktop and tablet UI/UX iteration without domain or WebMCP contract changes.
 
 ## Evidence conditions
 
-- Chromium rendered the application, accepted ORS fixtures, and live token-free OpenStreetMap tiles after cleared storage, reduced-motion emulation, font readiness, and visible-tile completion.
-- Desktop images are 1440×900; tablet images are 900×900. No canvas, mockup, background substitute, hidden marker, or image-composited UI was used.
-- Comparison authority is the supplied logistics-console references and Phase 1.1 written brief; composition and hierarchy govern rather than pixel matching.
+- Chromium rendered the production build with cleared storage, reduced-motion emulation, loaded fonts, and completed OpenStreetMap tiles.
+- Desktop captures are 1440×900. Tablet captures are 900×900.
+- The evidence test drives the real filters, vehicle selection, route focus, drawers, and responsive layout. No mockup, canvas replacement, or composited UI image is used.
+- Animations are disabled only while taking deterministic screenshots. The live application retains smooth compositor-based panel motion and selected-vehicle breathing feedback.
 
 ## State comparison
 
-| State | Verdict | Critical comparison |
+| State | Verdict | Final behavior |
 |---|---|---|
-| Desktop overview | PASS | The 56px topbar, compact rail, Spain map, and overview panel retain the reference hierarchy. Fifteen trucks and fifteen opaque labels remain visible; deterministic screen-space placement keeps labels inside the map and clear of labels, trucks, and compact risks. REST+time, `3.9m`, `26t`, closure, and `SNOW` tokens preserve risk meaning without verbose text blocks. |
-| Desktop Weather affected | PASS | Expanded rail and three-card result panel are proportionate. Only severe snow receives matched emphasis; unrelated risks remain compact muted context. All secondary fleet labels stay readable and collision-free without competing with matched trucks. |
-| Desktop selected route/risk | PASS | Unit 204, the plausible Barcelona→Valencia blue corridor, selected REST risk, severe-snow context, and inspection hierarchy remain prominent. Selected risk text expands while aggregate risks stay compact; route geometry is unchanged. |
-| Desktop two filters | PASS | Weather + Critical chips, five deduplicated priority results, and severity badges are explicit. Vehicle labels remain collision-free and risk emphasis follows the active Weather risk category rather than every matched vehicle. |
-| Tablet results | PASS | The contained results dialog, expanded rail, dimmed map, three Weather results, attribution, and close action remain usable with no horizontal overflow. The intentionally narrow map strip is contextual rather than a primary interaction surface. |
-| Tablet detail | PASS | The 560×720 inspection remains viewport-contained and readable. Identity, summary, and risks lead; keyboard/browser scrolling reaches tabs and Actions, verified by Playwright. |
+| Desktop overview | PASS | The 72px operational topbar, compact fleet rail, map-first workspace, and overview cards preserve a clear three-surface hierarchy. All 15 trucks remain visible, while vehicle labels stay hidden at the Spain overview and appear from zoom 7.5 to prevent map clutter. |
+| Desktop weather filter | PASS | The expanded rail and result cards remain proportionate without shrinking the map unnecessarily. Severe weather is shown as a blue translucent dashed affected zone with a snowflake icon, not a textual SNOW token. |
+| Desktop selected route/risk | PASS | Unit 204, its selected corridor, contextual risk detail, and inspection hierarchy remain prominent. Only the selected truck's rest deadline is shown, and the selected marker keeps a stable truck icon with an accessible breathing aura in live motion. |
+| Desktop two filters | PASS | Weather + Critical chips produce five deduplicated priority results with clear severity. Muted and matched map states preserve operational context without exposing overview labels prematurely. |
+| Tablet results | PASS | The 72px compact rail and map remain the primary surface. Filter results open in a dismissible right drawer, the legend stays compact, and the expanded left rail is never left competing with the right panel. |
+| Tablet detail | PASS | Vehicle inspection opens as a contained right drawer over the map-first workspace. Identity, summary, risks, tabs, actions, scrolling, close behavior, and focus restoration remain usable at 900×900. |
 
 ## Cross-state findings
 
-- **Composition/proportions:** desktop and tablet structures match the map-dominant logistics-console brief.
-- **Trucks/labels:** all 15 pairs remain accessible and visible; stable placement prevents label-label, label-truck, and label-risk intersections in required desktop states. Wide offsets can separate a label from its truck, but ordering is deterministic and identity remains explicit.
-- **Routes/risks:** selected road geometry is plausible and unchanged. Compact aggregate tokens plus expanded selected risks provide clear severity and context.
-- **Spain viewport:** Spain remains centered with useful Iberian, southern-France, and North-Africa context.
-- **Panels/filters/density:** cards, chips, result ordering, drawer hierarchy, and muted context support rapid scanning without overflow.
-- **Forbidden decoration:** no gradients, glassmorphism, giant metrics, sparkles, bottom bar, agent/chat chrome, canvas substitution, or Phase 2 controls appear.
+- **Responsive composition:** desktop preserves the full operational workspace; tablet uses a dedicated map-first layout rather than three compressed columns.
+- **Map controls:** zoom controls and the legend move clear of the expanded rail and retain reduced-motion behavior.
+- **Labels:** overview clutter is prevented through zoom-gated visibility; screen-space placement uses the rendered 112×30 label footprint.
+- **Risks:** rest deadlines are contextual to the selected truck, and severe weather uses an icon-led colored area.
+- **Motion:** rail and drawer transitions use compositor-friendly transforms. The selected truck aura expands and contracts symmetrically while the truck remains stable.
+- **Accessibility:** localized controls, semantic drawers, keyboard focus restoration, and reduced-motion fallbacks remain covered.
+- **Scope:** no domain model, scenario contract, WebMCP tool, backend, routing provider, or Phase 2 capability was added.
 
-## Limitations
+## Final verification
 
-Tablet results intentionally prioritize the modal over the map, and tablet detail requires scrolling for tabs/actions. Overview labels may use wider offsets at dense points, but remain deterministic, contained, readable, and fully present.
+- ESLint: passed.
+- TypeScript project build: passed.
+- Vitest: **92/92 passed** across 20 files.
+- Playwright operational and production scenarios: **8/8 passed**.
+- ORS checked-in route verification: passed.
+- Production Vite build: passed.
+- Scope guard: no pending changes under `src/domain` or `src/platform/webmcp`.
+- The existing Vite chunk-size advisory remains non-blocking.
