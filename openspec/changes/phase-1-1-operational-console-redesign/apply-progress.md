@@ -338,3 +338,39 @@ Reverting implementation commit `5c0a74b6294852c3389ce0b3a4b3684a642622bd` remov
 ## Remaining Tasks
 
 - [ ] Unit 5 tasks 5.1–5.4: full regression, native WebMCP proof, screenshots, and release evidence.
+
+## Work Unit 5 — Release Regression and Evidence (Blocked)
+
+- Branch/base: `test/phase1-1-release-evidence` / immediate predecessor `8124f4d3c377cd95c69bf4606259ea6efe31ffc6` (`feat/phase1-1-inspection-i18n`). Feature-branch-chain target remains Unit 4; tracker remains unmerged.
+- Delivery state: partial evidence only. Tasks 5.1–5.4 remain unchecked because native zero-error and critical visual acceptance failed.
+- Source/evidence revision before this cumulative progress update: `sha256:a966cbe4cf2ca9f19a732ae0529414549544f238fa6a7a019222b5686018e992`.
+- Settlement: `native_attempt=already-acquired`; `acquire=NOT_RUN`; `reset=NOT_RUN`; `settle=NOT_RUN`. No review, push, PR, merge, or main modification ran.
+
+### Unit 5 Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Focused tests | `env -u ORS_API_KEY VITE_WEBMCP_LOCAL_BYPASS=false bun run test:e2e -- e2e/operational-console.spec.ts --reporter=line` → exit 0; 7/7 Playwright tests. The suite inventories all 58 scenario names and exercises desktop/tablet filters, context restoration, map/inspection/follow, rename/delete, EN↔ES reload, accessibility/reduced motion, exact four-tool seam parity/cleanup, Phase 2 absence, and six captures. |
+| Component/regression | `env -u ORS_API_KEY bun run test` → exit 0; 19 files, 80 tests. `bun run lint` and `bun run typecheck` → exit 0. Direct E2E/native-script `tsc --noEmit` → exit 0. |
+| Fixture/runtime guard | `env -u ORS_API_KEY bun --no-env-file run routes:verify` → exit 0; 15 routes, 45,577 coordinates, source `16e9952c577cfcc7de3e1cd8bfbc1ea068557c049d5674052b3b1e74fcacc439`; runtime provider boundary clean. ORS fixture/generator and WebMCP production-contract diffs from `8124f4d` are empty. |
+| Production gate/build | `VITE_WEBMCP_LOCAL_BYPASS=true bun run build` → exit 0; 4,714 modules, existing chunk advisory only. Production preview plus `bun run test:e2e -- e2e/production-gate.spec.ts --reporter=line` → exit 0; 1/1, bypass rejected. |
+| Native runtime | `/usr/bin/chromium --enable-features=WebMCP` against the production preview, no seam/polyfill/init script/interception/bypass: registration-before-render, four tools/schemas, fleet query, rename/query/UI parity, structured invalid-label, rename restore, and cleanup 4→0 passed. Final command exited 1 because Chromium emitted one missing `/favicon.ico` resource error; HTTP 404 was independently confirmed. |
+| Visual runtime | Exactly six real PNGs were captured at 1440×900 or 900×900 after storage reset, reduced motion, font readiness, and loaded tiles. Full-resolution inspection verdict: BLOCKED by overlapping/truncated truck and REST/restriction labels in desktop overview and filtered states. Selected route/risk and tablet hierarchy pass with documented limitations. |
+| Rollback boundary | Revert the single eventual Unit 5 evidence commit (or discard this uncommitted slice): E2E specs, native verifier/package script, six PNGs, visual comparison, current readiness docs, and this Unit 5 progress section only. Units 1–4, production behavior, ORS bytes/contracts, WebMCP contracts, Phase 2, tracker, and main remain intact. |
+
+### Screenshot Evidence
+
+| File | Dimensions | Bytes | SHA-256 | Verdict |
+|---|---:|---:|---|---|
+| `desktop-overview.png` | 1440×900 | 756,992 | `5e778fd661fb43654e9927b8df77ba3490f704a7de093fdec0cdb4981782d817` | FAIL: label/risk collisions |
+| `desktop-weather-filter.png` | 1440×900 | 701,464 | `0cba33c3370c3bbcb5b704a2d0b6e243b6c21e3e0ea0768fb328b33ba8b5f762` | FAIL: muted-label text cloud |
+| `desktop-selected-route-risk.png` | 1440×900 | 752,462 | `95afb0ec27234df6e6477003aa44b4f031b6ddbf3a7f7a6e324841cd43b2d023` | PASS |
+| `desktop-two-filters.png` | 1440×900 | 701,139 | `d178324ee224427297b19b126dccf89c62b987077c44a5a191ead2b054c2e2dc` | FAIL: risk/vehicle collisions |
+| `tablet-results.png` | 900×900 | 292,364 | `2a3b3fa560ede32f368fc7ba238721c168522a0989cd1490a67c45f1af38027d` | PASS with map-width limitation |
+| `tablet-detail.png` | 900×900 | 235,674 | `1a075044ee67300f6cadc6e654d6a83bbec0326c52f1195fa83f84773fc88f27` | PASS with below-fold controls |
+
+### Unit 5 Blockers
+
+1. Acceptance-critical visual readability: required overview and filtered map states contain overlapping/truncated truck and risk labels.
+2. Native no-error gate: production preview requests missing `/favicon.ico`, producing one Chromium console error and HTTP 404.
+3. No production correction was made because Unit 5 is evidence-only and the user required blockers to be reported rather than behavior changed.

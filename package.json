@@ -13,7 +13,8 @@
     "preview": "vite preview",
     "routes:generate": "bun run --no-env-file scripts/generate-ors-routes.ts generate",
     "routes:verify": "bun run --no-env-file scripts/generate-ors-routes.ts verify",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "webmcp:verify-native": "bun run scripts/validate-native-webmcp.ts"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

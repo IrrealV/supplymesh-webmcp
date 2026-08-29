@@ -2,7 +2,7 @@
 
 ## Current status
 
-The Phase 1 operational shell is implemented and verified for desktop and tablet layouts.
+The Phase 1 operational shell is implemented and verified for desktop and tablet layouts. Phase 1.1 evidence is active but blocked; the required overview and filtered desktop states do not yet keep all truck and risk labels readable.
 
 ## Current console
 
@@ -13,3 +13,5 @@ The topbar contains only the provisional product name, an `EN` language control 
 The visual language is professional and operational: no gradients, glassmorphism, giant cards, sparkle icons, excessive rounding, decorative metrics, chat, or surveillance framing. The rail categories are all, resting, needs attention, critical, weather affected, driving/rest risk, and road/restriction issues.
 
 Visible and fallback copy resolves through typed locale catalogs. A vehicle drawer appears only after selection; Fleet Edit Mode, vehicle creation, and route assignment remain unavailable Phase 2 capabilities.
+
+The six Phase 1.1 application screenshots and critical verdict are recorded in [`evidence/phase1-1/visual-comparison.md`](evidence/phase1-1/visual-comparison.md). Selected-route, tablet-results, and tablet-detail hierarchy are acceptable; aggregate desktop map density is not.
