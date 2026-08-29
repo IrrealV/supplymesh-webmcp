@@ -52,13 +52,13 @@ Chain strategy: feature-branch-chain
 
 ## Phase 5: Release Regression and Evidence (Unit 5; depends on 4)
 
-- [ ] 5.1 Extend `e2e/operational-console.spec.ts` and `e2e/production-gate.spec.ts` to trace all 58 corrected scenarios, operational/a11y/tablet/reduced-motion flows, gate/lifecycle, exactly four tools/schemas/responses, and Phase 2 absence.
-- [ ] 5.2 Run genuine native Chromium `/usr/bin/chromium --enable-features=WebMCP` with no seam, polyfill, interception, or bypass; prove registration-before-render, rename restore, abort cleanup, stopped processes, and free port 4173.
-- [ ] 5.3 Capture and critically compare: `docs/evidence/phase1-1/desktop-overview.png`, `docs/evidence/phase1-1/desktop-weather-filter.png`, `docs/evidence/phase1-1/desktop-selected-route-risk.png`, `docs/evidence/phase1-1/desktop-two-filters.png`, `docs/evidence/phase1-1/tablet-results.png`, `docs/evidence/phase1-1/tablet-detail.png`; add `docs/evidence/phase1-1/visual-comparison.md` and update only current release-readiness docs.
-- [ ] 5.4 Require `bun run lint`, `bun run typecheck`, `bun run test`, `bun run test:e2e -- e2e/operational-console.spec.ts`, `bun run test:e2e -- e2e/production-gate.spec.ts`, `bun run build`; run tracked-secret/generated-output guards and process/output cleanup before the Unit 5 review PR.
+- [x] 5.1 Extend `e2e/operational-console.spec.ts` and `e2e/production-gate.spec.ts` to trace all 58 corrected scenarios, operational/a11y/tablet/reduced-motion flows, gate/lifecycle, exactly four tools/schemas/responses, and Phase 2 absence.
+- [x] 5.2 Run genuine native Chromium `/usr/bin/chromium --enable-features=WebMCP` with no seam, polyfill, interception, or bypass; prove registration-before-render, rename restore, abort cleanup, stopped processes, and free port 4173.
+- [x] 5.3 Capture and critically compare: `docs/evidence/phase1-1/desktop-overview.png`, `docs/evidence/phase1-1/desktop-weather-filter.png`, `docs/evidence/phase1-1/desktop-selected-route-risk.png`, `docs/evidence/phase1-1/desktop-two-filters.png`, `docs/evidence/phase1-1/tablet-results.png`, `docs/evidence/phase1-1/tablet-detail.png`; add `docs/evidence/phase1-1/visual-comparison.md` and update only current release-readiness docs.
+- [x] 5.4 Require `bun run lint`, `bun run typecheck`, `bun run test`, `bun run test:e2e -- e2e/operational-console.spec.ts`, `bun run test:e2e -- e2e/production-gate.spec.ts`, `bun run build`; run tracked-secret/generated-output guards and process/output cleanup before the Unit 5 review PR.
 
 ## Dependencies and Threat Matrix
 
 `1 -> 2 -> 3A -> 3B -> 4 -> 5`; tests travel with each behavior. Every design threat-matrix row is explicitly N/A, so no threat RED-test task applies. Retain only `scenario_current`, `fleet_status`, `vehicle_get`, and `vehicle_rename`; no new tools or Phase 2 work.
 
-Exactly 15/19 tasks are complete. Unit 5 remains pending.
+Exactly 19/19 tasks are complete. Unit 5 is ready for verification.

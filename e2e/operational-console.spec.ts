@@ -82,6 +82,19 @@ async function capture(page: Page, name: string): Promise<void> {
   await page.screenshot({ animations: "disabled", path: path.join(process.cwd(), "docs/evidence/phase1-1", name) });
 }
 
+async function assertCollisionFreeLabels(page: Page): Promise<void> {
+  await expect.poll(async () => page.evaluate(() => {
+    const roots = [...document.querySelectorAll<HTMLElement>(".fleet-label-icon")];
+    const obstacles = [...document.querySelectorAll<HTMLElement>(".fleet-truck-icon, .risk-marker")];
+    const intersects = (left: DOMRect, right: DOMRect): boolean => left.left < right.right && left.right > right.left && left.top < right.bottom && left.bottom > right.top;
+    const collisions = roots.flatMap((root, index) => {
+      const rect = root.getBoundingClientRect();
+      return [...roots.slice(index + 1), ...obstacles].filter((other) => intersects(rect, other.getBoundingClientRect())).map((other) => `${root.title}|${other.title || other.className}`);
+    });
+    return { collisions, count: roots.length, opaque: roots.every((root) => getComputedStyle(root).opacity === "1"), overflow: roots.some((root) => { const label = root.querySelector<HTMLElement>(".fleet-marker-label")!; return label.scrollWidth > label.clientWidth; }), visible: roots.filter((root) => root.getBoundingClientRect().width > 0).length };
+  })).toEqual({ collisions: [], count: 15, opaque: true, overflow: false, visible: 15 });
+}
+
 test.beforeEach(async ({ page }) => page.emulateMedia({ reducedMotion: "reduce" }));
 
 test("should trace all 58 corrected SDD scenarios", async () => {
@@ -131,8 +144,16 @@ test("should complete the desktop filters, map, inspection, locale, and restorat
   await expect(page.locator(".fleet-truck-icon")).toHaveCount(15);
   await expect(page.locator(".fleet-label-icon")).toHaveCount(15);
   await expect(page.locator(".route-corridor")).toHaveCount(15);
+  await assertCollisionFreeLabels(page);
+  await expect(page.locator(".risk-marker-symbol")).toHaveCount(19);
+  await expect(page.locator(".risk-marker-label:visible")).toHaveCount(0);
+  const panes = await page.evaluate(() => ["risk-tokens", "fleet-trucks", "fleet-labels"].map((name) => Number(getComputedStyle(document.querySelector<HTMLElement>(`.leaflet-${name}-pane`)!).zIndex)));
+  expect(panes).toEqual([620, 640, 660]);
   await expect(page.getByRole("group", { name: "Map legend" }).getByRole("listitem")).toHaveCount(5);
   await page.getByRole("button", { name: "Weather affected" }).click();
+  await assertCollisionFreeLabels(page);
+  await expect(page.locator(".risk-marker.map-layer-matched")).toHaveCount(1);
+  await expect(page.locator(".risk-marker.map-layer-matched.risk-severe-snow")).toHaveCount(1);
   await expect(page.getByRole("heading", { name: "Weather affected" })).toBeVisible();
   await expect(page.locator(".vehicle-result-card")).toHaveCount(3);
   await page.getByRole("button", { name: "Critical" }).click();
@@ -145,6 +166,7 @@ test("should complete the desktop filters, map, inspection, locale, and restorat
   for (const heading of ["Identity", "Operational summary", "Why attention is needed", "Actions"]) await expect(inspection.getByRole("heading", { name: heading })).toBeVisible();
   await expect(page.locator(".route-corridor-selected")).toHaveCount(1);
   await expect(page.locator(".risk-marker.map-layer-selected")).not.toHaveCount(0);
+  await expect(page.locator(".risk-marker.map-layer-selected .risk-marker-label:visible")).not.toHaveCount(0);
   await inspection.getByRole("button", { name: "View on route" }).click();
   await page.locator(".map-frame").dispatchEvent("wheel");
   await expect(inspection.getByRole("button", { name: "Follow Unit 204" })).toBeVisible();
@@ -196,6 +218,9 @@ test("should keep tablet dialogs accessible, contained, and focus-restoring", as
   expect(bounds).not.toBeNull();
   expect(bounds!.x).toBeGreaterThanOrEqual(0);
   expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(900);
+  await inspection.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+  await expect(inspection.getByRole("heading", { name: "Actions" })).toBeVisible();
+  await expect(inspection.getByRole("tablist")).toBeVisible();
   await inspection.getByRole("button", { name: "Close inspection" }).click();
   await expect(results).toBeVisible();
   await expect(results.getByRole("button", { name: "Select Unit 204" })).toBeFocused();
@@ -221,9 +246,11 @@ test("should suppress nonessential motion and exclude prohibited or Phase 2 chro
 test("should capture exactly the six accepted real-application evidence states", async ({ page }) => {
   await installModelContextSeam(page);
   await resetApplication(page, 1440, 900);
+  await assertCollisionFreeLabels(page);
   await capture(page, "desktop-overview.png");
   await resetApplication(page, 1440, 900);
   await page.getByRole("button", { name: "Weather affected" }).click();
+  await assertCollisionFreeLabels(page);
   await capture(page, "desktop-weather-filter.png");
   await resetApplication(page, 1440, 900);
   await selectUnit204(page);
@@ -231,6 +258,7 @@ test("should capture exactly the six accepted real-application evidence states",
   await resetApplication(page, 1440, 900);
   await page.getByRole("button", { name: "Weather affected" }).click();
   await page.getByRole("button", { name: "Critical" }).click();
+  await assertCollisionFreeLabels(page);
   await capture(page, "desktop-two-filters.png");
   await resetApplication(page, 900, 900);
   await page.getByRole("button", { name: "Weather affected" }).click();

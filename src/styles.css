@@ -136,10 +136,13 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
 .status-driving { background: var(--route); } .status-resting { background: var(--resting); } .status-needs-attention { background: var(--warning); } .status-critical { background: var(--critical); }
 .fleet-marker-label { background: rgb(243 246 247 / 92%); border: 1px solid #879aa5; color: #17374e; display: block; font: 650 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; max-width: 104px; overflow: hidden; padding: 4px 5px; text-overflow: ellipsis; white-space: nowrap; }
 .map-layer-muted { opacity: .3; } .map-layer-matched { opacity: 1; } .map-layer-selected { opacity: 1; }
+.fleet-label-icon.map-layer-muted { opacity: 1; }
+.fleet-label-icon.map-layer-muted .fleet-marker-label { background: #edf1f2; border-color: #9ba9b1; color: #5b6d78; }
 .map-layer-selected .fleet-truck-shape, .map-layer-selected .fleet-marker-label { border-color: var(--route); box-shadow: 0 0 0 2px rgb(37 99 166 / 30%); }
 .risk-marker { color: var(--ink); font: 650 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
 .risk-marker-symbol { align-items: center; background: var(--panel); border: 2px solid var(--warning); display: inline-flex; height: 28px; justify-content: center; min-width: 28px; padding: 0 3px; vertical-align: middle; }
 .risk-marker-label { background: rgb(243 246 247 / 92%); border: 1px solid #a9b6bd; display: inline-block; max-width: 92px; overflow: hidden; padding: 5px; text-overflow: ellipsis; vertical-align: middle; }
+.risk-marker:not(.map-layer-selected) .risk-marker-label { display: none; }
 .risk-road-closure .risk-marker-symbol { border-color: var(--critical); color: var(--critical); font-size: 18px; }
 .risk-severe-snow .risk-marker-symbol { border-color: var(--weather); color: #36536c; }
 .risk-rest-deadline .risk-marker-symbol { border-color: #8b5b24; color: #704718; }

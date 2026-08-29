@@ -1,6 +1,6 @@
 import { divIcon, latLngBounds, type LatLngExpression, type Map as LeafletMap } from "leaflet";
 import { Fragment, useEffect, useMemo } from "react";
-import { MapContainer, Marker, Polygon, Polyline, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, Marker, Pane, Polygon, Polyline, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import { useUiCoordinationStore } from "../../app/state/useUiCoordinationStore";
 import type { OperatingRegion, OperationalRisk, RiskSeverity } from "../../domain/entities";
 import { catalog, operationalCopy, type Locale } from "../../preferences/i18n/catalog";
@@ -82,8 +82,8 @@ function riskLabel(risk: OperationalRisk, locale: Locale): string {
 
 function riskIcon(entry: DerivedRisk, locale: Locale) {
   const { risk, state } = entry; const label = escapeHtml(riskLabel(risk, locale));
-  const symbol = risk.kind === "height-restriction" ? `${risk.limitMeters}m` : risk.kind === "weight-restriction" ? `${risk.limitTonnes}t` : risk.kind === "road-closure" ? "×" : risk.kind === "severe-snow" ? "SNOW" : "REST";
-  return divIcon({ className: `risk-marker risk-${risk.kind} map-layer-${state}`, html: `<span class="risk-marker-symbol">${symbol}</span><span class="risk-marker-label">${label}</span>`, iconAnchor: [14, 14], iconSize: [120, 28] });
+  const symbol = risk.kind === "height-restriction" ? `${risk.limitMeters}m` : risk.kind === "weight-restriction" ? `${risk.limitTonnes}t` : risk.kind === "road-closure" ? "×" : risk.kind === "severe-snow" ? "SNOW" : `REST ${risk.deadline?.slice(11, 16) ?? ""}`.trim();
+  return divIcon({ className: `risk-marker risk-${risk.kind} map-layer-${state}`, html: `<span class="risk-marker-symbol">${symbol}</span><span class="risk-marker-label">${label}</span>`, iconAnchor: [14, 14], iconSize: [state === "selected" ? 120 : 64, 28] });
 }
 
 function RiskLayers({ entries, locale }: { entries: readonly DerivedRisk[]; locale: Locale }) {
@@ -93,7 +93,7 @@ function RiskLayers({ entries, locale }: { entries: readonly DerivedRisk[]; loca
     const shape = risk.geometry.geometry.type === "Polygon"
       ? <Polygon pathOptions={pathOptions} positions={risk.geometry.geometry.coordinates[0].map(toPosition)} />
       : <Polyline noClip pathOptions={pathOptions} positions={risk.geometry.geometry.coordinates.map(toPosition)} smoothFactor={0} />;
-    return <Fragment key={risk.id}>{shape}<Marker alt={riskLabel(risk, locale)} icon={riskIcon(entry, locale)} interactive={false} keyboard={false} position={riskPosition(risk)} title={riskLabel(risk, locale)} zIndexOffset={state === "selected" ? 1300 : 500} /></Fragment>;
+    return <Fragment key={risk.id}>{shape}<Marker alt={riskLabel(risk, locale)} icon={riskIcon(entry, locale)} interactive={false} keyboard={false} pane="risk-tokens" position={riskPosition(risk)} title={riskLabel(risk, locale)} zIndexOffset={state === "selected" ? 1300 : 500} /></Fragment>;
   });
 }
 
@@ -119,6 +119,7 @@ export function FleetMap({ locale, scenario }: { locale: Locale; scenario: Opera
   return <div aria-label={copy.currentRoute} className="map-frame" onKeyDown={(event) => { if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "+", "-", "="].includes(event.key)) cancelManualFollow(); }} onPointerDown={cancelManualFollow} onWheel={cancelManualFollow}>
     <MapContainer bounds={SPAIN_BOUNDS} boundsOptions={{ padding: [24, 24] }} className="fleet-map" maxZoom={12} minZoom={5} zoomControl>
       <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+      <Pane name="risk-tokens" style={{ zIndex: 620 }} /><Pane name="fleet-trucks" style={{ zIndex: 640 }} /><Pane name="fleet-labels" style={{ zIndex: 660 }} />
       <MapEvents coordinator={coordinator} /><MapFocus coordinator={coordinator} scenario={scenario} /><MapLayout coordinator={coordinator} signature={layoutSignature} />
       {layers.routes.map((entry) => <Polyline key={entry.route.id} noClip pathOptions={routeStyle(entry)} positions={routePositions(entry.route)} smoothFactor={0} />)}
       <RiskLayers entries={layers.risks} locale={locale} />

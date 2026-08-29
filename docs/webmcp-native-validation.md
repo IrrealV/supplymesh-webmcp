@@ -27,6 +27,6 @@ This validation proves SupplyMesh's native WebMCP registration, execution, state
 
 ## Phase 1.1 candidate status
 
-The 2026-08-29 Unit 5 rerun on `test/phase1-1-release-evidence` again proved registration before console render, exactly four native tools and schemas, query/edit/UI parity, structured `invalid-label`, rename restoration, and unload cleanup from 4 tools to 0. It used `/usr/bin/chromium --enable-features=WebMCP` against the production preview with no seam, polyfill, init script, interception, or bypass.
+The 2026-08-29 Unit 5 correction on `test/phase1-1-release-evidence` proved registration before console render, exactly four native tools and schemas, query/edit/UI parity, structured `invalid-label`, rename restoration, and unload cleanup from 4 tools to 0. It used `/usr/bin/chromium --enable-features=WebMCP` against the production preview with no seam, polyfill, init script, interception, or bypass.
 
-Release evidence remains **BLOCKED** because Chromium emits one console error for missing `/favicon.ico` (confirmed HTTP 404). The test intentionally fails its zero-error assertion; this active-branch result does not replace or invalidate the archived Phase 1 native proof above.
+The explicit SVG favicon removed the prior `/favicon.ico` failure. Native validation completed with zero console/page errors, all processes stopped, and port 4173 free.

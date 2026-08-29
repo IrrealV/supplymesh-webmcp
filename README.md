@@ -4,7 +4,7 @@ SupplyMesh is a provisional name for a deterministic, map-first fleet operations
 
 Final verification verdict: **PASS WITH WARNINGS** — 18/18 requirements, 37/37 scenarios, and 17/17 tasks, with zero blockers or CRITICAL findings. The local WebMCP seam, production capability gate, 32 Vitest tests, 4 Playwright tests, lint, typecheck, and builds passed.
 
-Phase 1.1 release evidence on `test/phase1-1-release-evidence` is **BLOCKED**: functional regression passed, but required overview/filter screenshots contain acceptance-critical map-label collisions, and native Chromium reports a missing `/favicon.ico` resource. The active SDD change remains 15/19 tasks complete; no merge or release is claimed. See [the visual evidence verdict](docs/evidence/phase1-1/visual-comparison.md).
+Phase 1.1 release evidence on `test/phase1-1-release-evidence` is **PASS**: all 58 scenarios, 82 Vitest tests, eight Playwright checks, six reviewed screenshots, and genuine native WebMCP validation passed. The active change is 19/19 tasks complete, but remains an unmerged chained candidate; no merge or release is claimed. See [the visual evidence verdict](docs/evidence/phase1-1/visual-comparison.md).
 
 ## Run locally
 

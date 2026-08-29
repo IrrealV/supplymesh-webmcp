@@ -24,16 +24,18 @@ describe("FleetMap layers", () => {
 
     expect(filtered.vehicles.filter((entry) => entry.state === "matched")).toHaveLength(5);
     expect(filtered.vehicles.filter((entry) => entry.state === "muted")).toHaveLength(10);
+    expect(filtered.risks.filter((entry) => entry.state === "matched").every((entry) => entry.risk.kind === "severe-snow")).toBe(true);
+    expect(filtered.risks.filter((entry) => entry.risk.kind === "rest-deadline").every((entry) => entry.state === "muted")).toBe(true);
     expect(selected.vehicles.find((entry) => entry.state === "selected")?.zIndex).toBeGreaterThan(1000);
     expect(selected.routes.at(-1)?.state).toBe("selected");
     expect(selected.risks.filter((entry) => entry.state === "selected").every((entry) => entry.risk.affectedVehicleIds.includes("vehicle-001"))).toBe(true);
   });
 
   it("should allow only presentation and accepted scenario dependencies in visual map files", () => {
-    const sources = ["FleetMap.tsx", "layers.ts", "VehicleMarkerLayer.tsx", "MapLegend.tsx", "MapEventCoordinator.ts"]
+    const sources = ["FleetMap.tsx", "layers.ts", "VehicleMarkerLayer.tsx", "labelPlacement.ts", "MapLegend.tsx", "MapEventCoordinator.ts"]
       .map((file) => readFileSync(`src/features/map/${file}`, "utf8"))
       .join("\n");
-    const allowedImports = new Set(["leaflet", "react", "react-leaflet", "../../app/state/useUiCoordinationStore", "../../domain/entities", "../../preferences/i18n/catalog", "../fleet/filtering", "./layers", "./MapEventCoordinator", "./MapLegend", "./VehicleMarkerLayer"]);
+    const allowedImports = new Set(["leaflet", "react", "react-leaflet", "../../app/state/useUiCoordinationStore", "../../domain/entities", "../../preferences/i18n/catalog", "../fleet/filtering", "./layers", "./labelPlacement", "./MapEventCoordinator", "./MapLegend", "./VehicleMarkerLayer"]);
     const imports = [...sources.matchAll(/from\s+["']([^"']+)["']/g)].map((match) => match[1]);
     const networkCall = new RegExp(`\\b${["fet", "ch"].join("")}\\s*\\(`);
 
