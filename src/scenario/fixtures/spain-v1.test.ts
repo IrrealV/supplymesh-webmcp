@@ -36,10 +36,12 @@ describe("Spain scenario fixture", () => {
       new Set(["driving", "resting", "needs-attention", "critical"]),
     );
     expect(scenario.routes).toHaveLength(15);
-    expect(scenario.routes.every((route) => route.geometry.geometry.type === "LineString")).toBe(true);
+    expect(scenario.routes.every((route) => route.geometry.geometry.type === "LineString" && route.geometry.geometry.coordinates.length > 2)).toBe(true);
 
     for (const vehicle of scenario.vehicles) {
       expect(vehicle.routeId.length).toBeGreaterThan(0);
+      expect(vehicle.routeProgress).toBeGreaterThanOrEqual(0);
+      expect(vehicle.routeProgress).toBeLessThanOrEqual(1);
       expect(vehicle.origin.name.length).toBeGreaterThan(0);
       expect(vehicle.destination.name.length).toBeGreaterThan(0);
       expect(vehicle.currentRoute.length).toBeGreaterThan(0);
@@ -61,5 +63,17 @@ describe("Spain scenario fixture", () => {
     expect(snow?.geometry.geometry.type).toBe("Polygon");
     expect(snow?.severity).toBe("high");
     expect(deadline?.vehicleId).toBe("vehicle-001");
+  });
+
+  it("derives endpoint positions and keeps risk associations snapped symmetrically", () => {
+    const scenario = createSpainScenario(); const firstRoute = scenario.routes[0]; const lastRoute = scenario.routes.at(-1)!;
+    expect(scenario.vehicles[0].position.geometry.coordinates).toStrictEqual(firstRoute.geometry.geometry.coordinates[0]);
+    expect(scenario.vehicles.at(-1)!.position.geometry.coordinates).toStrictEqual(lastRoute.geometry.geometry.coordinates.at(-1));
+    for (const risk of scenario.risks) for (const snap of risk.routeSnaps ?? []) {
+      const route = scenario.routes.find((candidate) => candidate.id === snap.routeId);
+      expect(route).not.toBeUndefined(); expect(risk.affectedVehicleIds).toContain(route!.vehicleId);
+      expect(route!.geometry.geometry.coordinates[snap.startIndex]).toStrictEqual(snap.startCoordinate);
+      expect(route!.geometry.geometry.coordinates[snap.endIndex]).toStrictEqual(snap.endCoordinate);
+    }
   });
 });
