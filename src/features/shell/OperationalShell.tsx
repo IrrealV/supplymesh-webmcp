@@ -6,7 +6,7 @@ import { catalog, operationalCopy, type Locale } from "../../preferences/i18n/ca
 import { FilterRail } from "../fleet/FilterRail";
 import { FilterResults } from "../fleet/FilterResults";
 import { OperationalOverview } from "../fleet/OperationalOverview";
-import { VehicleDrawer } from "../fleet/VehicleDrawer";
+import { VehicleInspection } from "../fleet/VehicleInspection";
 import { FleetMap } from "../map/FleetMap";
 import { ContextPanel } from "./ContextPanel";
 import { Topbar } from "./Topbar";
@@ -38,6 +38,13 @@ export function OperationalShell({ locale, onLocaleChange, onScenarioChange, ope
     requestAnimationFrame(() => (document.getElementById(returnFocusId) ?? document.getElementById("context-panel-heading") ?? document.getElementById("context-panel"))?.focus());
   }
 
+  function closeResults(): void {
+    const activeFilter = useUiCoordinationStore.getState().activeFilters.values().next().value;
+    const returnFocusId = activeFilter === undefined ? panelContext.returnFocusId : `filter-${activeFilter}`;
+    useUiCoordinationStore.getState().clearFilters(returnFocusId);
+    requestAnimationFrame(() => (document.getElementById(returnFocusId) ?? document.getElementById("context-panel"))?.focus());
+  }
+
   return (
     <div className="console-shell">
       <a className="skip-link" href="#operational-map" onClick={focusMap}>{copy.operationalMap}</a>
@@ -48,11 +55,11 @@ export function OperationalShell({ locale, onLocaleChange, onScenarioChange, ope
           <FleetMap locale={locale} scenario={scenario} />
         </section>
         {selectedVehicle === undefined ? (
-          <ContextPanel label={panelContext.mode === "overview" ? panelCopy.operationalOverview : copy.fleetFilters} mode={panelContext.mode}>
+          <ContextPanel closeLabel={copy.closeResults} label={panelContext.mode === "overview" ? panelCopy.operationalOverview : copy.fleetFilters} mode={panelContext.mode} onClose={closeResults}>
             {panelContext.mode === "overview" ? <OperationalOverview locale={locale} scenario={scenario} /> : <FilterResults locale={locale} scenario={scenario} />}
           </ContextPanel>
         ) : (
-          <VehicleDrawer isFollowing={follow.kind === "vehicle" && follow.vehicleId === selectedVehicle.internalId} key={selectedVehicle.internalId} locale={locale} onClose={closeInspection} onRestoreFollow={() => useUiCoordinationStore.getState().restoreFollow()} onScenarioChange={onScenarioChange} operations={operations} scenario={scenario} vehicle={selectedVehicle} />
+          <VehicleInspection isFollowing={follow.kind === "vehicle" && follow.vehicleId === selectedVehicle.internalId} key={selectedVehicle.internalId} locale={locale} onClose={closeInspection} onRestoreFollow={() => useUiCoordinationStore.getState().restoreFollow()} onScenarioChange={onScenarioChange} onViewRoute={() => useUiCoordinationStore.getState().focusRoute(selectedVehicle.internalId)} operations={operations} scenario={scenario} vehicle={selectedVehicle} />
         )}
       </main>
     </div>

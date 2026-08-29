@@ -9,6 +9,7 @@ vi.mock("react-leaflet", () => ({
   Marker: ({ eventHandlers, icon, title, zIndexOffset }: { eventHandlers: { click(): void }; icon: { options: { html: string } }; title: string; zIndexOffset: number }) => (
     <button aria-label={title} data-html={icon.options.html} data-z-index={zIndexOffset} onClick={eventHandlers.click} type="button" />
   ),
+  useMap: () => ({ getContainer: () => document.createElement("div"), off: vi.fn(), on: vi.fn() }),
 }));
 
 afterEach(cleanup);

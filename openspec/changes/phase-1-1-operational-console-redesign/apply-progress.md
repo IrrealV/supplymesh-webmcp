@@ -4,8 +4,8 @@
 
 - Mode: Standard; `strict_tdd: false` in `openspec/config.yaml`.
 - Delivery: `auto-chain`, `feature-branch-chain`.
-- Current boundary: Unit 3B `feat(map): render accepted route fixtures` on `feat/phase1-1-visual-map`, targeting Unit 3A at `0fcf574`.
-- Completed tasks: 1.1–2.3, 3A.1–3A.3, and 3B.1–3B.3 (12/19). Units 4–5 remain pending.
+- Current boundary: Unit 5 `test(console): prove release evidence` on `test/phase1-1-release-evidence`, targeting Unit 4 at `8124f4d`.
+- Completed tasks: 1.1–5.4 (19/19). No implementation tasks remain; the change stays active, unarchived, unmerged, and pending review.
 - Approved issue: #15. Planning baseline: `9009983`.
 
 ## Immutable Unit 1 Candidate Binding
@@ -277,7 +277,107 @@ Reverting implementation commit `5c0a74b6294852c3389ce0b3a4b3684a642622bd` remov
 - Correction scope: only this cumulative apply-progress artifact changed. Tasks remain 12/19; Unit 4 and Unit 5 remain pending. Production, tests, task checkboxes, Unit 3A protected files, product behavior, WebMCP, and Phase 2 are byte-identical.
 - Settlement: `native_correction_attempt=already-acquired`; `acquire=NOT_RUN`; `reset=NOT_RUN`; `settle=NOT_RUN`. No push, PR, merge, review, or main modification ran.
 
+## Work Unit 4 — Inspection and Localization
+
+- [x] 4.1 Replaced the flat drawer with hierarchical Identity, Operational summary, highlighted attention, keyboard-accessible Vehicle/Cargo/Driver tabs, and Actions; added localized formatters, fallbacks, route focus, follow, saved feedback, and confirmed deletion.
+- [x] 4.2 Added typed English/Spanish inspection copy, locale dates/numbers/units/enums/risks, exact `EN ▾` menu behavior, independent locale persistence, tablet results/detail dialogs, focus restoration, scrolling, and reduced-motion-safe feedback.
+- [x] 4.3 Preserved `OperationsApi` mutation boundaries and completed rename/reload, invalid/corrupt recovery regression, cancel/confirm delete, locale roundtrip, and 900×900 tablet runtime evidence. Unit 5 remains the sole final E2E/screenshot/native proof/docs boundary.
+
+### Unit 4 Candidate and Immutable Evidence
+
+- Immediate predecessor/base: `bacb5c31f28590984a572bf9461df197792b93cf` on `feat/phase1-1-visual-map`; child branch: `feat/phase1-1-inspection-i18n`; child PR target remains Unit 3B.
+- Source/test/style diff revision before SDD bookkeeping: `sha256:e1dbd5459acf60a4f3882eb7180a4e6dc55192da2f63cbf67c3fbb834e9bb3f4`.
+- Deterministic evidence revision: `sha256:ec7972daa602f43e19bbddfbae8fa3c2a2f378a954c1417372cc27ffc6d4fcc0`.
+- Authored implementation scope before SDD bookkeeping: **386 additions + 214 deletions = 600 changed lines**. Commit-wide authored review scope including cumulative SDD updates: **441 additions + 221 deletions = 662 changed lines**, below the hard 800-line limit.
+- Evidence payload: `{"schema":"supplymesh.unit4-evidence/v1","base":"bacb5c31f28590984a572bf9461df197792b93cf","sourceDiff":"sha256:e1dbd5459acf60a4f3882eb7180a4e6dc55192da2f63cbf67c3fbb834e9bb3f4","red":"2 suites failed,0 tests,missing VehicleInspection and formatters","focused":"4 files,21 tests","regression":"18 files,78 tests","full":"19 files,80 tests,4714 modules","routes":"15 routes,45577 coordinates,16e9952c577cfcc7de3e1cd8bfbc1ea068557c049d5674052b3b1e74fcacc439","runtime":{"desktop":true,"localeRoundtrip":true,"tablet900":true,"consoleErrors":0,"pageErrors":0,"screenshots":0},"settlement":{"native":"already-acquired","acquire":"NOT_RUN","reset":"NOT_RUN","settle":"NOT_RUN"}}`.
+
+### Unit 4 RED/GREEN and Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| RED | `env -u ORS_API_KEY bun run test -- src/features/fleet/formatters.test.ts src/features/fleet/VehicleInspection.test.tsx` → exit 1; 2 suites failed, 0 tests collected because `VehicleInspection` and `formatters` were absent. |
+| GREEN / focused | `env -u ORS_API_KEY bun run test -- src/features/fleet/formatters.test.ts src/features/fleet/VehicleInspection.test.tsx src/preferences/i18n/catalog.test.ts src/features/shell/OperationalShell.test.tsx` → exit 0; 4 files, 21 tests. Direct test-file typecheck with `src/vite-env.d.ts` → exit 0, no diagnostics. |
+| Unit 1–3B regression | `env -u ORS_API_KEY bun run test -- src/app/state/useUiCoordinationStore.test.ts src/features/shell/OperationalShell.test.tsx src/features/fleet src/features/map scripts/generate-ors-routes.test.ts src/scenario src/platform/webmcp` → exit 0; 18 files, 78 tests. |
+| Fixture verification | `env -u ORS_API_KEY bun --no-env-file run routes:verify` → exit 0; 15 routes, 45,577 coordinates, source revision `16e9952c577cfcc7de3e1cd8bfbc1ea068557c049d5674052b3b1e74fcacc439`; runtime provider boundary clean. |
+| Full quality | `env -u ORS_API_KEY bun run check` → exit 0; lint/typecheck clean, 19 files/80 tests, 4,714 modules built; existing chunk-size advisory only. |
+| Managed desktop runtime | Key-unset bypass Vite at `127.0.0.1:4173`; temporary Playwright Chromium harness → PASS. Invalid/unchanged Save stayed disabled; valid rename published immediately to inspection/map, showed discreet feedback, and survived reload; humanized route/date/duration/risk comparison/distance and keyboard tabs passed; View on route retained inspection; manual wheel exposed Follow and restoration passed; delete cancel retained inspection, confirm removed vehicle/route and restored filtered heading focus. |
+| Locale runtime | `EN ▾`; keyboard English→Español; all visible overview/inspection labels, status, risks, tabs, dates, and `html lang` changed immediately; Spanish survived reload; click Español→English and English reload passed. `locale:v1` and `scenario-overrides:v1` remained independent; WebMCP gate copy stayed cataloged without storage changes. |
+| Tablet/reduced motion | Chromium 900×900 with reduced motion: results and selected detail were trapped/closable dialogs; detail scroll boundary was `720/1053` client/scroll height; close restored result-card then filter focus; dialog bounds stayed inside viewport; final map was `x=56,y=56,width=844,height=844`; label feedback animation/transition were both `1e-05s`. |
+| Guards / cleanup | Protected ORS generator/manifest/GeoJSON/catalog/runtime/docs/package diff empty; `src/platform/webmcp/**`, `e2e/**`, Phase 2, and PNG diff empty; 0 console errors, 0 page errors, 0 screenshots; temporary harness/log/PID deleted, server stopped, port 4173 free. |
+| Settlement | `native_attempt=already-acquired`; `acquire=NOT_RUN`; `reset=NOT_RUN`; `settle=NOT_RUN`. No push, PR, merge, review, main modification, or attempt lifecycle command ran. |
+| Rollback boundary | Revert the single Unit 4 implementation commit. This removes only the inspection/formatter/tests, typed inspection copy/menu/shell/tablet/CSS integration, and Unit 4 SDD updates listed below; Units 1–3B, ORS bytes, WebMCP, Unit 5, Phase 2, tracker, and main remain intact. |
+
+### Exact Unit 4 Rollback Files
+
+- `openspec/changes/phase-1-1-operational-console-redesign/apply-progress.md`
+- `openspec/changes/phase-1-1-operational-console-redesign/tasks.md`
+- `src/features/fleet/VehicleDrawer.test.tsx` (removed)
+- `src/features/fleet/VehicleDrawer.tsx` (removed)
+- `src/features/fleet/VehicleInspection.test.tsx`
+- `src/features/fleet/VehicleInspection.tsx`
+- `src/features/fleet/formatters.test.ts`
+- `src/features/fleet/formatters.ts`
+- `src/features/shell/ContextPanel.tsx`
+- `src/features/shell/OperationalShell.test.tsx`
+- `src/features/shell/OperationalShell.tsx`
+- `src/features/shell/Topbar.tsx`
+- `src/preferences/i18n/catalog.ts`
+- `src/preferences/i18n/en.ts`
+- `src/preferences/i18n/es.ts`
+- `src/styles.css` (Unit 4 inspection/tablet/motion rules only)
+
+### Unit 4 Gatekeeper Evidence Binding
+
+- Immutable implementation identity: parent `bacb5c31f28590984a572bf9461df197792b93cf`; implementation commit `f25089cc702735ae933750b5af1d066941f39bb4`; implementation tree `479f490c82b872618a6fd9c4c7683cd3539588a0`.
+- Cryptographic binding: commit diff `sha256:a884cc1dce5a8bc775a2c68bf4216d596f523544ce9ca648ca17f98fc000144e`; source/test/style revision `sha256:e1dbd5459acf60a4f3882eb7180a4e6dc55192da2f63cbf67c3fbb834e9bb3f4`; implementation evidence `sha256:ec7972daa602f43e19bbddfbae8fa3c2a2f378a954c1417372cc27ffc6d4fcc0`; **441 additions + 221 deletions = 662 changed lines**, below 800.
+- Exact rollback is `git revert f25089cc702735ae933750b5af1d066941f39bb4`; the expanded sixteen-file rollback list immediately above remains authoritative and bound to the implementation tree and revisions on the preceding line.
+- Deterministic correction evidence revision: `sha256:d85757c72101ef4e26f5577d65c49097c872814c3b58b265eff18ae82183e5cd`.
+- Correction scope: only this cumulative apply-progress artifact changed. Tasks remain 15/19; product, tests, task checkboxes, ORS, WebMCP, E2E, evidence assets, Phase 2, and behavior are byte-identical.
+- Settlement: `native_correction_attempt=already-acquired`; `acquire=NOT_RUN`; `reset=NOT_RUN`; `settle=NOT_RUN`. No push, PR, merge, review, or main modification ran.
+
+## Work Unit 5 — Corrected Release Regression and Evidence
+
+- Branch/correction parent: `test/phase1-1-release-evidence` / `031d2bb9e0ef7b4c3b13547eedff89669fa47eb3`; child target remains Unit 4 and tracker remains unmerged.
+- [x] 5.1–5.4 complete; cumulative task state is 19/19.
+- `remediates_evidence_revision=sha256:a966cbe4cf2ca9f19a732ae0529414549544f238fa6a7a019222b5686018e992`.
+- Corrective evidence revision before this cumulative progress update: `sha256:addf2e30f8bbe75cb09cec23fa875020648476d5841ecef6a1bb12e0f544f156`.
+- Settlement: `native_correction_attempt=already-acquired`; `acquire=NOT_RUN`; `reset=NOT_RUN`; `settle=NOT_RUN`. No review, push, PR, merge, or main modification ran.
+
+### Immutable Unit 5 Evidence Binding
+
+- Initial evidence commit/tree: `031d2bb9e0ef7b4c3b13547eedff89669fa47eb3` / `0276e0d7c76402f8a0dce4e4742f9778f787bcb1`; failed evidence `sha256:a966cbe4cf2ca9f19a732ae0529414549544f238fa6a7a019222b5686018e992`; **403 additions + 62 deletions = 465 changed lines**, below 800.
+- Initial diagnosis: required desktop overview/Weather/two-filter evidence had vehicle/risk label collisions, and native production preview emitted a missing-favicon console error.
+- Corrective parent/commit/final tree: `031d2bb9e0ef7b4c3b13547eedff89669fa47eb3` / `f55683ea50bbca3f6eddb0d462996e44c7f3950b` / `f7dda6bf14725d8c070a3d3c9724a3383decaa62`.
+- Corrective diff/passing evidence: `sha256:1c4d90e87222183bd7133ae4636229d77c9696d7a1b279756c5b9630d15d46b0` / `sha256:addf2e30f8bbe75cb09cec23fa875020648476d5841ecef6a1bb12e0f544f156`; **187 additions + 75 deletions = 262 changed lines**, below the hard 400-line correction budget.
+- Remediation: passing evidence explicitly remediates `sha256:a966cbe4cf2ca9f19a732ae0529414549544f238fa6a7a019222b5686018e992`.
+- Deterministic binding evidence revision: `sha256:9a2b6b6cdf77a6171f490a8c80489eebfd1cf677bfe014daa785236dbba18c73` (`supplymesh.unit5-evidence-binding/v1`).
+- Exact rollback, correction only: `git revert f55683ea50bbca3f6eddb0d462996e44c7f3950b`.
+- Exact rollback, full Unit 5: revert `f55683ea50bbca3f6eddb0d462996e44c7f3950b` first, then `031d2bb9e0ef7b4c3b13547eedff89669fa47eb3`.
+- Binding scope: only cumulative apply-progress changed; product, tests, screenshots, visual report, readiness docs, task checkboxes, ORS/WebMCP, behavior, Phase 2, tracker, and main are byte-identical.
+
+### Unit 5 Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Focused tests | RED: placement module missing and risk relevance failed. GREEN: `bun run test -- src/features/map/labelPlacement.test.ts src/features/map/FleetMap.test.ts src/features/map/VehicleMarkerLayer.test.tsx` → exit 0; 3 files/6 tests. Operational Playwright → exit 0; 7/7 with collision geometry, 58-scenario inventory, tablet scroll/actions, WebMCP parity, and six captures. |
+| Component/regression | `env -u ORS_API_KEY bun run test` → exit 0; 20 files/82 tests. Lint, typecheck, direct E2E/native-script typecheck → exit 0. |
+| Fixture/runtime guard | `env -u ORS_API_KEY bun --no-env-file run routes:verify` → exit 0; 15 routes, 45,577 coordinates, source `16e9952c577cfcc7de3e1cd8bfbc1ea068557c049d5674052b3b1e74fcacc439`; runtime provider boundary clean. ORS fixture/generator and WebMCP production-contract diffs from `8124f4d` are empty. |
+| Production gate/build | Build → exit 0; 4,715 modules. Production gate → exit 0; 1/1, explicit favicon 200 and bypass rejected. |
+| Native runtime | Genuine Chromium 151 with `--enable-features=WebMCP`, no seam/polyfill/init/interception/bypass → exit 0; registration-before-render, four tools/schemas, query/edit/UI parity, structured invalid-label, rename restore, cleanup 4→0, zero console/page errors. |
+| Visual runtime | Six real PNGs recaptured and inspected at full resolution. Overview, Weather, selected route/risk, two filters, tablet results, and tablet detail all PASS; 15 labels remain visible and tested collision-free, selected geometry unchanged, tabs/actions reachable by scroll. |
+| Rollback boundary | Revert the single correction commit: placement source/tests, bounded map/layer/CSS changes, favicon, E2E assertions, six replacement PNGs, readiness docs, tasks, and this correction evidence. Prior Unit 5 evidence, Units 1–4, ORS bytes/contracts, WebMCP contracts, Phase 2, tracker, and main remain intact. |
+
+### Screenshot Evidence
+
+| File | Dimensions | Bytes | SHA-256 | Verdict |
+|---|---:|---:|---|---|
+| `desktop-overview.png` | 1440×900 | 749,955 | `ed658a06b9b58634e686e370c9b387ba881280688814f72bc38d8157c071de5a` | PASS |
+| `desktop-weather-filter.png` | 1440×900 | 668,766 | `aaf209887f4342486522ae216397820d18a7c57fb5171e5bb6e37b2af85c6c3e` | PASS |
+| `desktop-selected-route-risk.png` | 1440×900 | 723,764 | `137a926f1ece889b81c15837e45c9ef06639e76e92801c5db01fa6450517e707` | PASS |
+| `desktop-two-filters.png` | 1440×900 | 680,956 | `6432b98154f1af7a28f31d4421226ecc28e39113dc2681688d738229c6cadfd3` | PASS |
+| `tablet-results.png` | 900×900 | 285,602 | `74b4779ac682cdd23233b403c2092468605f17ceb604d5f5d6624895134231dd` | PASS |
+| `tablet-detail.png` | 900×900 | 231,870 | `3ce0b2a0194c0f79ced7906b97fe9ecd7d98dfb650120d4611a5af6cb5a7ac8d` | PASS |
+
 ## Remaining Tasks
 
-- [ ] Unit 4 tasks 4.1–4.3: inspection redesign and localization.
-- [ ] Unit 5 tasks 5.1–5.4: full regression, native WebMCP proof, screenshots, and release evidence.
+None. Ready for SDD verification; archive remains premature.
