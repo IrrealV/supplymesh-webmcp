@@ -19,7 +19,7 @@ function clone<T>(value: T): T { return structuredClone(value); }
 describe("clearance alternative generator", () => {
   it("should keep fixed identities and retry one candidate with the exact closed polygon", async () => {
     const bodies: string[] = []; const sleeps: number[] = []; const responses = [new Response(null, { status: 429 }), response()];
-    const fetcher = vi.fn<typeof fetch>(async (_input, init = {}) => { bodies.push(String(init.body)); return responses.shift()!; });
+    const fetcher = vi.fn<typeof fetch>(async (_input, init: RequestInit = {}) => { bodies.push(String(init.body)); return responses.shift()!; });
     const path = await outputPath(); const result = await generateClearanceAlternative({ apiKey, currentFixture, fetcher, outputPath: path, sleep: async (milliseconds) => { sleeps.push(milliseconds); } });
     const body = JSON.parse(bodies[0]) as Record<string, unknown>; const polygon = buildAvoidPolygon(); const fixture = JSON.parse(await readFile(path, "utf8")) as { features: Array<{ properties: { relation: Record<string, string> } }> };
     expect(bodies).toStrictEqual([bodies[0], bodies[0]]); expect(sleeps).toStrictEqual([250]);
