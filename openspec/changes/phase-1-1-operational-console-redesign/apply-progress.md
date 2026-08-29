@@ -4,8 +4,8 @@
 
 - Mode: Standard; `strict_tdd: false` in `openspec/config.yaml`.
 - Delivery: `auto-chain`, `feature-branch-chain`.
-- Current boundary: Unit 4 `feat(inspection): localize operational detail` on `feat/phase1-1-inspection-i18n`, targeting Unit 3B at `bacb5c3`.
-- Completed tasks: 1.1–2.3, 3A.1–3A.3, 3B.1–3B.3, and 4.1–4.3 (15/19). Unit 5 remains pending.
+- Current boundary: Unit 5 `test(console): prove release evidence` on `test/phase1-1-release-evidence`, targeting Unit 4 at `8124f4d`.
+- Completed tasks: 1.1–5.4 (19/19). No implementation tasks remain; the change stays active, unarchived, unmerged, and pending review.
 - Approved issue: #15. Planning baseline: `9009983`.
 
 ## Immutable Unit 1 Candidate Binding
@@ -342,6 +342,18 @@ Reverting implementation commit `5c0a74b6294852c3389ce0b3a4b3684a642622bd` remov
 - `remediates_evidence_revision=sha256:a966cbe4cf2ca9f19a732ae0529414549544f238fa6a7a019222b5686018e992`.
 - Corrective evidence revision before this cumulative progress update: `sha256:addf2e30f8bbe75cb09cec23fa875020648476d5841ecef6a1bb12e0f544f156`.
 - Settlement: `native_correction_attempt=already-acquired`; `acquire=NOT_RUN`; `reset=NOT_RUN`; `settle=NOT_RUN`. No review, push, PR, merge, or main modification ran.
+
+### Immutable Unit 5 Evidence Binding
+
+- Initial evidence commit/tree: `031d2bb9e0ef7b4c3b13547eedff89669fa47eb3` / `0276e0d7c76402f8a0dce4e4742f9778f787bcb1`; failed evidence `sha256:a966cbe4cf2ca9f19a732ae0529414549544f238fa6a7a019222b5686018e992`; **403 additions + 62 deletions = 465 changed lines**, below 800.
+- Initial diagnosis: required desktop overview/Weather/two-filter evidence had vehicle/risk label collisions, and native production preview emitted a missing-favicon console error.
+- Corrective parent/commit/final tree: `031d2bb9e0ef7b4c3b13547eedff89669fa47eb3` / `f55683ea50bbca3f6eddb0d462996e44c7f3950b` / `f7dda6bf14725d8c070a3d3c9724a3383decaa62`.
+- Corrective diff/passing evidence: `sha256:1c4d90e87222183bd7133ae4636229d77c9696d7a1b279756c5b9630d15d46b0` / `sha256:addf2e30f8bbe75cb09cec23fa875020648476d5841ecef6a1bb12e0f544f156`; **187 additions + 75 deletions = 262 changed lines**, below the hard 400-line correction budget.
+- Remediation: passing evidence explicitly remediates `sha256:a966cbe4cf2ca9f19a732ae0529414549544f238fa6a7a019222b5686018e992`.
+- Deterministic binding evidence revision: `sha256:9a2b6b6cdf77a6171f490a8c80489eebfd1cf677bfe014daa785236dbba18c73` (`supplymesh.unit5-evidence-binding/v1`).
+- Exact rollback, correction only: `git revert f55683ea50bbca3f6eddb0d462996e44c7f3950b`.
+- Exact rollback, full Unit 5: revert `f55683ea50bbca3f6eddb0d462996e44c7f3950b` first, then `031d2bb9e0ef7b4c3b13547eedff89669fa47eb3`.
+- Binding scope: only cumulative apply-progress changed; product, tests, screenshots, visual report, readiness docs, task checkboxes, ORS/WebMCP, behavior, Phase 2, tracker, and main are byte-identical.
 
 ### Unit 5 Work Unit Evidence
 
