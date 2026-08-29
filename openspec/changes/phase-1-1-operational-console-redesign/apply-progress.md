@@ -4,8 +4,8 @@
 
 - Mode: Standard; `strict_tdd: false` in `openspec/config.yaml`.
 - Delivery: `auto-chain`, `feature-branch-chain`.
-- Current boundary: Unit 3B `feat(map): render accepted route fixtures` on `feat/phase1-1-visual-map`, targeting Unit 3A at `0fcf574`.
-- Completed tasks: 1.1–2.3, 3A.1–3A.3, and 3B.1–3B.3 (12/19). Units 4–5 remain pending.
+- Current boundary: Unit 4 `feat(inspection): localize operational detail` on `feat/phase1-1-inspection-i18n`, targeting Unit 3B at `bacb5c3`.
+- Completed tasks: 1.1–2.3, 3A.1–3A.3, 3B.1–3B.3, and 4.1–4.3 (15/19). Unit 5 remains pending.
 - Approved issue: #15. Planning baseline: `9009983`.
 
 ## Immutable Unit 1 Candidate Binding
@@ -277,7 +277,55 @@ Reverting implementation commit `5c0a74b6294852c3389ce0b3a4b3684a642622bd` remov
 - Correction scope: only this cumulative apply-progress artifact changed. Tasks remain 12/19; Unit 4 and Unit 5 remain pending. Production, tests, task checkboxes, Unit 3A protected files, product behavior, WebMCP, and Phase 2 are byte-identical.
 - Settlement: `native_correction_attempt=already-acquired`; `acquire=NOT_RUN`; `reset=NOT_RUN`; `settle=NOT_RUN`. No push, PR, merge, review, or main modification ran.
 
+## Work Unit 4 — Inspection and Localization
+
+- [x] 4.1 Replaced the flat drawer with hierarchical Identity, Operational summary, highlighted attention, keyboard-accessible Vehicle/Cargo/Driver tabs, and Actions; added localized formatters, fallbacks, route focus, follow, saved feedback, and confirmed deletion.
+- [x] 4.2 Added typed English/Spanish inspection copy, locale dates/numbers/units/enums/risks, exact `EN ▾` menu behavior, independent locale persistence, tablet results/detail dialogs, focus restoration, scrolling, and reduced-motion-safe feedback.
+- [x] 4.3 Preserved `OperationsApi` mutation boundaries and completed rename/reload, invalid/corrupt recovery regression, cancel/confirm delete, locale roundtrip, and 900×900 tablet runtime evidence. Unit 5 remains the sole final E2E/screenshot/native proof/docs boundary.
+
+### Unit 4 Candidate and Immutable Evidence
+
+- Immediate predecessor/base: `bacb5c31f28590984a572bf9461df197792b93cf` on `feat/phase1-1-visual-map`; child branch: `feat/phase1-1-inspection-i18n`; child PR target remains Unit 3B.
+- Source/test/style diff revision before SDD bookkeeping: `sha256:e1dbd5459acf60a4f3882eb7180a4e6dc55192da2f63cbf67c3fbb834e9bb3f4`.
+- Deterministic evidence revision: `sha256:ec7972daa602f43e19bbddfbae8fa3c2a2f378a954c1417372cc27ffc6d4fcc0`.
+- Authored implementation scope before SDD bookkeeping: **386 additions + 214 deletions = 600 changed lines**. Commit-wide authored review scope including cumulative SDD updates: **441 additions + 221 deletions = 662 changed lines**, below the hard 800-line limit.
+- Evidence payload: `{"schema":"supplymesh.unit4-evidence/v1","base":"bacb5c31f28590984a572bf9461df197792b93cf","sourceDiff":"sha256:e1dbd5459acf60a4f3882eb7180a4e6dc55192da2f63cbf67c3fbb834e9bb3f4","red":"2 suites failed,0 tests,missing VehicleInspection and formatters","focused":"4 files,21 tests","regression":"18 files,78 tests","full":"19 files,80 tests,4714 modules","routes":"15 routes,45577 coordinates,16e9952c577cfcc7de3e1cd8bfbc1ea068557c049d5674052b3b1e74fcacc439","runtime":{"desktop":true,"localeRoundtrip":true,"tablet900":true,"consoleErrors":0,"pageErrors":0,"screenshots":0},"settlement":{"native":"already-acquired","acquire":"NOT_RUN","reset":"NOT_RUN","settle":"NOT_RUN"}}`.
+
+### Unit 4 RED/GREEN and Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| RED | `env -u ORS_API_KEY bun run test -- src/features/fleet/formatters.test.ts src/features/fleet/VehicleInspection.test.tsx` → exit 1; 2 suites failed, 0 tests collected because `VehicleInspection` and `formatters` were absent. |
+| GREEN / focused | `env -u ORS_API_KEY bun run test -- src/features/fleet/formatters.test.ts src/features/fleet/VehicleInspection.test.tsx src/preferences/i18n/catalog.test.ts src/features/shell/OperationalShell.test.tsx` → exit 0; 4 files, 21 tests. Direct test-file typecheck with `src/vite-env.d.ts` → exit 0, no diagnostics. |
+| Unit 1–3B regression | `env -u ORS_API_KEY bun run test -- src/app/state/useUiCoordinationStore.test.ts src/features/shell/OperationalShell.test.tsx src/features/fleet src/features/map scripts/generate-ors-routes.test.ts src/scenario src/platform/webmcp` → exit 0; 18 files, 78 tests. |
+| Fixture verification | `env -u ORS_API_KEY bun --no-env-file run routes:verify` → exit 0; 15 routes, 45,577 coordinates, source revision `16e9952c577cfcc7de3e1cd8bfbc1ea068557c049d5674052b3b1e74fcacc439`; runtime provider boundary clean. |
+| Full quality | `env -u ORS_API_KEY bun run check` → exit 0; lint/typecheck clean, 19 files/80 tests, 4,714 modules built; existing chunk-size advisory only. |
+| Managed desktop runtime | Key-unset bypass Vite at `127.0.0.1:4173`; temporary Playwright Chromium harness → PASS. Invalid/unchanged Save stayed disabled; valid rename published immediately to inspection/map, showed discreet feedback, and survived reload; humanized route/date/duration/risk comparison/distance and keyboard tabs passed; View on route retained inspection; manual wheel exposed Follow and restoration passed; delete cancel retained inspection, confirm removed vehicle/route and restored filtered heading focus. |
+| Locale runtime | `EN ▾`; keyboard English→Español; all visible overview/inspection labels, status, risks, tabs, dates, and `html lang` changed immediately; Spanish survived reload; click Español→English and English reload passed. `locale:v1` and `scenario-overrides:v1` remained independent; WebMCP gate copy stayed cataloged without storage changes. |
+| Tablet/reduced motion | Chromium 900×900 with reduced motion: results and selected detail were trapped/closable dialogs; detail scroll boundary was `720/1053` client/scroll height; close restored result-card then filter focus; dialog bounds stayed inside viewport; final map was `x=56,y=56,width=844,height=844`; label feedback animation/transition were both `1e-05s`. |
+| Guards / cleanup | Protected ORS generator/manifest/GeoJSON/catalog/runtime/docs/package diff empty; `src/platform/webmcp/**`, `e2e/**`, Phase 2, and PNG diff empty; 0 console errors, 0 page errors, 0 screenshots; temporary harness/log/PID deleted, server stopped, port 4173 free. |
+| Settlement | `native_attempt=already-acquired`; `acquire=NOT_RUN`; `reset=NOT_RUN`; `settle=NOT_RUN`. No push, PR, merge, review, main modification, or attempt lifecycle command ran. |
+| Rollback boundary | Revert the single Unit 4 implementation commit. This removes only the inspection/formatter/tests, typed inspection copy/menu/shell/tablet/CSS integration, and Unit 4 SDD updates listed below; Units 1–3B, ORS bytes, WebMCP, Unit 5, Phase 2, tracker, and main remain intact. |
+
+### Exact Unit 4 Rollback Files
+
+- `openspec/changes/phase-1-1-operational-console-redesign/apply-progress.md`
+- `openspec/changes/phase-1-1-operational-console-redesign/tasks.md`
+- `src/features/fleet/VehicleDrawer.test.tsx` (removed)
+- `src/features/fleet/VehicleDrawer.tsx` (removed)
+- `src/features/fleet/VehicleInspection.test.tsx`
+- `src/features/fleet/VehicleInspection.tsx`
+- `src/features/fleet/formatters.test.ts`
+- `src/features/fleet/formatters.ts`
+- `src/features/shell/ContextPanel.tsx`
+- `src/features/shell/OperationalShell.test.tsx`
+- `src/features/shell/OperationalShell.tsx`
+- `src/features/shell/Topbar.tsx`
+- `src/preferences/i18n/catalog.ts`
+- `src/preferences/i18n/en.ts`
+- `src/preferences/i18n/es.ts`
+- `src/styles.css` (Unit 4 inspection/tablet/motion rules only)
+
 ## Remaining Tasks
 
-- [ ] Unit 4 tasks 4.1–4.3: inspection redesign and localization.
 - [ ] Unit 5 tasks 5.1–5.4: full regression, native WebMCP proof, screenshots, and release evidence.

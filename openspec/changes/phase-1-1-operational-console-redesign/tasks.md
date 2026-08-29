@@ -46,9 +46,9 @@ Chain strategy: feature-branch-chain
 
 ## Phase 4: Inspection and Localization (Unit 4; depends on 3B)
 
-- [ ] 4.1 Add `src/features/fleet/{formatters,VehicleInspection}.test.ts*` RED tests; replace `VehicleDrawer.tsx` with `VehicleInspection.tsx` and `formatters.ts` for five sections, fallbacks, View on route, Follow, valid-save feedback, and confirmed deletion.
-- [ ] 4.2 Modify `src/preferences/i18n/{catalog,en,es}.ts` and relevant tests for typed English/Spanish strings, `Intl` values, persistence independence, dialog focus trap/restoration, keyboard access, and reduced motion.
-- [ ] 4.3 Commit Unit 4 with rename/reload, invalid/corrupt override recovery, cancel/confirm delete, and tablet dialog tests.
+- [x] 4.1 Add `src/features/fleet/{formatters,VehicleInspection}.test.ts*` RED tests; replace `VehicleDrawer.tsx` with `VehicleInspection.tsx` and `formatters.ts` for five sections, fallbacks, View on route, Follow, valid-save feedback, and confirmed deletion.
+- [x] 4.2 Modify `src/preferences/i18n/{catalog,en,es}.ts` and relevant tests for typed English/Spanish strings, `Intl` values, persistence independence, dialog focus trap/restoration, keyboard access, and reduced motion.
+- [x] 4.3 Commit Unit 4 with rename/reload, invalid/corrupt override recovery, cancel/confirm delete, and tablet dialog tests.
 
 ## Phase 5: Release Regression and Evidence (Unit 5; depends on 4)
 
@@ -61,4 +61,4 @@ Chain strategy: feature-branch-chain
 
 `1 -> 2 -> 3A -> 3B -> 4 -> 5`; tests travel with each behavior. Every design threat-matrix row is explicitly N/A, so no threat RED-test task applies. Retain only `scenario_current`, `fleet_status`, `vehicle_get`, and `vehicle_rename`; no new tools or Phase 2 work.
 
-Exactly 12/19 tasks are complete. Units 4 and 5 remain pending.
+Exactly 15/19 tasks are complete. Unit 5 remains pending.
