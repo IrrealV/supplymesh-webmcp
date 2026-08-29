@@ -4,8 +4,8 @@
 
 - Mode: Standard; `strict_tdd: false` in `openspec/config.yaml`.
 - Delivery: `auto-chain`, `feature-branch-chain`.
-- Current boundary: Unit 2 `feat(console): add OR result panels` on `feat/phase1-1-filter-panels`, targeting predecessor `feat/phase1-1-shell-coordination` at `9f1a7a5`.
-- Completed tasks: 1.1–2.3 (6/16). Units 3–5 remain pending.
+- Current boundary: Unit 3A `feat(routes): generate reviewed ORS fixtures` on `feat/phase1-1-ors-route-fixtures`, targeting Unit 2 at `d834b2b`.
+- Completed tasks: 1.1–2.3 and 3A.1–3A.3 (9/19). Units 3B–5 remain pending.
 - Approved issue: #15. Planning baseline: `9009983`.
 
 ## Immutable Unit 1 Candidate Binding
@@ -149,8 +149,37 @@ Reverting implementation commit `5c0a74b6294852c3389ce0b3a4b3684a642622bd` remov
 - `FleetMap.tsx` only consumes the pure OR selector to preserve multi-filter marker/route emphasis compatibility. Unit 3 still owns route geometry, markers, layers, legend, focus/follow redesign, and its acceptance claims.
 - The first managed harness run exposed an ambiguous Playwright locator shared by a map marker and result card. The harness was scoped to the result-card ID and passed without a production change.
 
+## Work Unit 3A — Reviewed ORS Route Fixtures
+
+- [x] 3A.1 Secret-safe atomic generator/verifier with radius, retry, canonical hash, no-op, malformed/surplus, and redaction coverage.
+- [x] 3A.2 Reviewed 15-route ORS HGV manifest/GeoJSON plus key-safe generation and review documentation.
+- [x] 3A.3 Offline catalog, route-progress-derived positions, exact snapped risk references, runtime/provider guards, and compatibility-only current map consumption.
+
+### Unit 3A Candidate and Provenance
+
+- Parent/amendment: `a4fbebb2e3fcab3ff0ecc3752a62c976ff9f6905`; child PR target remains Unit 2 `d834b2b598d0d1f50e690eecf1469556bef8d503`.
+- Implementation binding: finalized by the evidence-only follow-up after the implementation commit.
+- Authored review size: **373 additions + 20 deletions = 393 changed lines**, including the compact one-line reviewed GeoJSON and all source/tests/docs/OpenSpec changes.
+- Generated fixture: 15 routes / 45,577 exact ORS coordinates; `generatedAt=2026-08-29T00:42:35.649Z`; manifest `sha256:8285a93bbdddacb5dd47452348a1f1c56d2b649f913248a81caaa33e05616cd3`; source `sha256:16e9952c577cfcc7de3e1cd8bfbc1ea068557c049d5674052b3b1e74fcacc439`.
+- Route-014 preserved logical endpoints, passed exact `[547,350]`, and retained 2,002 returned coordinates; snaps were `546.8199476793687m` / `113.79408158125304m`; ORS summary was `228585.4m` / `12352.3s`.
+- Prior failed evidence is remediated: `sha256:8050c7d3b2336c93fe6bcbfb2e7bfb6e29520d97a8a7bed91267031a940a9d18`.
+- Old unpublished Unit 3 (`230a57a` / `c582707`) is abandoned, absent from this branch, and receives no delivery or task credit.
+
+### Unit 3A Evidence
+
+| Evidence | Exact result |
+|---|---|
+| RED / GREEN | Generator RED: exit 1, 1 suite failed, 0 tests (missing module). GREEN: 1 file, 15 tests passed. Direct generator/scenario test typechecks exited 0. |
+| Real generation | `bun --no-env-file run routes:generate` exited 0 once: 15 routes, 45,577 coordinates, source revision above; key remained process-only/redacted. |
+| Verify and focused tests | `bun --no-env-file run routes:verify` exited 0 with 15 routes/45,577 coordinates/runtime boundary clean. `bun run test -- scripts/generate-ors-routes.test.ts src/scenario` exited 0: 4 files, 27 tests. |
+| Unit 1/2 regression | Nine shell/filter/map/inspection/catalog files exited 0: 9 files, 32 tests. |
+| Full quality | `bun run check` exited 0: lint/typecheck clean, 15 files/66 tests passed, 4,711 modules built; existing chunk-size advisory only. |
+| Offline runtime | With `ORS_API_KEY` unset: 15 markers, 34 current-map paths, 0 routing requests, 0 unexpected errors; one known asset 404; port 4173 freed. No Unit 3B visual acceptance claimed. |
+| Settlement | `native_attempt=already-acquired`; `acquire=NOT_RUN`; `reset=NOT_RUN`; `settle=NOT_RUN`. |
+| Rollback | Revert the Unit 3A implementation/evidence commits: generator/scripts/package, manifest/GeoJSON/catalog/runtime/domain/scenario tests/docs, this section, and only task checkboxes 3A.1–3A.3. Units 1/2, 3B–5, WebMCP, Phase 2, tracker, and main remain intact. |
+
 ## Remaining Tasks
 
-- [ ] Unit 3 tasks 3.1–3.3: deterministic route geometry and map behavior.
+- [ ] Unit 3B tasks 3B.1–3B.3: fixture-only visual map behavior.
 - [ ] Unit 4 tasks 4.1–4.3: inspection redesign and localization.
 - [ ] Unit 5 tasks 5.1–5.4: full regression, native WebMCP proof, screenshots, and release evidence.

@@ -11,6 +11,8 @@
     "build": "vite build",
     "check": "bun run lint && bun run typecheck && bun run test && bun run build",
     "preview": "vite preview",
+    "routes:generate": "bun run --no-env-file scripts/generate-ors-routes.ts generate",
+    "routes:verify": "bun run --no-env-file scripts/generate-ors-routes.ts verify",
     "test:e2e": "playwright test"
   },
   "dependencies": {
