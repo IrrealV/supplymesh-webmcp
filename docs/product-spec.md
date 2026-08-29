@@ -4,6 +4,8 @@
 
 Phase 1 is implemented, independently verified, and archived. Final verification verdict: **PASS WITH WARNINGS** — 18/18 requirements, 37/37 scenarios, and 17/17 tasks, with zero blockers or CRITICAL findings.
 
+Phase 1.1 is complete at 19/19 tasks on its feature-branch chain. Functional, visual, production-gate, and genuine native WebMCP evidence pass; the tracker remains unmerged and no main/release claim is made.
+
 The delivered product includes the deterministic fleet scenario, map workspace, inspection and vehicle operations, English and Español UI, persisted validated overrides, and four WebMCP tools: `scenario_current`, `fleet_status`, `vehicle_get`, and `vehicle_rename`.
 
 ## Product principles

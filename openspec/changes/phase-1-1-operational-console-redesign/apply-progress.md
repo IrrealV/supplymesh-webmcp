@@ -4,8 +4,8 @@
 
 - Mode: Standard; `strict_tdd: false` in `openspec/config.yaml`.
 - Delivery: `auto-chain`, `feature-branch-chain`.
-- Current boundary: Unit 4 `feat(inspection): localize operational detail` on `feat/phase1-1-inspection-i18n`, targeting Unit 3B at `bacb5c3`.
-- Completed tasks: 1.1–2.3, 3A.1–3A.3, 3B.1–3B.3, and 4.1–4.3 (15/19). Unit 5 remains pending.
+- Current boundary: Unit 5 `test(console): prove release evidence` on `test/phase1-1-release-evidence`, targeting Unit 4 at `8124f4d`.
+- Completed tasks: 1.1–5.4 (19/19). No implementation tasks remain; the change stays active, unarchived, unmerged, and pending review.
 - Approved issue: #15. Planning baseline: `9009983`.
 
 ## Immutable Unit 1 Candidate Binding
@@ -335,6 +335,49 @@ Reverting implementation commit `5c0a74b6294852c3389ce0b3a4b3684a642622bd` remov
 - Correction scope: only this cumulative apply-progress artifact changed. Tasks remain 15/19; product, tests, task checkboxes, ORS, WebMCP, E2E, evidence assets, Phase 2, and behavior are byte-identical.
 - Settlement: `native_correction_attempt=already-acquired`; `acquire=NOT_RUN`; `reset=NOT_RUN`; `settle=NOT_RUN`. No push, PR, merge, review, or main modification ran.
 
+## Work Unit 5 — Corrected Release Regression and Evidence
+
+- Branch/correction parent: `test/phase1-1-release-evidence` / `031d2bb9e0ef7b4c3b13547eedff89669fa47eb3`; child target remains Unit 4 and tracker remains unmerged.
+- [x] 5.1–5.4 complete; cumulative task state is 19/19.
+- `remediates_evidence_revision=sha256:a966cbe4cf2ca9f19a732ae0529414549544f238fa6a7a019222b5686018e992`.
+- Corrective evidence revision before this cumulative progress update: `sha256:addf2e30f8bbe75cb09cec23fa875020648476d5841ecef6a1bb12e0f544f156`.
+- Settlement: `native_correction_attempt=already-acquired`; `acquire=NOT_RUN`; `reset=NOT_RUN`; `settle=NOT_RUN`. No review, push, PR, merge, or main modification ran.
+
+### Immutable Unit 5 Evidence Binding
+
+- Initial evidence commit/tree: `031d2bb9e0ef7b4c3b13547eedff89669fa47eb3` / `0276e0d7c76402f8a0dce4e4742f9778f787bcb1`; failed evidence `sha256:a966cbe4cf2ca9f19a732ae0529414549544f238fa6a7a019222b5686018e992`; **403 additions + 62 deletions = 465 changed lines**, below 800.
+- Initial diagnosis: required desktop overview/Weather/two-filter evidence had vehicle/risk label collisions, and native production preview emitted a missing-favicon console error.
+- Corrective parent/commit/final tree: `031d2bb9e0ef7b4c3b13547eedff89669fa47eb3` / `f55683ea50bbca3f6eddb0d462996e44c7f3950b` / `f7dda6bf14725d8c070a3d3c9724a3383decaa62`.
+- Corrective diff/passing evidence: `sha256:1c4d90e87222183bd7133ae4636229d77c9696d7a1b279756c5b9630d15d46b0` / `sha256:addf2e30f8bbe75cb09cec23fa875020648476d5841ecef6a1bb12e0f544f156`; **187 additions + 75 deletions = 262 changed lines**, below the hard 400-line correction budget.
+- Remediation: passing evidence explicitly remediates `sha256:a966cbe4cf2ca9f19a732ae0529414549544f238fa6a7a019222b5686018e992`.
+- Deterministic binding evidence revision: `sha256:9a2b6b6cdf77a6171f490a8c80489eebfd1cf677bfe014daa785236dbba18c73` (`supplymesh.unit5-evidence-binding/v1`).
+- Exact rollback, correction only: `git revert f55683ea50bbca3f6eddb0d462996e44c7f3950b`.
+- Exact rollback, full Unit 5: revert `f55683ea50bbca3f6eddb0d462996e44c7f3950b` first, then `031d2bb9e0ef7b4c3b13547eedff89669fa47eb3`.
+- Binding scope: only cumulative apply-progress changed; product, tests, screenshots, visual report, readiness docs, task checkboxes, ORS/WebMCP, behavior, Phase 2, tracker, and main are byte-identical.
+
+### Unit 5 Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Focused tests | RED: placement module missing and risk relevance failed. GREEN: `bun run test -- src/features/map/labelPlacement.test.ts src/features/map/FleetMap.test.ts src/features/map/VehicleMarkerLayer.test.tsx` → exit 0; 3 files/6 tests. Operational Playwright → exit 0; 7/7 with collision geometry, 58-scenario inventory, tablet scroll/actions, WebMCP parity, and six captures. |
+| Component/regression | `env -u ORS_API_KEY bun run test` → exit 0; 20 files/82 tests. Lint, typecheck, direct E2E/native-script typecheck → exit 0. |
+| Fixture/runtime guard | `env -u ORS_API_KEY bun --no-env-file run routes:verify` → exit 0; 15 routes, 45,577 coordinates, source `16e9952c577cfcc7de3e1cd8bfbc1ea068557c049d5674052b3b1e74fcacc439`; runtime provider boundary clean. ORS fixture/generator and WebMCP production-contract diffs from `8124f4d` are empty. |
+| Production gate/build | Build → exit 0; 4,715 modules. Production gate → exit 0; 1/1, explicit favicon 200 and bypass rejected. |
+| Native runtime | Genuine Chromium 151 with `--enable-features=WebMCP`, no seam/polyfill/init/interception/bypass → exit 0; registration-before-render, four tools/schemas, query/edit/UI parity, structured invalid-label, rename restore, cleanup 4→0, zero console/page errors. |
+| Visual runtime | Six real PNGs recaptured and inspected at full resolution. Overview, Weather, selected route/risk, two filters, tablet results, and tablet detail all PASS; 15 labels remain visible and tested collision-free, selected geometry unchanged, tabs/actions reachable by scroll. |
+| Rollback boundary | Revert the single correction commit: placement source/tests, bounded map/layer/CSS changes, favicon, E2E assertions, six replacement PNGs, readiness docs, tasks, and this correction evidence. Prior Unit 5 evidence, Units 1–4, ORS bytes/contracts, WebMCP contracts, Phase 2, tracker, and main remain intact. |
+
+### Screenshot Evidence
+
+| File | Dimensions | Bytes | SHA-256 | Verdict |
+|---|---:|---:|---|---|
+| `desktop-overview.png` | 1440×900 | 749,955 | `ed658a06b9b58634e686e370c9b387ba881280688814f72bc38d8157c071de5a` | PASS |
+| `desktop-weather-filter.png` | 1440×900 | 668,766 | `aaf209887f4342486522ae216397820d18a7c57fb5171e5bb6e37b2af85c6c3e` | PASS |
+| `desktop-selected-route-risk.png` | 1440×900 | 723,764 | `137a926f1ece889b81c15837e45c9ef06639e76e92801c5db01fa6450517e707` | PASS |
+| `desktop-two-filters.png` | 1440×900 | 680,956 | `6432b98154f1af7a28f31d4421226ecc28e39113dc2681688d738229c6cadfd3` | PASS |
+| `tablet-results.png` | 900×900 | 285,602 | `74b4779ac682cdd23233b403c2092468605f17ceb604d5f5d6624895134231dd` | PASS |
+| `tablet-detail.png` | 900×900 | 231,870 | `3ce0b2a0194c0f79ced7906b97fe9ecd7d98dfb650120d4611a5af6cb5a7ac8d` | PASS |
+
 ## Remaining Tasks
 
-- [ ] Unit 5 tasks 5.1–5.4: full regression, native WebMCP proof, screenshots, and release evidence.
+None. Ready for SDD verification; archive remains premature.
