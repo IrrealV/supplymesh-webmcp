@@ -18,6 +18,8 @@ export type VehicleStatus = (typeof VehicleStatuses)[keyof typeof VehicleStatuse
 export type GeoPoint = Feature<Point>;
 export type GeoLine = Feature<LineString>;
 export type GeoPolygon = Feature<Polygon>;
+export type RouteSummary = { distanceMeters: number; durationSeconds: number };
+export type RiskRouteSnap = { riskId: string; routeId?: string; kind: "point" | "segment"; startIndex: number; endIndex: number; startCoordinate: number[]; endCoordinate: number[] };
 export type RiskSeverity = "low" | "medium" | "high" | "critical";
 export type RiskKind =
   | "height-restriction"
@@ -44,9 +46,10 @@ export type Vehicle = {
   destination: Place;
   currentRoute: string;
   routeId: string;
+  routeProgress: number;
   riskIds: string[];
 };
-export type Route = { id: string; vehicleId: string; name: string; geometry: GeoLine };
+export type Route = { id: string; vehicleId: string; name: string; geometry: GeoLine; summary: RouteSummary; riskSnaps: RiskRouteSnap[] };
 export type OperationalRisk = {
   id: string;
   kind: RiskKind;
@@ -54,6 +57,7 @@ export type OperationalRisk = {
   title: string;
   geometry: GeoLine | GeoPolygon;
   affectedVehicleIds: string[];
+  routeSnaps?: RiskRouteSnap[];
   limitMeters?: number;
   limitTonnes?: number;
   vehicleId?: string;

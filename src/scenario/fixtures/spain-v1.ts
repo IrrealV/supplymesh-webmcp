@@ -1,6 +1,8 @@
-import type { Cargo, Dimensions, OperatingRegion, OperationalRisk, Place, Vehicle, VehicleStatus } from "../../domain/entities";
+import type { Cargo, Dimensions, OperatingRegion, OperationalRisk, Place, RiskRouteSnap, Route, Vehicle, VehicleStatus } from "../../domain/entities";
 import { getVehicleDisplayName } from "../../domain/entities";
 import { geoLine, geoPoint, geoPolygon, type Coordinates } from "../geometry";
+import { assertRouteProgress, pointAtRouteProgress } from "../routeRuntime";
+import { routeCatalog } from "./routeCatalog";
 
 type VehicleSeed = readonly [string, string, string, VehicleStatus, Coordinates, string, Coordinates, string, string];
 
@@ -37,31 +39,38 @@ function dimensions(index: number): Dimensions {
 function vehicleFromSeed(seed: VehicleSeed, index: number): Vehicle {
   const [internalId, fleetNumber, plate, status, originCoordinates, originName, destinationCoordinates, destinationName, cargoDescription] = seed;
   const routeId = `route-${String(index + 1).padStart(3, "0")}`;
+  const route = routeCatalog.get(routeId); const routeProgress = index / (vehicleSeeds.length - 1);
+  if (route === undefined) throw new Error(`Missing route fixture ${routeId}.`); assertRouteProgress(routeProgress);
   return {
-    internalId, fleetNumber, plate, label: index === 0 ? "" : `Unit ${fleetNumber.slice(-3)}`, position: geoPoint(originCoordinates), status,
+    internalId, fleetNumber, plate, label: index === 0 ? "" : `Unit ${fleetNumber.slice(-3)}`, position: pointAtRouteProgress(route.geometry.geometry.coordinates, routeProgress), status,
     cargo: cargo(index, cargoDescription), dimensions: dimensions(index),
     timing: { remainingDriveMinutes: 45 + index * 19, restDeadline: `2026-08-28T${String(6 + (index % 12)).padStart(2, "0")}:00:00Z`, eta: `2026-08-28T${String(10 + (index % 10)).padStart(2, "0")}:30:00Z`, delayMinutes: index % 4 === 0 ? 25 : 0 },
-    origin: place(originName, originCoordinates), destination: place(destinationName, destinationCoordinates), currentRoute: `${originName} to ${destinationName}`, routeId,
-    riskIds: [index % 5 === 0 ? "restriction-height-3.9" : index % 5 === 1 ? "restriction-weight-26" : index % 5 === 2 ? "closure-ap-68" : index % 5 === 3 ? "severe-snow-leon" : `rest-deadline-${internalId}`],
+    origin: place(originName, originCoordinates), destination: place(destinationName, destinationCoordinates), currentRoute: `${originName} to ${destinationName}`, routeId, routeProgress,
+    riskIds: route.riskSnaps.map(({ riskId }) => riskId),
   };
 }
 
-function createRisks(): OperationalRisk[] {
+function snaps(routes: Route[], riskId: string): RiskRouteSnap[] { return routes.flatMap((route) => route.riskSnaps.filter((snap) => snap.riskId === riskId)); }
+function affected(routes: Route[], routeSnaps: RiskRouteSnap[]): string[] { const ids = new Set(routeSnaps.map((snap) => routes.find((route) => route.id === snap.routeId)?.vehicleId).filter((id): id is string => id !== undefined)); return [...ids]; }
+function snappedLine(routeSnaps: RiskRouteSnap[]) { const snap = routeSnaps[0]; if (snap === undefined) throw new Error("Missing risk snap."); return geoLine(snap.startCoordinate, snap.endCoordinate); }
+function createRisks(routes: Route[]): OperationalRisk[] {
+  const shared = (id: string, rest: Omit<OperationalRisk, "id" | "geometry" | "affectedVehicleIds" | "routeSnaps">): OperationalRisk => { const routeSnaps = snaps(routes, id); return { id, ...rest, geometry: snappedLine(routeSnaps), affectedVehicleIds: affected(routes, routeSnaps), routeSnaps }; };
   return [
-    { id: "restriction-height-3.9", kind: "height-restriction", severity: "high", title: "3.9 m clearance restriction", geometry: geoLine([-3.91, 40.48], [-3.82, 40.45]), affectedVehicleIds: ["vehicle-001", "vehicle-006", "vehicle-011"], limitMeters: 3.9 },
-    { id: "restriction-weight-26", kind: "weight-restriction", severity: "medium", title: "26 t weight restriction", geometry: geoLine([-1.06, 42.18], [-0.99, 42.08]), affectedVehicleIds: ["vehicle-002", "vehicle-007", "vehicle-012"], limitTonnes: 26 },
-    { id: "closure-ap-68", kind: "road-closure", severity: "critical", title: "AP-68 closure segment", geometry: geoLine([-2.01, 42.55], [-1.78, 42.42]), affectedVehicleIds: ["vehicle-003", "vehicle-008", "vehicle-013"] },
-    { id: "severe-snow-leon", kind: "severe-snow", severity: "high", title: "Severe snow advisory", geometry: geoPolygon([[-5.75, 42.62], [-5.42, 42.62], [-5.42, 42.83], [-5.75, 42.83]]), affectedVehicleIds: ["vehicle-004", "vehicle-009", "vehicle-014"] },
-    ...vehicleSeeds.map(([internalId], index) => ({ id: `rest-deadline-${internalId}`, kind: "rest-deadline" as const, severity: index % 4 === 3 ? "critical" as const : "high" as const, title: "Driving and rest deadline", geometry: geoLine(vehicleSeeds[index][4], vehicleSeeds[index][6]), affectedVehicleIds: [internalId], vehicleId: internalId, deadline: `2026-08-28T${String(6 + (index % 12)).padStart(2, "0")}:00:00Z` })),
+    shared("restriction-height-3.9", { kind: "height-restriction", severity: "high", title: "3.9 m clearance restriction", limitMeters: 3.9 }),
+    shared("restriction-weight-26", { kind: "weight-restriction", severity: "medium", title: "26 t weight restriction", limitTonnes: 26 }),
+    shared("closure-ap-68", { kind: "road-closure", severity: "critical", title: "AP-68 closure segment" }),
+    (() => { const routeSnaps = snaps(routes, "severe-snow-leon"); return { id: "severe-snow-leon", kind: "severe-snow" as const, severity: "high" as const, title: "Severe snow advisory", geometry: geoPolygon([[-5.75, 42.62], [-5.42, 42.62], [-5.42, 42.83], [-5.75, 42.83]]), affectedVehicleIds: affected(routes, routeSnaps), routeSnaps }; })(),
+    ...vehicleSeeds.map(([internalId], index) => { const id = `rest-deadline-${internalId}`; const routeSnaps = snaps(routes, id); return { id, kind: "rest-deadline" as const, severity: index % 4 === 3 ? "critical" as const : "high" as const, title: "Driving and rest deadline", geometry: snappedLine(routeSnaps), affectedVehicleIds: [internalId], routeSnaps, vehicleId: internalId, deadline: `2026-08-28T${String(6 + (index % 12)).padStart(2, "0")}:00:00Z` }; }),
   ];
 }
 
 export function createSpainScenario(): OperatingRegion {
   const vehicles = vehicleSeeds.map(vehicleFromSeed);
+  const routes = vehicles.map((vehicle) => { const fixture = routeCatalog.get(vehicle.routeId); if (fixture === undefined) throw new Error(`Missing route fixture ${vehicle.routeId}.`); return { id: vehicle.routeId, vehicleId: vehicle.internalId, name: vehicle.currentRoute, geometry: fixture.geometry, summary: fixture.summary, riskSnaps: fixture.riskSnaps }; });
   return {
     id: "spain-v1", name: "Iberian operational corridor", vehicles,
-    routes: vehicles.map((vehicle) => ({ id: vehicle.routeId, vehicleId: vehicle.internalId, name: vehicle.currentRoute, geometry: geoLine(vehicle.origin.position.geometry.coordinates, vehicle.destination.position.geometry.coordinates) })),
-    risks: createRisks(),
+    routes,
+    risks: createRisks(routes),
   };
 }
 
