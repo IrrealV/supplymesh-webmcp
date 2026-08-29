@@ -123,12 +123,33 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
 
 .map-workspace { min-height: 0; min-width: 0; overflow: hidden; }
 .map-frame, .fleet-map { height: 100%; min-height: 0; width: 100%; }
+.map-frame { position: relative; }
 .leaflet-container { background: #ccd7dc; font-family: inherit; }
 .leaflet-tile-pane { filter: saturate(.28) contrast(.86) brightness(1.08); }
-.fleet-marker-wrap { background: transparent; border: 0; }
-.fleet-marker { background: #f1f5f4; border: 1px solid var(--route); border-radius: 2px; box-shadow: 0 1px 3px rgb(11 23 38 / 22%); color: #163b5c; cursor: pointer; font: 600 11px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 4px 5px; white-space: nowrap; }
-.fleet-marker-muted { opacity: .38; }
-.fleet-marker-active { border-color: #184f7d; box-shadow: 0 0 0 2px rgb(37 99 166 / 22%); }
+.fleet-truck-icon, .fleet-label-icon, .risk-marker { background: transparent; border: 0; }
+.fleet-truck-shape { background: #eef3f4; border: 2px solid #193c57; box-shadow: 0 1px 3px rgb(11 23 38 / 28%); display: block; height: 15px; left: 3px; position: absolute; top: 8px; width: 23px; }
+.fleet-truck-shape::before { background: #eef3f4; border: 2px solid #193c57; border-left: 0; content: ""; height: 10px; position: absolute; right: -7px; top: 3px; width: 6px; }
+.fleet-truck-shape::after, .fleet-truck-shape span::after { background: #193c57; border: 2px solid #eef3f4; border-radius: 50%; bottom: -7px; content: ""; height: 7px; position: absolute; width: 7px; }
+.fleet-truck-shape::after { left: 2px; }
+.fleet-truck-shape span::after { right: 1px; }
+.fleet-status-pin { border: 2px solid #eef3f4; border-radius: 50%; height: 10px; position: absolute; right: -4px; top: 1px; width: 10px; z-index: 1; }
+.status-driving { background: var(--route); } .status-resting { background: var(--resting); } .status-needs-attention { background: var(--warning); } .status-critical { background: var(--critical); }
+.fleet-marker-label { background: rgb(243 246 247 / 92%); border: 1px solid #879aa5; color: #17374e; display: block; font: 650 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; max-width: 104px; overflow: hidden; padding: 4px 5px; text-overflow: ellipsis; white-space: nowrap; }
+.map-layer-muted { opacity: .3; } .map-layer-matched { opacity: 1; } .map-layer-selected { opacity: 1; }
+.map-layer-selected .fleet-truck-shape, .map-layer-selected .fleet-marker-label { border-color: var(--route); box-shadow: 0 0 0 2px rgb(37 99 166 / 30%); }
+.risk-marker { color: var(--ink); font: 650 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+.risk-marker-symbol { align-items: center; background: var(--panel); border: 2px solid var(--warning); display: inline-flex; height: 28px; justify-content: center; min-width: 28px; padding: 0 3px; vertical-align: middle; }
+.risk-marker-label { background: rgb(243 246 247 / 92%); border: 1px solid #a9b6bd; display: inline-block; max-width: 92px; overflow: hidden; padding: 5px; text-overflow: ellipsis; vertical-align: middle; }
+.risk-road-closure .risk-marker-symbol { border-color: var(--critical); color: var(--critical); font-size: 18px; }
+.risk-severe-snow .risk-marker-symbol { border-color: var(--weather); color: #36536c; }
+.risk-rest-deadline .risk-marker-symbol { border-color: #8b5b24; color: #704718; }
+.map-legend { background: rgb(243 246 247 / 94%); border: 1px solid #aebbc2; bottom: 22px; box-shadow: 0 2px 8px rgb(11 23 38 / 15%); color: var(--ink); left: 12px; padding: 7px 8px; position: absolute; z-index: 600; }
+.map-legend ul { display: grid; gap: 4px; list-style: none; margin: 0; padding: 0; }
+.map-legend li { align-items: center; display: flex; font-size: 10px; gap: 6px; white-space: nowrap; }
+.legend-swatch { display: inline-block; height: 8px; width: 18px; }
+.legend-route { border-top: 3px solid var(--route); } .legend-restriction { border: 2px solid var(--warning); height: 12px; width: 12px; }
+.legend-closure { border-top: 3px dashed var(--critical); } .legend-weather { background: rgb(96 123 150 / 22%); border: 1px solid var(--weather); height: 12px; }
+.legend-rest { background: #f0e3cf; border: 1px solid #8b5b24; height: 12px; width: 12px; }
 
 .context-panel, .vehicle-drawer {
   background: var(--panel);

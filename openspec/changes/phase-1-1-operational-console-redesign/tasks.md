@@ -40,9 +40,9 @@ Chain strategy: feature-branch-chain
 
 ## Phase 3B: Fixture-Only Visual Map (depends on 3A)
 
-- [ ] 3B.1 Add map RED tests; modify/create `src/features/map/{FleetMap,layers,MapEventCoordinator,VehicleMarkerLayer,MapLegend}.ts*` for checked-in fixture markers/labels, routes, severity encodings, legend, desaturated attributed OSM, and Spain viewport/invalidation.
-- [ ] 3B.2 Add pointer/touch/tablet diagnostics proving one-click focus, user-versus-programmatic follow cancellation, panel/dialog resize invalidation, and fixture-only route/risk rendering; do not change generator, provider, API, key, manifest, or fixture pipeline files.
-- [ ] 3B.3 Commit this child slice targeting Unit 3A with `bun run test -- src/features/map && bun run test` and the fixture-only dev harness; retain Unit 5 as the sole final screenshot capture and visual comparison boundary.
+- [x] 3B.1 Add map RED tests; modify/create `src/features/map/{FleetMap,layers,MapEventCoordinator,VehicleMarkerLayer,MapLegend}.ts*` for checked-in fixture markers/labels, routes, severity encodings, legend, desaturated attributed OSM, and Spain viewport/invalidation.
+- [x] 3B.2 Add pointer/touch/tablet diagnostics proving one-click focus, user-versus-programmatic follow cancellation, panel/dialog resize invalidation, and fixture-only route/risk rendering; do not change generator, provider, API, key, manifest, or fixture pipeline files.
+- [x] 3B.3 Commit this child slice targeting Unit 3A with `bun run test -- src/features/map && bun run test` and the fixture-only dev harness; retain Unit 5 as the sole final screenshot capture and visual comparison boundary.
 
 ## Phase 4: Inspection and Localization (Unit 4; depends on 3B)
 
@@ -60,3 +60,5 @@ Chain strategy: feature-branch-chain
 ## Dependencies and Threat Matrix
 
 `1 -> 2 -> 3A -> 3B -> 4 -> 5`; tests travel with each behavior. Every design threat-matrix row is explicitly N/A, so no threat RED-test task applies. Retain only `scenario_current`, `fleet_status`, `vehicle_get`, and `vehicle_rename`; no new tools or Phase 2 work.
+
+Exactly 12/19 tasks are complete. Units 4 and 5 remain pending.

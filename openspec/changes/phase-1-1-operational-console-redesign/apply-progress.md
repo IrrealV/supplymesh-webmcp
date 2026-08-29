@@ -4,8 +4,8 @@
 
 - Mode: Standard; `strict_tdd: false` in `openspec/config.yaml`.
 - Delivery: `auto-chain`, `feature-branch-chain`.
-- Current boundary: Unit 3A `feat(routes): generate reviewed ORS fixtures` on `feat/phase1-1-ors-route-fixtures`, targeting Unit 2 at `d834b2b`.
-- Completed tasks: 1.1–2.3 and 3A.1–3A.3 (9/19). Units 3B–5 remain pending.
+- Current boundary: Unit 3B `feat(map): render accepted route fixtures` on `feat/phase1-1-visual-map`, targeting Unit 3A at `0fcf574`.
+- Completed tasks: 1.1–2.3, 3A.1–3A.3, and 3B.1–3B.3 (12/19). Units 4–5 remain pending.
 - Approved issue: #15. Planning baseline: `9009983`.
 
 ## Immutable Unit 1 Candidate Binding
@@ -211,8 +211,53 @@ Reverting implementation commit `5c0a74b6294852c3389ce0b3a4b3684a642622bd` remov
 - Product, generator, tests, generated fixture, task checkboxes, Unit 3B+, WebMCP, and Phase 2 bytes remain unchanged.
 - Settlement: `native_correction_attempt=already-acquired`; `acquire=NOT_RUN`; `reset=NOT_RUN`; `settle=NOT_RUN`.
 
+## Work Unit 3B — Fixture-Only Visual Map
+
+- [x] 3B.1 Fixture-only route/layer state, 15 separate truck and label controls, status pins, full unsimplified ORS corridors, selected/risk styling, markers, weather zone, and compact accessible legend.
+- [x] 3B.2 Moderate route focus, `focusRoute` request consumption, useful Spain fit, resize invalidation, and manual-versus-programmatic follow coordination with desktop and 900×900 diagnostics.
+- [x] 3B.3 One coherent Unit 3B commit boundary targeting Unit 3A; Unit 5 remains the only final screenshot and comparison boundary.
+
+### Unit 3B Candidate and Immutable Evidence
+
+- Immediate predecessor/base: `0fcf574be250f744661b52288cf1d88a26c4647b` on `feat/phase1-1-ors-route-fixtures`; child branch: `feat/phase1-1-visual-map`.
+- Source/test/style diff revision before SDD bookkeeping: `sha256:04bf2f89963dde8a15e085d4f978cc2eb29b91e4c152dcfb8a56d0f8932f5b41`.
+- Deterministic evidence revision: `sha256:53eee73fb2f83fbbdab066c7ed8ec79295f9e5b0464f011cc409e73b4c9dfa26`.
+- Authored review size: **381 additions + 110 deletions = 491 changed lines**, below the hard 800-line Unit 3B limit.
+- Accepted route geometry is consumed only through the existing scenario/catalog/runtime chain. No generator, manifest, GeoJSON, route catalog/runtime, provider, key, WebMCP, inspection/i18n, final evidence, or Phase 2 file changed.
+- The existing typed `focusRoute(vehicleId)` Unit 4 hook is now consumed by `MapFocus`; no inspection component or copy changed.
+
+### Unit 3B RED/GREEN and Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| RED | `env -u ORS_API_KEY bun run test -- src/features/map` → exit 1; 4 files failed, 10 tests failed. Missing `VehicleMarkerLayer`/`MapLegend`, route/state derivation, dependency guard, and programmatic/manual coordinator APIs were observed. |
+| GREEN / focused | Same command → exit 0; 4 files, 12 tests passed. Marker/label activation, status pins, fallback identity, OR match/mute/selected states, z-order, exact route-coordinate identity, legend semantics, dependency allowlist, and coordinator transitions passed. |
+| Test/type safety | `env -u ORS_API_KEY bun run typecheck` → exit 0; `tsc -b` emitted no diagnostics, including all Unit 3B test files. |
+| Unit 1–3A regression | `env -u ORS_API_KEY bun run test -- src/app/state/useUiCoordinationStore.test.ts src/features/shell/OperationalShell.test.tsx src/features/fleet scripts/generate-ors-routes.test.ts src/scenario` → exit 0; 11 files, 54 tests passed. |
+| Fixture verification | `env -u ORS_API_KEY bun --no-env-file run routes:verify` → exit 0; 15 ORS routes, 45,577 coordinates, source revision `16e9952c577cfcc7de3e1cd8bfbc1ea068557c049d5674052b3b1e74fcacc439`, runtime provider boundary clean. |
+| Full quality | `env -u ORS_API_KEY bun run check` → exit 0; ESLint and `tsc -b` clean, 18 Vitest files and 75 tests passed, Vite transformed 4,713 modules and built successfully. Existing >500 kB chunk advisory remained non-blocking. |
+| Runtime harness | Managed Vite with `VITE_WEBMCP_LOCAL_BYPASS=true`, key unset, at `127.0.0.1:4173`; temporary Playwright diagnostics only. Chromium 1440×900: map `987.203125×844`, 15 trucks, 15 separate labels, 15 full non-straight route paths (each rendered path >300 characters with `smoothFactor=0`), 19 risks, visible OSM attribution/legend, closure/weather/restriction/rest encodings, Weather 3 matched/12 muted, one selected blue route and selected high-severity weather path, result-card and keyboard-reachable label selection, programmatic focus/layout follow preservation, zoom-control cancellation, and restore action all passed. At 900×900, map `844×844`, 15 trucks and legend remained usable. Provider requests, console errors, page errors, and PNGs were all zero. |
+| Guards | Protected generator/manifest/GeoJSON/catalog/runtime/docs/package diff was empty; secret/provider scan and PNG diff were empty; fixture verification remained byte-clean. The temporary runtime script was deleted. |
+| Threat matrix | N/A per design; Unit 3B adds no executable classification, subprocess, VCS, provider, key, or network boundary. |
+| Settlement | `native_attempt=already-acquired`; `acquire=NOT_RUN`; `reset=NOT_RUN`; `settle=NOT_RUN`. No push, PR, merge, review, main modification, or native-attempt lifecycle command ran. |
+| Rollback boundary | Revert the one Unit 3B implementation commit. This removes only the map source/tests/style and 3B SDD updates listed below, restoring the Unit 3A visual adapter without removing accepted fixtures, Unit 1/2 behavior, or later units. |
+
+### Exact Unit 3B Rollback Files
+
+- `openspec/changes/phase-1-1-operational-console-redesign/apply-progress.md`
+- `openspec/changes/phase-1-1-operational-console-redesign/tasks.md`
+- `src/features/map/FleetMap.test.ts`
+- `src/features/map/FleetMap.tsx`
+- `src/features/map/MapEventCoordinator.test.ts`
+- `src/features/map/MapEventCoordinator.ts`
+- `src/features/map/MapLegend.test.tsx`
+- `src/features/map/MapLegend.tsx`
+- `src/features/map/VehicleMarkerLayer.test.tsx`
+- `src/features/map/VehicleMarkerLayer.tsx`
+- `src/features/map/layers.ts`
+- `src/styles.css` (Unit 3B map-marker/risk/legend rules only)
+
 ## Remaining Tasks
 
-- [ ] Unit 3B tasks 3B.1–3B.3: fixture-only visual map behavior.
 - [ ] Unit 4 tasks 4.1–4.3: inspection redesign and localization.
 - [ ] Unit 5 tasks 5.1–5.4: full regression, native WebMCP proof, screenshots, and release evidence.
