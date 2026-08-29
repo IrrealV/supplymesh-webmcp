@@ -116,10 +116,27 @@ describe("OperationalShell", () => {
     function LocalizedTopbar() { const [locale, setLocale] = useState<"en" | "es">("en"); return <Topbar locale={locale} onLocaleChange={setLocale} />; }
     render(<LocalizedTopbar />);
 
-    await user.click(screen.getByRole("button", { name: "Language" }));
-    await user.click(screen.getByRole("menuitem", { name: "Español" }));
+    const language = screen.getByRole("button", { name: "Language" });
+    expect(language.textContent).toBe("EN ▾");
+    language.focus();
+    await user.keyboard("{Enter}{ArrowDown}{Enter}");
 
     expect(screen.getByRole("button", { name: "Ayuda" })).not.toBeNull();
     expect(screen.getByRole("button", { name: "Idioma" })).not.toBeNull();
+  });
+
+  it("should render tablet results as a trapped, closable dialog and restore focus", async () => {
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, "matchMedia", { configurable: true, value: () => ({ addEventListener: () => undefined, matches: true, removeEventListener: () => undefined }) });
+    try {
+      const user = userEvent.setup();
+      render(<OperationalShell locale="en" onLocaleChange={() => undefined} onScenarioChange={() => undefined} operations={createOperationsApi(createZustandScenarioRepository())} scenario={createSpainScenario()} />);
+      await user.click(screen.getByRole("button", { name: "Critical" }));
+      expect(screen.getByRole("dialog", { name: "Fleet filters" })).not.toBeNull();
+      await user.click(screen.getByRole("button", { name: "Close results" }));
+
+      expect(screen.getByRole("heading", { name: "Operational overview" })).not.toBeNull();
+      expect(document.activeElement).toBe(screen.getByRole("button", { name: "Critical" }));
+    } finally { Object.defineProperty(window, "matchMedia", { configurable: true, value: originalMatchMedia }); }
   });
 });

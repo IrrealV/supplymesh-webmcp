@@ -1,5 +1,4 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { CaretDown } from "@phosphor-icons/react";
 import { catalog, type Locale } from "../../preferences/i18n/catalog";
 import { browserLocaleStorage, saveLocale } from "../../preferences/i18n/localeStorage";
 
@@ -16,7 +15,7 @@ export function Topbar({ locale, onLocaleChange }: { locale: Locale; onLocaleCha
       <nav aria-label={copy.consoleControls} className="topbar-controls">
         <DropdownMenu.Root>
           <DropdownMenu.Trigger className="topbar-control" aria-label={copy.language}>
-            {locale.toUpperCase()} <CaretDown aria-hidden="true" size={14} weight="bold" />
+            {locale.toUpperCase()} <span aria-hidden="true">▾</span>
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
             <DropdownMenu.Content className="language-menu" sideOffset={8}>
