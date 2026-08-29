@@ -1,6 +1,6 @@
 # Delta for Deterministic Fleet Scenario
 
-**Coverage**: 5 requirements (3 MODIFIED, 2 ADDED); 14 scenarios.
+**Coverage**: 5 requirements (3 MODIFIED, 2 ADDED); 19 scenarios.
 
 ## MODIFIED Requirements
 
@@ -68,7 +68,7 @@ The region MUST include controlled, plausibly corridor-aligned risk segments and
 
 ### Requirement: Reproducible HGV Route Generation
 
-Route geometry MUST be precalculated by the OpenStreetMap-based openrouteservice `driving-hgv` router; manual, invented, generated interpolation/smoothing, and hand-drawn polylines are prohibited. A reproducible documented Bun/TypeScript generation script MUST use `ORS_API_KEY` only at generation time, send authenticated POST requests to `/v2/directions/driving-hgv/geojson` with `[longitude, latitude]` coordinates, and fail clearly for a missing key or malformed response. Generated fixtures MUST be reviewed, versioned, checked-in GeoJSON with stable route IDs, schema version, profile/source, generated-at/source-data provenance or reproducibility metadata, endpoint association, distance/duration summary, and validated geometry.
+Route geometry MUST be precalculated by the OpenStreetMap-based openrouteservice `driving-hgv` router; manual, invented, generated interpolation/smoothing, and hand-drawn polylines are prohibited. A manifest MUST preserve original logical origin/destination coordinates and MAY include per-endpoint `radiuses` passed directly to ORS directions. `radiuses` MUST contain exactly one finite positive radius per requested coordinate and are geometry-affecting canonical input. Route-014 MUST use `[547,350]`, the minimum tested integer bound above its measured 546.77 m origin snap; every other route MUST retain the default 350 m unless independently evidenced. The generator MUST NOT substitute pre-snapped coordinates, add shape waypoints, request alternatives, smooth, simplify, or rewrite returned geometry. It MUST validate returned geometry endpoints against each configured radius and the existing 2 km logical-endpoint tolerance, while retaining logical endpoint associations separately from ORS-selected geometry endpoints. A reproducible documented Bun/TypeScript generation script MUST use `ORS_API_KEY` only at generation time, send authenticated POST requests to `/v2/directions/driving-hgv/geojson` with `[longitude, latitude]` coordinates, and fail clearly for a missing key or malformed response. Generated fixtures MUST be reviewed, versioned, checked-in GeoJSON with stable route IDs, schema version, profile/source, generated-at/source-data provenance or reproducibility metadata, endpoint association, distance/duration summary, and validated geometry.
 
 #### Scenario: Generate an authenticated HGV route
 - GIVEN `ORS_API_KEY` and valid endpoint coordinates
@@ -85,9 +85,34 @@ Route geometry MUST be precalculated by the OpenStreetMap-based openrouteservice
 - WHEN fixture validation runs
 - THEN every route has required stable identity, provenance, endpoints, summary, and valid geometry
 
+#### Scenario: Pass canonical endpoint radiuses to ORS
+- GIVEN manifest logical coordinates and valid per-endpoint radiuses
+- WHEN the generator requests directions
+- THEN it forwards exactly one finite positive radius per coordinate without changing coordinates
+
+#### Scenario: Reject invalid radius input
+- GIVEN a radius list with wrong length, non-finite, or non-positive value
+- WHEN manifest validation runs
+- THEN generation fails before an ORS request or fixture write
+
+#### Scenario: Hash geometry-affecting radius input
+- GIVEN otherwise identical manifests with different radiuses
+- WHEN their canonical inputs are hashed
+- THEN their hashes differ and retain their logical endpoint coordinates
+
+#### Scenario: Generate route-014 with its measured snap bound
+- GIVEN route-014 logical endpoints and `radiuses` `[547,350]`
+- WHEN the generator receives a valid mocked ORS response
+- THEN it succeeds with the original logical associations and validated geometry endpoints
+
+#### Scenario: Prohibit pre-snapped route substitution
+- GIVEN ORS-selected geometry endpoints differ from logical endpoints within validation bounds
+- WHEN the fixture is generated
+- THEN it preserves manifest coordinates, returned geometry, and no added waypoints, alternatives, smoothing, simplification, or rewriting
+
 ### Requirement: Route Fixture Verification and Documentation
 
-Verification MUST cover fixture schema/provenance, every expected route, non-two-point long geometry, endpoint and plausibility bounds, progress-derived positions, snapped restrictions, deterministic offline runtime loading, mocked generation-time HTTP missing-key/malformed-response failures, absence of runtime provider/network imports, and absence of secrets. Documentation MUST explain the regeneration command, `ORS_API_KEY` generation-only boundary, review expectations, and generated-file marking. Final visual and map tests MUST use only checked-in fixtures.
+Verification MUST cover fixture schema/provenance, every expected route, non-two-point long geometry, endpoint and plausibility bounds, progress-derived positions, snapped restrictions, deterministic offline runtime loading, mocked generation-time HTTP missing-key/malformed-response failures, radius passthrough and validation, canonical-hash sensitivity, route-014 success, prohibition of pre-snapped coordinate substitution, absence of runtime provider/network imports, and absence of secrets. Documentation MUST explain the regeneration command, `ORS_API_KEY` generation-only boundary, review expectations, and generated-file marking. Final visual and map tests MUST use only checked-in fixtures.
 
 #### Scenario: Verify runtime and fixture invariants
 - GIVEN checked-in routes and scenario fixtures
