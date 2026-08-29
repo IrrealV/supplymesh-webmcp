@@ -159,11 +159,18 @@ Reverting implementation commit `5c0a74b6294852c3389ce0b3a4b3684a642622bd` remov
 
 - Parent/amendment: `a4fbebb2e3fcab3ff0ecc3752a62c976ff9f6905`; child PR target remains Unit 2 `d834b2b598d0d1f50e690eecf1469556bef8d503`.
 - Implementation commit/tree: `f7a69d356866eb5d0ec260451753590cc1e5e755` / `ed574a89a01993a8bceeda45d6481a474069005e`.
-- Implementation diff/evidence revisions: `sha256:d4d4dd238b30b4fb9d33e4ed92ebe31c8944978b690fc1e77e620dce9615a622` / `sha256:e74c91fa6d2abce36f29d5c4b4080f7953ffb3307255a648b920fa2e6cadf3d9`.
-- Authored review size: **373 additions + 20 deletions = 393 changed lines**, including the compact one-line reviewed GeoJSON and all source/tests/docs/OpenSpec changes.
+- Implementation diff revision: `sha256:d4d4dd238b30b4fb9d33e4ed92ebe31c8944978b690fc1e77e620dce9615a622`.
+- Deterministic implementation evidence revision: `sha256:e74c91fa6d2abce36f29d5c4b4080f7953ffb3307255a648b920fa2e6cadf3d9`.
+- Evidence binding commit/final tree: `37260336a08331e083c42ae1dd4987abb7c2fd93` / `68e625ebbb76ed26f25a9b59e5453fdbd2a07803`.
+- Final review revision through the binding: `sha256:71b9ac3b6228692b4af84f21819b518fc7ca9681effcb77ad475cdba0cad587f`.
+- Final evidence revision: `sha256:e74c91fa6d2abce36f29d5c4b4080f7953ffb3307255a648b920fa2e6cadf3d9`; binding changed documentation only, so the candidate evidence bytes remained authoritative.
+- Native implementation scope (`a4fbebb..f7a69d3`): **373 additions + 20 deletions = 393 changed lines**, including the compact one-line reviewed GeoJSON and all source/tests/docs/OpenSpec changes; below 800.
+- Human review scope through evidence binding (`a4fbebb..3726033`): **374 additions + 20 deletions = 394 changed lines**; below 800 and distinct from the native implementation charge.
 - Generated fixture: 15 routes / 45,577 exact ORS coordinates; `generatedAt=2026-08-29T00:42:35.649Z`; manifest `sha256:8285a93bbdddacb5dd47452348a1f1c56d2b649f913248a81caaa33e05616cd3`; source `sha256:16e9952c577cfcc7de3e1cd8bfbc1ea068557c049d5674052b3b1e74fcacc439`.
 - Route-014 preserved logical endpoints, passed exact `[547,350]`, and retained 2,002 returned coordinates; snaps were `546.8199476793687m` / `113.79408158125304m`; ORS summary was `228585.4m` / `12352.3s`.
-- Prior failed evidence is remediated: `sha256:8050c7d3b2336c93fe6bcbfb2e7bfb6e29520d97a8a7bed91267031a940a9d18`.
+- Failed evidence `sha256:8050c7d3b2336c93fe6bcbfb2e7bfb6e29520d97a8a7bed91267031a940a9d18` recorded route-014 HTTP 404 at the default 350m radius with zero fixture writes.
+- Official ORS diagnostics established the origin snap radius, OpenSpec adopted the radius contract, and replacement generation preserved logical endpoints while passing exact `[547,350]`.
+- Passing evidence `sha256:e74c91fa6d2abce36f29d5c4b4080f7953ffb3307255a648b920fa2e6cadf3d9` explicitly remediates that failed evidence revision.
 - Old unpublished Unit 3 (`230a57a` / `c582707`) is abandoned, absent from this branch, and receives no delivery or task credit.
 
 ### Unit 3A Evidence
@@ -177,7 +184,32 @@ Reverting implementation commit `5c0a74b6294852c3389ce0b3a4b3684a642622bd` remov
 | Full quality | `bun run check` exited 0: lint/typecheck clean, 15 files/66 tests passed, 4,711 modules built; existing chunk-size advisory only. |
 | Offline runtime | With `ORS_API_KEY` unset: 15 markers, 34 current-map paths, 0 routing requests, 0 unexpected errors; one known asset 404; port 4173 freed. No Unit 3B visual acceptance claimed. |
 | Settlement | `native_attempt=already-acquired`; `acquire=NOT_RUN`; `reset=NOT_RUN`; `settle=NOT_RUN`. |
-| Rollback | Revert the Unit 3A implementation/evidence commits: generator/scripts/package, manifest/GeoJSON/catalog/runtime/domain/scenario tests/docs, this section, and only task checkboxes 3A.1–3A.3. Units 1/2, 3B–5, WebMCP, Phase 2, tracker, and main remain intact. |
+| Rollback | Revert `37260336a08331e083c42ae1dd4987abb7c2fd93`, then `f7a69d356866eb5d0ec260451753590cc1e5e755`; remove exactly the files listed below. Units 1/2, 3B–5, WebMCP, Phase 2, tracker, and main remain intact. |
+
+### Exact Unit 3A Rollback Files (`a4fbebb..3726033`)
+
+- `docs/route-fixtures.md`
+- `openspec/changes/phase-1-1-operational-console-redesign/apply-progress.md`
+- `openspec/changes/phase-1-1-operational-console-redesign/tasks.md`
+- `package.json`
+- `scripts/generate-ors-routes.test.ts`
+- `scripts/generate-ors-routes.ts`
+- `scripts/routes/generator.ts`
+- `src/domain/entities.ts`
+- `src/scenario/fixtures/ors-route-manifest.json`
+- `src/scenario/fixtures/ors-routes.geojson`
+- `src/scenario/fixtures/routeCatalog.ts`
+- `src/scenario/fixtures/spain-v1.test.ts`
+- `src/scenario/fixtures/spain-v1.ts`
+- `src/scenario/routeRuntime.test.ts`
+- `src/scenario/routeRuntime.ts`
+
+### Unit 3A Gatekeeper Correction
+
+- Correction parent: `37260336a08331e083c42ae1dd4987abb7c2fd93`; only the already-reconciled design and this cumulative progress artifact change.
+- Correction evidence revision: `sha256:25f0f80f204d2589517f4ca3c9962a554997ce22d3752e4a0bd0a1c344edfc8d`.
+- Product, generator, tests, generated fixture, task checkboxes, Unit 3B+, WebMCP, and Phase 2 bytes remain unchanged.
+- Settlement: `native_correction_attempt=already-acquired`; `acquire=NOT_RUN`; `reset=NOT_RUN`; `settle=NOT_RUN`.
 
 ## Remaining Tasks
 

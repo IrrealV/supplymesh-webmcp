@@ -21,17 +21,17 @@ UI state retains filters/context/selection/follow/rail/map-focus; React mutation
 
 ## ORS Generation Boundary
 
-Add `"routes:generate":"bun run --no-env-file scripts/generate-route-fixtures.ts"`; run `bun run routes:generate`. The entry requires `process.env.ORS_API_KEY`; it never reads/writes `.env`, logs/exposes secrets, or starts HTTP without the key.
+Add `"routes:generate":"bun run --no-env-file scripts/generate-ors-routes.ts"`; run `bun run routes:generate`. The entry requires `process.env.ORS_API_KEY`; it never reads/writes `.env`, logs/exposes secrets, or starts HTTP without the key.
 
-`scripts/routes/manifest.ts` exports typed `RouteGenerationManifest={version,routes:[{routeId,origin:{id,coordinates:[lon,lat]},destination:{id,coordinates:[lon,lat]},request:{preference,options,radiuses?:readonly number[]}}]}`: stable geometry-affecting configuration, no shape waypoints/alternatives. Radiuses length MUST equal coordinates length and every value MUST be finite/positive. `scripts/routes/risk-snap-input.ts` holds risk/route IDs and approximate anchors.
+`src/scenario/fixtures/ors-route-manifest.json` conforms to typed `RouteGenerationManifest={version,routes:[{routeId,origin:{id,coordinates:[lon,lat]},destination:{id,coordinates:[lon,lat]},request:{preference,options,radiuses?:readonly number[]}}]}`: stable geometry-affecting configuration, no shape waypoints/alternatives. Radiuses length MUST equal coordinates length and every value MUST be finite/positive.
 
 `scripts/routes/generator.ts` sequentially POSTs sorted routes to `https://api.openrouteservice.org/v2/directions/driving-hgv/geojson` with `Authorization: <ORS_API_KEY>`, JSON content, `{coordinates:[origin,destination],...request,instructions:false}`, and no alternatives. It forwards optional radiuses unchanged beside original logical coordinates; it MUST NOT substitute pre-snapped coordinates or add waypoints. Honor `Retry-After`; retry 429/5xx thrice; fail other status/JSON/schema errors.
 
 ### Route-014 Radius Evidence
 
-`route-014` alone declares `radiuses:[547,350]`; every other route omits radiuses and uses ORS's 350m default unless separately evidenced. Accepted output stores logical endpoints, returned LineString first/last endpoints, and Turf-computed snap distances separately. Each distance MUST be within its configured/default radius and the global 2km tolerance. Safe diagnostics: route-014 origin `546.77m`, destination `<350m`, successful `2,002`-point LineString; route-015 default-radius preflight succeeded. These facts justify request configuration/acceptance only; response summaries remain generated ORS data, never hand-authored fixtures.
+`route-014` alone declares `radiuses:[547,350]`; every other route omits radiuses and uses ORS's 350m default unless separately evidenced. Accepted output stores logical endpoints, returned LineString first/last endpoints, and Turf-computed snap distances separately. Each distance MUST be within its configured/default radius and the global 2km tolerance. Safe diagnostics: route-014 origin `546.8199476793687` m, destination `113.79408158125304` m, successful `2,002`-point LineString; route-015 default-radius preflight succeeded. These facts justify request configuration/acceptance only; response summaries remain generated ORS data, never hand-authored fixtures.
 
-Write only `src/scenario/fixtures/generated/spain-hgv.v1.geojson`; top-level `xSupplyMesh` records generated marker, versions, endpoint/profile, UTC `generatedAt`, and `sourceRevision`. Validate all in memory, write/fsync sibling temp, then rename; failure preserves the accepted file.
+Write only `src/scenario/fixtures/ors-routes.geojson`; top-level `xSupplyMesh` records generated marker, versions, endpoint/profile, UTC `generatedAt`, and `sourceRevision`. Validate all in memory, write/fsync sibling temp, then rename; failure preserves the accepted file.
 
 ### `sourceRevision` Canonical Contract
 
@@ -41,11 +41,11 @@ Canonical JSON recursively sorts object keys; arrays preserve semantic order exc
 
 Exclude API key/Authorization/headers, raw response, provider timestamps, uncontrolled ORS engine/build metadata, `generatedAt`, prior `sourceRevision`, temp paths, and volatile provenance. `generatedAt` changes only with the hash; unchanged payload/hash performs a byte-for-byte no-op preserving timestamp/file bytes.
 
-Snap point restrictions to vertices and route risks to contiguous segment endpoints. Persist IDs, indices, exact coordinates; validate associations/index equality and reject drift.
+Snap point restrictions to vertices and route risks to contiguous segment endpoints. Persist IDs, indices, and exact coordinates in the generated fixture; `routeCatalog.ts` and fixture composition consume them, validate associations/index equality, and reject drift.
 
 ## Runtime Contracts and Files
 
-`src/scenario/fixtures/routes/{types,loadRouteFixtures}.ts` defines fixture/route/summary/snap types and validated static `?raw` loading. Runtime cannot reach scripts/ORS/key/fetch.
+`src/scenario/fixtures/routeCatalog.ts` validates/catalogs the manifest and generated GeoJSON; `src/scenario/routeRuntime.ts` owns progress/position runtime behavior. Static fixture imports require no fetch. Runtime cannot reach scripts/ORS/key/fetch.
 
 `Vehicle` uses `routeId` plus finite `[0,1]` `routeProgress`, not seeded position. Turf segment traversal returns first/last coordinate at bounds or the interior segment point without rewriting geometry. Invalid route/progress/snap throws typed error; `spain-v1.ts` derives position/route/risks.
 
