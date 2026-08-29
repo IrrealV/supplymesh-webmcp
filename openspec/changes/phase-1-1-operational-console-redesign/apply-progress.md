@@ -257,6 +257,26 @@ Reverting implementation commit `5c0a74b6294852c3389ce0b3a4b3684a642622bd` remov
 - `src/features/map/layers.ts`
 - `src/styles.css` (Unit 3B map-marker/risk/legend rules only)
 
+### Unit 3B Gatekeeper Evidence Binding
+
+- Immutable implementation identity: parent `0fcf574be250f744661b52288cf1d88a26c4647b`; implementation commit `408ff1effc055b0b48ac97f8e66efc80dd628446`; implementation tree `5e148cdc600cfc3da9eec37f06628b9b0d974bf4`.
+- Cryptographic binding: implementation diff `sha256:e4ddc5e6978891b466323513927ad3006e60785bbae63ef5181084d090489efd`; implementation evidence `sha256:78ce5fa0f6991f9b85a837f52cc9b548fef0a49d557909cef4d9903fd3f0cad2`; **381 additions + 110 deletions = 491 changed lines**, below 800.
+- Exact rollback is `git revert 408ff1effc055b0b48ac97f8e66efc80dd628446`. The exact `0fcf574..408ff1e` path set is the twelve-file list above; that list is bound to the implementation tree and diff revision on this section's preceding line.
+- Deterministic correction evidence revision: `sha256:9b745e790d9b31ee4ff7f95000c10464aca493aee0db4a9c44c1d3ba038b8367`.
+
+#### Managed Browser Diagnostics
+
+- Commands: `env -u ORS_API_KEY VITE_WEBMCP_LOCAL_BYPASS=true bun run dev -- --host 127.0.0.1 --port 4173`; then `env -u ORS_API_KEY bun run /tmp/opencode/unit3b-correction-runtime.ts` using headless Chromium with `hasTouch: true`. The temporary harness was outside the repository and deleted after the passing run.
+- Desktop initial OSM tile envelope was zoom 6, west/east `-16.875/11.25`, south/north `31.952162238024968/48.92249926375824`, span `28.125×16.970337025733272`, 20 tiles: useful Spain/Iberian context, not continental scale.
+- One click on the keyboard-reachable `Unit 204` truck marker produced exactly one inspection and one selected route. Moderate completed focus was zoom 8, west/east `-2.8125/4.21875`, south/north `37.718590325588146/43.06888777416962`, span `7.03125×5.350297448581472`, 25 tiles. Closing and one click on its separate keyboard-reachable label independently produced the same single-selection/single-route result.
+- Programmatic marker focus, label focus, and desktop rail/context invalidation preserved follow. The real desktop map width changed `987.203125 -> 819.203125 -> 987.203125` across expand/collapse without blank map state.
+- A real two-contact CDP `touchStart -> touchMove -> touchEnd` pinch-style gesture in the touch-capable context cancelled follow; the existing `Follow Unit 204` action restored it.
+- Computed tile-pane filter was exactly `saturate(0.28) contrast(0.86) brightness(1.08)` and visible attribution contained `OpenStreetMap`.
+- At 900×900 the map began `844×844`. A real Weather rail/results transition changed rail overlay width `56 -> 232` while the context panel remained 336; subsequent route focus reloaded 5 cached tile elements (0 network requests required), left 5 current tiles, 15 markers, and the legend usable, with no blank/clipped state.
+- Final diagnostics: 87 OSM tile requests across all desktop/touch/tablet flows; 0 console errors, 0 page errors, 0 screenshots/PNGs; temporary harness deleted; managed server stopped; port 4173 free.
+- Correction scope: only this cumulative apply-progress artifact changed. Tasks remain 12/19; Unit 4 and Unit 5 remain pending. Production, tests, task checkboxes, Unit 3A protected files, product behavior, WebMCP, and Phase 2 are byte-identical.
+- Settlement: `native_correction_attempt=already-acquired`; `acquire=NOT_RUN`; `reset=NOT_RUN`; `settle=NOT_RUN`. No push, PR, merge, review, or main modification ran.
+
 ## Remaining Tasks
 
 - [ ] Unit 4 tasks 4.1–4.3: inspection redesign and localization.
