@@ -326,6 +326,15 @@ Reverting implementation commit `5c0a74b6294852c3389ce0b3a4b3684a642622bd` remov
 - `src/preferences/i18n/es.ts`
 - `src/styles.css` (Unit 4 inspection/tablet/motion rules only)
 
+### Unit 4 Gatekeeper Evidence Binding
+
+- Immutable implementation identity: parent `bacb5c31f28590984a572bf9461df197792b93cf`; implementation commit `f25089cc702735ae933750b5af1d066941f39bb4`; implementation tree `479f490c82b872618a6fd9c4c7683cd3539588a0`.
+- Cryptographic binding: commit diff `sha256:a884cc1dce5a8bc775a2c68bf4216d596f523544ce9ca648ca17f98fc000144e`; source/test/style revision `sha256:e1dbd5459acf60a4f3882eb7180a4e6dc55192da2f63cbf67c3fbb834e9bb3f4`; implementation evidence `sha256:ec7972daa602f43e19bbddfbae8fa3c2a2f378a954c1417372cc27ffc6d4fcc0`; **441 additions + 221 deletions = 662 changed lines**, below 800.
+- Exact rollback is `git revert f25089cc702735ae933750b5af1d066941f39bb4`; the expanded sixteen-file rollback list immediately above remains authoritative and bound to the implementation tree and revisions on the preceding line.
+- Deterministic correction evidence revision: `sha256:d85757c72101ef4e26f5577d65c49097c872814c3b58b265eff18ae82183e5cd`.
+- Correction scope: only this cumulative apply-progress artifact changed. Tasks remain 15/19; product, tests, task checkboxes, ORS, WebMCP, E2E, evidence assets, Phase 2, and behavior are byte-identical.
+- Settlement: `native_correction_attempt=already-acquired`; `acquire=NOT_RUN`; `reset=NOT_RUN`; `settle=NOT_RUN`. No push, PR, merge, review, or main modification ran.
+
 ## Remaining Tasks
 
 - [ ] Unit 5 tasks 5.1–5.4: full regression, native WebMCP proof, screenshots, and release evidence.
