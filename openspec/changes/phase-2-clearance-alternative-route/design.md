@@ -48,7 +48,7 @@ Admit `>=3` coordinates; `booleanIntersects(route,polygon)===false` (boundary in
 | `src/scenario/fixtures/clearanceAlternativeCatalog.test.ts` | Catalog/exclusions | 18 |
 | `package.json`, `docs/route-fixtures.md` | Commands/docs | 27 |
 
-Total: **354 manual changed lines**, one batch, one commit, one unmerged PR; no chained PR.
+Delivery: **two-PR feature-branch chain**. The planning tracker targets `main` and remains unmerged; the implementation child targets the tracker, stays below 400 manual changed lines, and reports generated GeoJSON separately.
 
 ## Testing Strategy
 

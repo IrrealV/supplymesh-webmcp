@@ -30,7 +30,7 @@ Generation and offline verification MUST reject a geometry that touches or enter
 
 Tests MUST separately assert one logical candidate/one feature and the expected number of retried HTTP calls. The exclusion guard MUST scan `src/features`, `src/domain/operations`, `src/platform/webmcp`, and `src/scenario/fixtures/spain-v1.ts`, proving none imports or uses the alternative fixture/catalog or gains assignment, rerouting, staged plans, application behavior, or tools; only the dedicated catalog, generation path, and tests may reference the fixture.
 
-Estimated authored implementation: source 165–185 lines, tests 120–140 lines, docs/manifests/package scripts 35–45 lines; total 320–370 manual lines. The generated GeoJSON is excluded from that count. The batch can remain below the 400-line manual budget: `Decision needed before apply: No`; `Chained PRs recommended: No`; `400-line budget risk: Low`.
+Delivery uses the resolved two-PR feature-branch chain: the planning tracker targets `main` and remains unmerged; the implementation child targets the tracker and stays below the 400-line manual budget, with generated GeoJSON reported separately. `Decision needed before apply: No`; `Chained PRs recommended: Yes`; `400-line budget risk: Low`.
 
 Rollback is deletion of the new alternative manifest/GeoJSON/catalog/script/test and reversal of the three shared exports, package commands, and documentation; `git diff --exit-code 435f14f -- src/scenario/fixtures/ors-route-manifest.json src/scenario/fixtures/ors-routes.geojson` proves the protected main fixtures remain untouched.
 

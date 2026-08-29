@@ -29,7 +29,7 @@ PR 1: `feat/phase2-clearance-alternative-route` → `main`, only the existing 29
 | Unit | Goal | Likely PR | Focused test command | Runtime harness | Rollback boundary |
 |---|---|---|---|---|---|
 | 1 | Review the existing OpenSpec plan | PR 1: tracker → `main` | `git diff --check -- openspec/changes/phase-2-clearance-alternative-route` | N/A — planning artifacts only | Revert only the 291-line planning commit. |
-| 2 | Implement one inert clearance fixture | PR 2: implementation → tracker | `bun run test -- scripts/generate-clearance-alternative-route.test.ts src/scenario/fixtures/clearanceAlternativeCatalog.test.ts` | `ORS_API_KEY=<secret> bun --no-env-file run routes:clearance:generate`, then keyless `bun --no-env-file run routes:clearance:verify` | Delete six new script/fixture/catalog files; revert exports, scripts, docs; recheck hashes. |
+| 2 | Implement one inert clearance fixture | PR 2: implementation → tracker | `bun run test -- scripts/generate-clearance-alternative-route.test.ts src/scenario/fixtures/clearanceAlternativeCatalog.test.ts` | `ORS_API_KEY=<secret> bun --no-env-file run routes:clearance:generate`, then keyless `bun --no-env-file run routes:clearance:verify` | Full rollback reverts the correction commit first, then `4f99f4c98077b6fbcadc77f1cd46a5394efe997a`; the correction hash is post-commit evidence. |
 
 ## Phase 1: RED Contract Tests
 
@@ -53,4 +53,4 @@ PR 1: `feat/phase2-clearance-alternative-route` → `main`, only the existing 29
 ## Phase 4: Verification and Delivery Boundary
 
 - [x] 4.1 Run focused tests; `bun --no-env-file run routes:clearance:verify`, `bun --no-env-file run routes:verify`, `bun run check`, guards, and `bunx tsc --noEmit` on both tests without `any`/ignores.
-- [x] 4.2 Keep all changes in this one reversible batch for issue #26; rollback exactly the Unit 1 boundary and do not alter Phase 2 UI, WebMCP, runtime routing, or other artifacts.
+- [x] 4.2 Keep issue #26 reversible: newest-first full rollback is the correction commit, then `4f99f4c98077b6fbcadc77f1cd46a5394efe997a`; do not alter Phase 2 UI, WebMCP, runtime routing, or other artifacts.

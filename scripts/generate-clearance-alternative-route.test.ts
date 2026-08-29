@@ -1,8 +1,9 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { buildAvoidPolygon, generateClearanceAlternative, verifyClearanceAlternative } from "./generate-clearance-alternative-route";
+import { writeAtomically } from "./routes/generator";
 
 const apiKey = "test-only-secret";
 const endpoints = [[-4.0273, 39.8628], [-3.7496, 40.4637]] as const;
@@ -63,5 +64,11 @@ describe("clearance alternative generator", () => {
     await expect(verifyClearanceAlternative(tampered, { currentFixture })).rejects.toThrow("revision"); await new Promise((resolve) => setTimeout(resolve, 20));
     const result = await generateClearanceAlternative({ apiKey, currentFixture, fetcher, now: () => new Date("2027-01-01T00:00:00.000Z"), outputPath: path });
     expect(result.changed).toBe(false); expect({ bytes: await readFile(path, "utf8"), mtimeMs: (await stat(path)).mtimeMs }).toStrictEqual(before);
+  });
+
+  it("should preserve accepted bytes and clean temporary files when atomic rename fails", async () => {
+    const path = await outputPath(); await writeFile(path, "accepted-bytes");
+    await expect(writeAtomically(path, "replacement", async () => { throw new Error("injected rename failure"); })).rejects.toThrow("injected rename failure");
+    expect(await readFile(path, "utf8")).toBe("accepted-bytes"); expect((await readdir(dirname(path))).filter((entry) => entry.includes(".tmp-"))).toStrictEqual([]);
   });
 });

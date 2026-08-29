@@ -18,6 +18,16 @@ describe("clearance alternative catalog", () => {
 
   it("should keep current consumers free of alternative, provider, staged-plan, application, movement, and tool integration", async () => {
     const roots = ["src/app", "src/features", "src/domain/operations", "src/platform/webmcp"]; const paths = (await Promise.all(roots.map(async (root) => (await readdir(root, { recursive: true })).filter((path) => /\.tsx?$/.test(path)).map((path) => `${root}/${path}`)))).flat(); paths.push("src/scenario/fixtures/spain-v1.ts");
-    const sources = await Promise.all(paths.map(async (path) => `${path}\n${await readFile(path, "utf8")}`)); expect(sources.join("\n")).not.toMatch(new RegExp(`clearanceAlternative|clearance-alternative-route|alternativeRoute|stagedPlan|rerout|${["ORS", "API", "KEY"].join("_")}`));
+    const sources = await Promise.all(paths.map(async (path) => `${path}\n${await readFile(path, "utf8")}`)); const source = sources.join("\n"); const webMcpSource = sources.filter((entry) => entry.startsWith("src/platform/webmcp/")).join("\n");
+    const prohibited: Array<[string, RegExp]> = [
+      ["alternative application or assignment", /\b(?:apply|assign)\w*(?:Alternative|Route)|\b(?:alternative|route)\w*(?:Apply|Assign)/i],
+      ["movement or position mutation", /\b(?:move|set|update)\w*(?:Vehicle)?(?:Position|Location)|\b(?:position|location)\w*(?:Mutation|Update)/i],
+      ["comparison UI", /\b(?:compare|comparison)\w*(?:Route|Alternative)|\b(?:route|alternative)\w*(?:Compare|Comparison)/i],
+      ["staged plan or approval", /\b(?:stagedPlan|stage\w*Alternative|approve\w*Alternative|alternative\w*Approval)\b/i],
+      ["runtime provider or key", new RegExp(`openrouteservice|fetch\\s*\\(|${["ORS", "API", "KEY"].join("_")}`, "i")],
+      ["alternative fixture or catalog import", /from\s+["'][^"']*(?:clearance|alternative)[^"']*["']|clearanceAlternative|clearance-alternative-route|alternative-route-\d{3}/i],
+    ];
+    for (const [concept, pattern] of prohibited) expect(source, concept).not.toMatch(pattern);
+    expect(webMcpSource, "WebMCP route tool or registration").not.toMatch(/name:\s*["'][^"']*(?:route|alternative)|registerTool\([^)]*(?:route|alternative)/i);
   });
 });
