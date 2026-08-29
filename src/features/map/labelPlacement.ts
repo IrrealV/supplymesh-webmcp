@@ -1,7 +1,7 @@
 export type ScreenRect = { height: number; width: number; x: number; y: number };
 export type ScreenPoint = { id: string; x: number; y: number };
 
-const LABEL = { height: 28, width: 104 };
+const LABEL = { height: 30, width: 112 };
 const directions = [[1, 0], [-1, 0], [0, -1], [0, 1], [1, -1], [-1, -1], [1, 1], [-1, 1]] as const;
 
 export function rectanglesIntersect(left: ScreenRect, right: ScreenRect): boolean {

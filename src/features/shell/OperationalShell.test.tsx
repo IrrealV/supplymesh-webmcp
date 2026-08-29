@@ -9,6 +9,7 @@ import { createOperationsApi } from "../../domain/operations/createOperationsApi
 import { createZustandScenarioRepository } from "../../scenario/state/createZustandScenarioRepository";
 import { OperationalShell } from "./OperationalShell";
 import { Topbar } from "./Topbar";
+import { TABLET_MEDIA_QUERY } from "../../app/presentation/useTabletViewport";
 
 const styles = readFileSync("src/styles.css", "utf8");
 
@@ -109,6 +110,7 @@ describe("OperationalShell", () => {
     expect(styles).toContain("grid-template-columns: 64px minmax(0, 1fr) clamp(336px, 27vw, 400px)");
     expect(styles).toContain("outline: 2px solid var(--focus)");
     expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(TABLET_MEDIA_QUERY).toBe("(min-width: 701px) and (max-width: 1279px)");
   });
 
   it("should switch the visible language immediately", async () => {
@@ -131,12 +133,32 @@ describe("OperationalShell", () => {
     try {
       const user = userEvent.setup();
       render(<OperationalShell locale="en" onLocaleChange={() => undefined} onScenarioChange={() => undefined} operations={createOperationsApi(createZustandScenarioRepository())} scenario={createSpainScenario()} />);
+      expect(screen.getByRole("button", { name: "Open operational overview" })).not.toBeNull();
+      expect(screen.queryByRole("dialog", { name: "Operational overview" })).toBeNull();
       await user.click(screen.getByRole("button", { name: "Critical" }));
       expect(screen.getByRole("dialog", { name: "Fleet filters" })).not.toBeNull();
+      expect(useUiCoordinationStore.getState().railState).toBe("compact");
       await user.click(screen.getByRole("button", { name: "Close results" }));
 
-      expect(screen.getByRole("heading", { name: "Operational overview" })).not.toBeNull();
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Fleet filters" })).toBeNull());
+      expect(screen.getByRole("button", { name: "Open operational overview" })).not.toBeNull();
       expect(document.activeElement).toBe(screen.getByRole("button", { name: "Critical" }));
+    } finally { Object.defineProperty(window, "matchMedia", { configurable: true, value: originalMatchMedia }); }
+  });
+
+  it("should expose a dismissible overview drawer on tablet without expanding the filter rail", async () => {
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, "matchMedia", { configurable: true, value: () => ({ addEventListener: () => undefined, matches: true, removeEventListener: () => undefined }) });
+    try {
+      const user = userEvent.setup();
+      render(<OperationalShell locale="en" onLocaleChange={() => undefined} onScenarioChange={() => undefined} operations={createOperationsApi(createZustandScenarioRepository())} scenario={createSpainScenario()} />);
+
+      await user.click(screen.getByRole("button", { name: "Open operational overview" }));
+      expect(screen.getByRole("dialog", { name: "Operational overview" })).not.toBeNull();
+      expect(useUiCoordinationStore.getState().railState).toBe("compact");
+
+      await user.click(screen.getByRole("button", { name: "Close operational overview" }));
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Operational overview" })).toBeNull());
     } finally { Object.defineProperty(window, "matchMedia", { configurable: true, value: originalMatchMedia }); }
   });
 });

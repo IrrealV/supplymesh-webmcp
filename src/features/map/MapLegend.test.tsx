@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { MapLegend } from "./MapLegend";
 
@@ -15,5 +16,22 @@ describe("MapLegend", () => {
     expect(legend.textContent).toContain("Road closure");
     expect(legend.textContent).toContain("Weather affected");
     expect(legend.textContent).toContain("Driving and rest risk");
+  });
+
+  it("should start collapsed and remain user-toggleable on tablet", async () => {
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, "matchMedia", { configurable: true, value: () => ({ addEventListener: () => undefined, matches: true, removeEventListener: () => undefined }) });
+    try {
+      const user = userEvent.setup();
+      render(<MapLegend locale="en" />);
+
+      const toggle = screen.getByRole("button", { name: "Map legend" });
+      expect(toggle.getAttribute("aria-expanded")).toBe("false");
+      expect(screen.getByRole("list", { hidden: true }).getAttribute("aria-hidden")).toBe("true");
+
+      await user.click(toggle);
+      expect(toggle.getAttribute("aria-expanded")).toBe("true");
+      expect(screen.getByRole("list", { hidden: true }).getAttribute("aria-hidden")).toBe("false");
+    } finally { Object.defineProperty(window, "matchMedia", { configurable: true, value: originalMatchMedia }); }
   });
 });

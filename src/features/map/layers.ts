@@ -21,6 +21,11 @@ function layerState(vehicleId: string, matchingIds: ReadonlySet<string>, selecte
   return matchingIds.has(vehicleId) ? "matched" : "muted";
 }
 
+export function selectVisibleRisks(entries: readonly DerivedRisk[], selectedVehicleId: string): DerivedRisk[] {
+  return entries.filter(({ risk }) => risk.kind !== "rest-deadline"
+    || (selectedVehicleId !== "" && risk.affectedVehicleIds.includes(selectedVehicleId)));
+}
+
 export function deriveMapLayers(scenario: OperatingRegion, activeFilters: ReadonlySet<FleetFilter>, selectedVehicleId: string): MapLayers {
   const matchingIds = new Set(selectFilterResults(scenario, activeFilters).map(({ vehicle }) => vehicle.internalId));
   const hasFilters = activeFilters.size > 0;

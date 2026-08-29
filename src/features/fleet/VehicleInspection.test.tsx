@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OperatingRegion, Vehicle } from "../../domain/entities";
@@ -113,7 +113,7 @@ describe("VehicleInspection", () => {
       const { onClose } = renderInspection();
       expect(screen.getByRole("dialog", { name: "FM-201" }).getAttribute("aria-label")).toBe("Vehicle inspection");
       await user.keyboard("{Escape}");
-      expect(onClose).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     } finally { Object.defineProperty(window, "matchMedia", { configurable: true, value: originalMatchMedia }); }
   });
 

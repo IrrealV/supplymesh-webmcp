@@ -6,6 +6,8 @@ import { catalog, interpolate, type Locale } from "../../preferences/i18n/catalo
 import type { DerivedVehicle, LayerState } from "./layers";
 import { placeLabels, type ScreenRect } from "./labelPlacement";
 
+const LABEL_ZOOM_THRESHOLD = 7.5;
+
 function escapeHtml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
@@ -16,13 +18,13 @@ function createVehicleMarkerIcons(vehicle: DerivedVehicle["vehicle"], state: Lay
   return {
     truck: divIcon({
       className: `fleet-truck-icon map-layer-${state}`,
-      html: `<span data-vehicle-truck="${vehicle.internalId}" class="fleet-status-pin status-${status}" aria-hidden="true"></span><span class="fleet-truck-shape" aria-hidden="true"><span></span></span>`,
-      iconAnchor: [15, 15], iconSize: [30, 30],
+      html: `<span data-vehicle-truck="${vehicle.internalId}" class="fleet-status-pin fleet-vehicle-pin status-${status}" aria-hidden="true"><span class="fleet-selection-aura"></span><svg viewBox="0 0 28 28"><path d="M4.5 7.5h12.3v9.4H4.5z"/><path d="M16.8 10.2h4.1l2.6 3.2v3.5h-6.7z"/><circle cx="8" cy="19.2" r="2.1"/><circle cx="20.2" cy="19.2" r="2.1"/></svg></span>`,
+      iconAnchor: [20, 20], iconSize: [40, 40],
     }),
     label: divIcon({
       className: `fleet-label-icon map-layer-${state}`,
       html: `<span data-vehicle-label="${vehicle.internalId}" class="fleet-marker-label">${label}</span>`,
-      iconAnchor: [-18, 14], iconSize: [104, 28],
+      iconAnchor: [52, 50], iconSize: [112, 30],
     }),
   };
 }
@@ -30,7 +32,14 @@ function createVehicleMarkerIcons(vehicle: DerivedVehicle["vehicle"], state: Lay
 export function VehicleMarkerLayer({ locale, onSelect, vehicles }: { locale: Locale; onSelect(vehicleId: string): void; vehicles: readonly DerivedVehicle[] }) {
   const map = useMap();
   const copy = catalog(locale);
-  const suffix = locale === "es" ? { truck: "camión", label: "etiqueta" } : { truck: "truck", label: "label" };
+  const suffix = locale === "es" ? { truck: "camion", label: "etiqueta" } : { truck: "truck", label: "label" };
+  useEffect(() => {
+    const container = map.getContainer();
+    const syncLabelVisibility = (): void => { container.classList.toggle("map-labels-visible", map.getZoom() >= LABEL_ZOOM_THRESHOLD); };
+    map.on("zoom zoomend", syncLabelVisibility);
+    syncLabelVisibility();
+    return () => { map.off("zoom zoomend", syncLabelVisibility); container.classList.remove("map-labels-visible"); };
+  }, [map]);
   useEffect(() => {
     let frame = 0;
     const place = (): void => {
