@@ -158,7 +158,8 @@ Reverting implementation commit `5c0a74b6294852c3389ce0b3a4b3684a642622bd` remov
 ### Unit 3A Candidate and Provenance
 
 - Parent/amendment: `a4fbebb2e3fcab3ff0ecc3752a62c976ff9f6905`; child PR target remains Unit 2 `d834b2b598d0d1f50e690eecf1469556bef8d503`.
-- Implementation binding: finalized by the evidence-only follow-up after the implementation commit.
+- Implementation commit/tree: `f7a69d356866eb5d0ec260451753590cc1e5e755` / `ed574a89a01993a8bceeda45d6481a474069005e`.
+- Implementation diff/evidence revisions: `sha256:d4d4dd238b30b4fb9d33e4ed92ebe31c8944978b690fc1e77e620dce9615a622` / `sha256:e74c91fa6d2abce36f29d5c4b4080f7953ffb3307255a648b920fa2e6cadf3d9`.
 - Authored review size: **373 additions + 20 deletions = 393 changed lines**, including the compact one-line reviewed GeoJSON and all source/tests/docs/OpenSpec changes.
 - Generated fixture: 15 routes / 45,577 exact ORS coordinates; `generatedAt=2026-08-29T00:42:35.649Z`; manifest `sha256:8285a93bbdddacb5dd47452348a1f1c56d2b649f913248a81caaa33e05616cd3`; source `sha256:16e9952c577cfcc7de3e1cd8bfbc1ea068557c049d5674052b3b1e74fcacc439`.
 - Route-014 preserved logical endpoints, passed exact `[547,350]`, and retained 2,002 returned coordinates; snaps were `546.8199476793687m` / `113.79408158125304m`; ORS summary was `228585.4m` / `12352.3s`.
