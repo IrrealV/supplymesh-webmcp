@@ -42,7 +42,7 @@ Only this root spec was modified. No runtime, routes, GeoJSON, generator, domain
 - `verify-report.md` — PASS
 - `archive-report.md`
 
-The active change path is absent. The closeout branch is `chore/phase-2-clearance-alternative-archive`; its single small closeout PR remains unmerged. No next Phase 2 batch was started.
+The active change path is absent. The closeout branch is `chore/phase2-clearance-alternative-archive`; its single small closeout PR remains unmerged. No next Phase 2 batch was started.
 
 ## Mechanical Readback
 
