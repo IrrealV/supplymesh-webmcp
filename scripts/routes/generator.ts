@@ -45,6 +45,7 @@ function canonicalValue(value: unknown): unknown {
 }
 export function canonicalJSON(value: unknown): string { return JSON.stringify(canonicalValue(value)); }
 function sha256(value: unknown): string { return createHash("sha256").update(canonicalJSON(value), "utf8").digest("hex"); }
+export function canonicalSha256(value: unknown): string { return sha256(value); }
 function canonicalManifest(manifest: RouteGenerationManifest): RouteGenerationManifest {
   const stable = sortedManifest(manifest);
   return { version: stable.version, routes: stable.routes.map((route) => ({ ...route, request: { preference: route.request.preference, options: route.request.options, radiuses: route.request.radiuses ?? null } })) } as RouteGenerationManifest;
@@ -60,7 +61,7 @@ function riskSnaps(routeId: string, coordinates: Coordinate[]): RiskSnap[] {
   return inputs.map(({ riskId, kind, ratio }) => { const startIndex = Math.min(coordinates.length - 2, Math.floor((coordinates.length - 1) * ratio)); const endIndex = kind === "point" ? startIndex : startIndex + 1; return { riskId, kind, startIndex, endIndex, startCoordinate: coordinates[startIndex], endCoordinate: coordinates[endIndex] }; }).sort((a, b) => a.riskId.localeCompare(b.riskId));
 }
 function retryDelay(response: Response, retry: number): number { const header = response.headers.get("Retry-After"); const value = header === null ? Number.NaN : Number(header); return Number.isFinite(value) && value >= 0 ? Math.min(value * 1000, 5000) : Math.min(250 * 2 ** retry, 2000); }
-async function requestRoute(route: ManifestRoute, apiKey: string, fetcher: typeof fetch, sleep: (milliseconds: number) => Promise<void>): Promise<AcceptedRoute> {
+export async function requestRoute(route: ManifestRoute, apiKey: string, fetcher: typeof fetch, sleep: (milliseconds: number) => Promise<void>): Promise<AcceptedRoute> {
   const body = JSON.stringify({ coordinates: [route.origin.coordinates, route.destination.coordinates], preference: route.request.preference, options: route.request.options, ...(route.request.radiuses === undefined ? {} : { radiuses: route.request.radiuses }), instructions: false });
   for (let attempt = 0; attempt <= 3; attempt += 1) {
     let response: Response; try { response = await fetcher(ENDPOINT, { method: "POST", headers: { Authorization: apiKey, "Content-Type": "application/json" }, body }); } catch { throw new Error(`ORS request failed for ${route.routeId}.`); }
@@ -95,7 +96,7 @@ export async function verifyRouteFixture(manifest: RouteGenerationManifest, valu
   const sourceRevision = calculateSourceRevision(stableManifest, routes); if (metadata.generated !== true || metadata.fixtureSchemaVersion !== 1 || metadata.provider !== "openrouteservice" || metadata.profile !== "driving-hgv" || metadata.routeCount !== routes.length || metadata.manifestRevision !== sha256(canonicalManifest(stableManifest)) || metadata.sourceRevision !== sourceRevision || typeof metadata.generatedAt !== "string" || new Date(metadata.generatedAt).toISOString() !== metadata.generatedAt) throw new Error("Route fixture provenance is invalid.");
   return { routeCount: routes.length, sourceRevision, coordinateCount: routes.reduce((total, route) => total + route.coordinates.length, 0) };
 }
-async function writeAtomically(path: string, bytes: string): Promise<void> { const temporaryPath = `${path}.tmp-${process.pid}-${Date.now()}`; let handle: Awaited<ReturnType<typeof open>> | undefined; try { handle = await open(temporaryPath, "w"); await handle.writeFile(bytes, "utf8"); await handle.sync(); await handle.close(); handle = undefined; await rename(temporaryPath, path); } catch (error) { await handle?.close().catch(() => undefined); await unlink(temporaryPath).catch(() => undefined); throw error; } }
+export async function writeAtomically(path: string, bytes: string, renameFile: typeof rename = rename): Promise<void> { const temporaryPath = `${path}.tmp-${process.pid}-${Date.now()}`; let handle: Awaited<ReturnType<typeof open>> | undefined; try { handle = await open(temporaryPath, "w"); await handle.writeFile(bytes, "utf8"); await handle.sync(); await handle.close(); handle = undefined; await renameFile(temporaryPath, path); } catch (error) { await handle?.close().catch(() => undefined); await unlink(temporaryPath).catch(() => undefined); throw error; } }
 export async function generateRouteFixture(options: GenerateOptions): Promise<{ changed: boolean; routeCount: number; coordinateCount: number; sourceRevision: string }> {
   if (options.apiKey === undefined || options.apiKey.trim().length === 0) throw new Error("ORS_API_KEY is required in the process environment."); const manifest = sortedManifest(options.manifest); const fetcher = options.fetcher ?? fetch; const sleep = options.sleep ?? ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))); const routes: AcceptedRoute[] = [];
   for (const route of manifest.routes) routes.push(await requestRoute(route, options.apiKey, fetcher, sleep)); const fixture = fixtureFrom(manifest, routes, (options.now ?? (() => new Date()))().toISOString());

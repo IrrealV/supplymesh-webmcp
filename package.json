@@ -13,6 +13,8 @@
     "preview": "vite preview",
     "routes:generate": "bun run --no-env-file scripts/generate-ors-routes.ts generate",
     "routes:verify": "bun run --no-env-file scripts/generate-ors-routes.ts verify",
+    "routes:clearance:generate": "bun run --no-env-file scripts/generate-clearance-alternative-route.ts generate",
+    "routes:clearance:verify": "bun run --no-env-file scripts/generate-clearance-alternative-route.ts verify",
     "test:e2e": "playwright test",
     "webmcp:verify-native": "bun run scripts/validate-native-webmcp.ts"
   },

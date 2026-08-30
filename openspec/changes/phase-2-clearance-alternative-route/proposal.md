@@ -56,6 +56,6 @@ Delete the script/tests/manifest/GeoJSON/catalog, revert exports/commands/docs, 
 
 ## Success Criteria
 
-- [ ] One logical candidate produces one validated feature avoiding the exact polygon; retries are transport-only.
-- [ ] Catalog is immutable; guards pass; runtime stays offline/keyless; main fixture bytes remain unchanged.
-- [ ] Authored source/test/docs changes remain within the 400-line budget and the PR remains unmerged.
+- [x] One logical candidate produces one validated feature avoiding the exact polygon; retries are transport-only.
+- [x] Catalog is immutable; guards pass; runtime stays offline/keyless; main fixture bytes remain unchanged.
+- [x] Authored source/test/docs changes remain within the 400-line budget and the PR remains unmerged.
