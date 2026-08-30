@@ -1,7 +1,10 @@
+import { booleanIntersects } from "@turf/turf";
+import type { GeoLine, GeoPolygon } from "../entities";
 import type {
   CargoAssignment,
   CargoContinuityValidation,
   ClearanceValidation,
+  GeometryAvoidanceValidation,
   RestWindowValidation,
   ScenarioClock,
 } from "./types";
@@ -77,6 +80,42 @@ export function validateClearancePolicy(input: ClearancePolicyInput): ClearanceV
     requiredClearanceMeters,
     status: isSatisfied ? "PASS" : "FAIL",
     vehicleHeightMeters: input.vehicleHeightMeters,
+  };
+}
+
+export function validateGeometryAvoidance(
+  routeGeometry: GeoLine,
+  exclusionZone: GeoPolygon,
+  minimumSeparationMeters: number,
+): GeometryAvoidanceValidation {
+  if (!Number.isFinite(minimumSeparationMeters) || minimumSeparationMeters < 0) {
+    return {
+      minimumSeparationMeters: 0,
+      reasonCode: "GEOMETRY_DATA_INVALID",
+      status: "UNKNOWN",
+    };
+  }
+
+  try {
+    if (booleanIntersects(routeGeometry, exclusionZone)) {
+      return {
+        minimumSeparationMeters: 0,
+        reasonCode: "EXCLUSION_ZONE_INTERSECTION",
+        status: "FAIL",
+      };
+    }
+  } catch {
+    return {
+      minimumSeparationMeters: 0,
+      reasonCode: "GEOMETRY_DATA_INVALID",
+      status: "UNKNOWN",
+    };
+  }
+
+  return {
+    minimumSeparationMeters,
+    reasonCode: "EXCLUSION_ZONE_AVOIDED",
+    status: "PASS",
   };
 }
 
