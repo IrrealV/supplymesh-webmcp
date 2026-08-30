@@ -267,3 +267,13 @@ export type RecoveryVehicleReference = {
   label: string;
   vehicleId: string;
 };
+
+export type RecoveryError = {
+  code: string;
+  message: string;
+  nextAction: string;
+};
+
+export type RecoveryResult<T> =
+  | { code: string; data: T; ok: true }
+  | { error: RecoveryError; ok: false };
