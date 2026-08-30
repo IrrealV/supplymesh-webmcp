@@ -99,6 +99,19 @@ export function verifyUnit211Recovery(
       },
     );
   const fingerprint = createPlanFingerprint(planFingerprintPayload(plan));
+  const approvalAuthorityPasses =
+    approval.planId === plan.id
+    && approval.vehicleId === plan.vehicleId
+    && approval.currentRouteId === plan.currentRouteId
+    && approval.proposedRouteId === plan.proposedRouteId
+    && approval.incidentId === plan.incidentId
+    && approval.selectedOptionId === plan.selectedOptionId
+    && approval.scenarioRevision === plan.basedOnScenarioRevision
+    && approval.approvedAt === snapshot.scenarioClock.instant
+    && approval.approvedAt === plan.createdAt
+    && approval.approvedBy === "human-ui"
+    && canonicalSerialize(approval.constraints) === canonicalSerialize(plan.constraints)
+    && canonicalSerialize(approval.constraints) === canonicalSerialize(snapshot.constraints);
   const receiptAuthorityPasses =
     receipt.receiptId === `operation-receipt-${plan.id}`
     && receipt.planId === plan.id
@@ -119,6 +132,7 @@ export function verifyUnit211Recovery(
     && plan.basedOnScenarioRevision === approval.scenarioRevision
     && plan.status === "EXECUTED"
     && approval.used
+    && approvalAuthorityPasses
     && receiptAuthorityPasses;
   const executionEvents = snapshot.auditTimeline.filter(
     ({ action }) => action === "RECOVERY_PLAN_EXECUTED",

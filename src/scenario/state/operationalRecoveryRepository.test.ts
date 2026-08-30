@@ -93,6 +93,41 @@ describe("authoritative operational recovery repository", () => {
     expect(receivedRevisions).toStrictEqual([1]);
   });
 
+
+  it("should reconcile repeated comparison and keep receipt audit references bounded", () => {
+    const repository = createZustandOperationalRecoveryRepository(new MemoryStorage());
+    const options = expectSuccess(repository.recoveryOptionsCompare());
+    const afterFirstComparison = repository.recoverySnapshot();
+
+    for (let index = 0; index < 25; index += 1) {
+      const repeated = repository.recoveryOptionsCompare();
+      expect(repeated.ok && repeated.code).toBe("OPTIONS_ALREADY_READY");
+    }
+    expect(repository.recoverySnapshot()).toStrictEqual(afterFirstComparison);
+
+    const alternative = options.find(({ kind }) => kind === "ALTERNATIVE_ROUTE");
+    if (alternative === undefined) {
+      throw new Error("Alternative option missing.");
+    }
+    const plan = expectSuccess(repository.recoveryPlanStage({
+      selectedOptionId: alternative.id,
+    }));
+    expectSuccess(repository.recoveryPlanRequestReview({ planId: plan.id }));
+    const approval = expectSuccess(
+      repository.recoveryPlanApprove({ planId: plan.id }),
+    );
+    const executedReceipt = expectSuccess(executeApproved(repository, approval));
+
+    expect(executedReceipt.auditEventIds).toHaveLength(2);
+    expectSuccess(repository.recoveryVerify({ planId: plan.id }));
+    const verifiedReceipt = expectSuccess(
+      repository.operationReceiptGet({ planId: plan.id }),
+    );
+    expect(verifiedReceipt.auditEventIds).toHaveLength(3);
+    expect(new Set(verifiedReceipt.auditEventIds).size).toBe(3);
+    expect(JSON.stringify(verifiedReceipt).length).toBeLessThan(4_000);
+  });
+
   it("should stage and review a plan without advancing revision or mutating the active route", () => {
     const repository = createZustandOperationalRecoveryRepository(new MemoryStorage());
     const before = repository.recoverySnapshot();
@@ -400,6 +435,16 @@ describe("authoritative operational recovery repository", () => {
     const fingerprintReport = verifyUnit211Recovery(fingerprintTampered, baseline);
 
 
+
+    const approvalTampered = repository.recoverySnapshot();
+    if (approvalTampered.approval === undefined) {
+      throw new Error("Consumed approval missing.");
+    }
+    approvalTampered.approval.planId = "recovery-plan-attacker";
+    approvalTampered.approval.selectedOptionId = "option-attacker";
+    approvalTampered.approval.approvedAt = "2026-08-28T09:01:00.000Z";
+    const approvalReport = verifyUnit211Recovery(approvalTampered, baseline);
+
     const receiptTampered = repository.recoverySnapshot();
     if (receiptTampered.receipt === undefined) {
       throw new Error("Execution receipt missing.");
@@ -417,6 +462,10 @@ describe("authoritative operational recovery repository", () => {
       ({ name }) => name === "cargoContinuity",
     )?.status).toBe("FAIL");
     expect(fingerprintReport.checks.find(
+      ({ name }) => name === "approvedFingerprint",
+    )?.status).toBe("FAIL");
+    expect(approvalReport.overall).toBe("FAIL");
+    expect(approvalReport.checks.find(
       ({ name }) => name === "approvedFingerprint",
     )?.status).toBe("FAIL");
     expect(receiptReport.overall).toBe("FAIL");

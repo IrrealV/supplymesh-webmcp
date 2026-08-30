@@ -278,6 +278,13 @@ export function createZustandOperationalRecoveryRepository(
           );
           return state;
         }
+        if (
+          snapshot.workflowState === "OPTIONS_READY"
+          && snapshot.options.length > 0
+        ) {
+          result = success("OPTIONS_ALREADY_READY", snapshot.options);
+          return state;
+        }
         const options = createUnit211RecoveryOptions(snapshot);
         const audit = appendAudit(snapshot, {
           action: "RECOVERY_OPTIONS_COMPARED",
@@ -728,12 +735,20 @@ export function createZustandOperationalRecoveryRepository(
             }
             : entry
         );
+        const approvalEventId = [...snapshot.auditTimeline]
+          .reverse()
+          .find(({ action, target }) =>
+            action === "RECOVERY_PLAN_APPROVED" && target === plan.id
+          )?.id;
         const receipt: OperationReceipt = {
           afterRevision,
           appliedRouteId: plan.proposedRouteId,
           approvalFingerprint: approval.fingerprint,
           approvalSource: approval.approvedBy,
-          auditEventIds: audit.timeline.map(({ id }) => id),
+          auditEventIds: [
+            ...(approvalEventId === undefined ? [] : [approvalEventId]),
+            audit.event.id,
+          ],
           beforeRevision: snapshot.scenarioRevision,
           constraints: structuredClone(snapshot.constraints),
           executedOnce: true,
@@ -804,7 +819,12 @@ export function createZustandOperationalRecoveryRepository(
         });
         const receipt: OperationReceipt = {
           ...snapshot.receipt,
-          auditEventIds: audit.timeline.map(({ id }) => id),
+          auditEventIds: [
+            ...new Set([
+              ...snapshot.receipt.auditEventIds,
+              audit.event.id,
+            ]),
+          ],
           verificationSummary: {
             reportId: report.id,
             status: report.overall,
