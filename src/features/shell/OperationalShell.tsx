@@ -22,6 +22,7 @@ type OperationalShellProps = {
   operations: OperationsApi;
   scenario: OperatingRegion;
 };
+function unit211PreDispatchContextForSnapshot(operations: OperationsApi, scenarioSnapshot: OperatingRegion): Unit211PreDispatchContextResult { void scenarioSnapshot; return operations.unit211PreDispatchContext(); }
 
 export function OperationalShell({ locale, onLocaleChange, onScenarioChange, operations, scenario }: OperationalShellProps) {
   const follow = useUiCoordinationStore((state) => state.follow);
@@ -33,7 +34,7 @@ export function OperationalShell({ locale, onLocaleChange, onScenarioChange, ope
   const panelCopy = operationalCopy(locale);
   const isTablet = useTabletViewport();
   const [tabletOverviewOpen, setTabletOverviewOpen] = useState(false);
-  const availableResult = useMemo(() => operations.unit211PreDispatchContext(), [operations]);
+  const availableResult = useMemo(() => unit211PreDispatchContextForSnapshot(operations, scenario), [operations, scenario]);
   const availableComparison = useMemo(() => createUnit211RecoveryComparisonModel(availableResult, locale), [availableResult, locale]);
   const [comparisonRequest, setComparisonRequest] = useState<Readonly<{ result: Unit211PreDispatchContextResult; vehicleId: string }>>();
   const comparison = useMemo(() => comparisonRequest === undefined || comparisonRequest.vehicleId !== selectedVehicle?.internalId ? undefined : createUnit211RecoveryComparisonModel(comparisonRequest.result, locale), [comparisonRequest, locale, selectedVehicle?.internalId]);
