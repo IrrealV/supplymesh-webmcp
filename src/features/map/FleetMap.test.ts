@@ -54,11 +54,21 @@ describe("FleetMap layers", () => {
     expect(styles).toContain(".risk-severe-snow .risk-marker-label { display: none; }");
   });
 
+  it("should focus and render comparison layers from the promoted operation projection", () => {
+    const mapSource = readFileSync("src/features/map/FleetMap.tsx", "utf8");
+    const recoverySource = readFileSync("src/features/recovery-comparison/RecoveryComparisonLayers.tsx", "utf8");
+
+    expect(mapSource).toContain('target.kind === "comparison"');
+    expect(mapSource).toContain("<RecoveryComparisonLayers");
+    expect(recoverySource).toContain("model.incident.position");
+    expect(recoverySource).not.toContain("risk.geometry");
+  });
+
   it("should allow only presentation and accepted scenario dependencies in visual map files", () => {
     const sources = ["FleetMap.tsx", "layers.ts", "VehicleMarkerLayer.tsx", "labelPlacement.ts", "MapLegend.tsx", "MapEventCoordinator.ts"]
       .map((file) => readFileSync(`src/features/map/${file}`, "utf8"))
       .join("\n");
-    const allowedImports = new Set(["@phosphor-icons/react", "leaflet", "react", "react-leaflet", "../../app/presentation/useTabletViewport", "../../app/state/useUiCoordinationStore", "../../domain/entities", "../../preferences/i18n/catalog", "../fleet/filtering", "./layers", "./labelPlacement", "./MapEventCoordinator", "./MapLegend", "./VehicleMarkerLayer"]);
+    const allowedImports = new Set(["@phosphor-icons/react", "leaflet", "react", "react-leaflet", "../../app/presentation/useTabletViewport", "../../app/state/useUiCoordinationStore", "../../domain/entities", "../../preferences/i18n/catalog", "../fleet/filtering", "../recovery-comparison/RecoveryComparisonLayers", "../recovery-comparison/unit211RecoveryComparisonModel", "./layers", "./labelPlacement", "./MapEventCoordinator", "./MapLegend", "./VehicleMarkerLayer"]);
     const imports = [...sources.matchAll(/from\s+["']([^"']+)["']/g)].map((match) => match[1]);
     const networkCall = new RegExp(`\\b${["fet", "ch"].join("")}\\s*\\(`);
 

@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useUiCoordinationStore } from "../../app/state/useUiCoordinationStore";
 import { createSpainScenario } from "../../scenario/fixtures/spain-v1";
 import { createOperationsApi } from "../../domain/operations/createOperationsApi";
+import type { OperationsApi } from "../../domain/operations/createOperationsApi";
+import { createApplication } from "../../app/createApplication";
 import { createZustandScenarioRepository } from "../../scenario/state/createZustandScenarioRepository";
 import { OperationalShell } from "./OperationalShell";
 import { Topbar } from "./Topbar";
@@ -13,7 +15,7 @@ import { TABLET_MEDIA_QUERY } from "../../app/presentation/useTabletViewport";
 
 const styles = readFileSync("src/styles.css", "utf8");
 
-vi.mock("../map/FleetMap", () => ({ FleetMap: () => <div data-testid="fleet-map" /> }));
+vi.mock("../map/FleetMap", () => ({ FleetMap: ({ comparison }: { comparison?: { kind: string } }) => <div data-comparison={comparison?.kind ?? "none"} data-testid="fleet-map" /> }));
 
 function resetUi(): void {
   useUiCoordinationStore.setState(useUiCoordinationStore.getInitialState(), true);
@@ -159,6 +161,55 @@ describe("OperationalShell", () => {
 
       await user.click(screen.getByRole("button", { name: "Close operational overview" }));
       await waitFor(() => expect(screen.queryByRole("dialog", { name: "Operational overview" })).toBeNull());
+    } finally { Object.defineProperty(window, "matchMedia", { configurable: true, value: originalMatchMedia }); }
+  });
+
+  it.each([
+    ["en", "Review recovery options", "Recovery comparison", "Back to vehicle details"],
+    ["es", "Revisar opciones de recuperación", "Comparación de recuperación", "Volver al detalle del vehículo"],
+  ] as const)("should open and leave the read-only comparison in %s with keyboard focus restored", async (locale, actionLabel, heading, backLabel) => {
+    const user = userEvent.setup();
+    const operations = createApplication();
+    useUiCoordinationStore.getState().selectVehicle("vehicle-011", "operational-map");
+    render(<OperationalShell locale={locale} onLocaleChange={() => undefined} onScenarioChange={() => undefined} operations={operations} scenario={createSpainScenario()} />);
+
+    const action = screen.getByRole("button", { name: actionLabel });
+    await user.click(action);
+    expect(screen.getByRole("heading", { name: heading })).not.toBeNull();
+    expect(screen.getByTestId("fleet-map").dataset.comparison).toBe("ready");
+    expect(screen.queryByRole("button", { name: /prepare|approve|execute|preparar|aprobar|ejecutar/i })).toBeNull();
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: actionLabel })));
+    expect(screen.queryByRole("heading", { name: heading })).toBeNull();
+    expect(screen.queryByRole("button", { name: backLabel })).toBeNull();
+    await user.keyboard("{Escape}");
+    expect(useUiCoordinationStore.getState().selection).toEqual({ kind: "none" });
+  });
+
+  it("should show the exact structured failure returned after the review action", async () => {
+    const user = userEvent.setup(); const real = createApplication(); const ready = real.unit211PreDispatchContext(); let calls = 0;
+    const operations: OperationsApi = { ...real, unit211PreDispatchContext: () => ++calls === 1 ? ready : { ok: false, reasonCode: "ALTERNATIVE_SOURCE_UNAVAILABLE" } };
+    useUiCoordinationStore.getState().selectVehicle("vehicle-011", "operational-map");
+    render(<OperationalShell locale="en" onLocaleChange={() => undefined} onScenarioChange={() => undefined} operations={operations} scenario={createSpainScenario()} />);
+
+    await user.click(screen.getByRole("button", { name: "Review recovery options" }));
+    const alert = screen.getByRole("alert", { name: "Recovery comparison unavailable" });
+    expect(alert.textContent).toContain("ALTERNATIVE_SOURCE_UNAVAILABLE");
+    expect(alert.textContent).toContain("No route was changed.");
+    expect(screen.getByTestId("fleet-map").dataset.comparison).toBe("none");
+  });
+
+  it("should keep comparison inside the tablet vehicle dialog and use Escape as Back first", async () => {
+    const originalMatchMedia = window.matchMedia; Object.defineProperty(window, "matchMedia", { configurable: true, value: () => ({ addEventListener: () => undefined, matches: true, removeEventListener: () => undefined }) });
+    try {
+      const user = userEvent.setup(); useUiCoordinationStore.getState().selectVehicle("vehicle-011", "operational-map");
+      render(<OperationalShell locale="en" onLocaleChange={() => undefined} onScenarioChange={() => undefined} operations={createApplication()} scenario={createSpainScenario()} />);
+      await user.click(screen.getByRole("button", { name: "Review recovery options" }));
+      expect(screen.getByRole("dialog", { name: "Unit 211" }).getAttribute("aria-label")).toBe("Vehicle inspection");
+      expect(screen.getByRole("heading", { name: "Recovery comparison" })).not.toBeNull();
+      await user.keyboard("{Escape}");
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Review recovery options" })));
     } finally { Object.defineProperty(window, "matchMedia", { configurable: true, value: originalMatchMedia }); }
   });
 });

@@ -1,5 +1,5 @@
 import { ChartPieSlice } from "@phosphor-icons/react";
-import { useState, type MouseEvent } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 import { useUiCoordinationStore } from "../../app/state/useUiCoordinationStore";
 import type { OperatingRegion } from "../../domain/entities";
 import type { OperationsApi } from "../../domain/operations/createOperationsApi";
@@ -12,6 +12,8 @@ import { FleetMap } from "../map/FleetMap";
 import { ContextPanel } from "./ContextPanel";
 import { Topbar } from "./Topbar";
 import { useTabletViewport } from "../../app/presentation/useTabletViewport";
+import type { Unit211PreDispatchContextResult } from "../../domain/operations/unit211PreDispatchContext";
+import { createUnit211RecoveryComparisonModel } from "../recovery-comparison/unit211RecoveryComparisonModel";
 
 type OperationalShellProps = {
   locale: Locale;
@@ -31,7 +33,10 @@ export function OperationalShell({ locale, onLocaleChange, onScenarioChange, ope
   const panelCopy = operationalCopy(locale);
   const isTablet = useTabletViewport();
   const [tabletOverviewOpen, setTabletOverviewOpen] = useState(false);
-
+  const availableResult = useMemo(() => operations.unit211PreDispatchContext(), [operations]);
+  const availableComparison = useMemo(() => createUnit211RecoveryComparisonModel(availableResult, locale), [availableResult, locale]);
+  const [comparisonRequest, setComparisonRequest] = useState<Readonly<{ result: Unit211PreDispatchContextResult; vehicleId: string }>>();
+  const comparison = useMemo(() => comparisonRequest === undefined || comparisonRequest.vehicleId !== selectedVehicle?.internalId ? undefined : createUnit211RecoveryComparisonModel(comparisonRequest.result, locale), [comparisonRequest, locale, selectedVehicle?.internalId]);
 
   function focusMap(event: MouseEvent<HTMLAnchorElement>): void {
     event.preventDefault();
@@ -39,9 +44,12 @@ export function OperationalShell({ locale, onLocaleChange, onScenarioChange, ope
   }
 
   function closeInspection(): void {
+    setComparisonRequest(undefined);
     const returnFocusId = useUiCoordinationStore.getState().closeSelection();
     requestAnimationFrame(() => (document.getElementById(returnFocusId) ?? document.getElementById("context-panel-heading") ?? document.getElementById("context-panel"))?.focus());
   }
+  function reviewRecovery(): void { if (!selectedVehicle) return; const result = operations.unit211PreDispatchContext(); setComparisonRequest({ result, vehicleId: selectedVehicle.internalId }); if (result.ok) useUiCoordinationStore.getState().focusComparison(result.data.context.unit.vehicleId); }
+  function backFromRecovery(): void { setComparisonRequest(undefined); requestAnimationFrame(() => document.getElementById("review-recovery-options")?.focus()); }
 
   function closeResults(): void {
     const activeFilter = useUiCoordinationStore.getState().activeFilters.values().next().value;
@@ -61,8 +69,8 @@ export function OperationalShell({ locale, onLocaleChange, onScenarioChange, ope
       <Topbar locale={locale} onLocaleChange={onLocaleChange} />
       <main className={`console-workspace ${railState === "expanded" ? "rail-is-expanded" : ""}`}>
         <FilterRail isTablet={isTablet} locale={locale} onInteraction={() => setTabletOverviewOpen(false)} scenario={scenario} />
-        <section aria-label={copy.operationalMap} className="map-workspace" id="operational-map" role="region" tabIndex={-1}>
-          <FleetMap locale={locale} scenario={scenario} />
+        <section aria-describedby={comparison?.kind === "ready" ? "recovery-map-summary" : undefined} aria-label={copy.operationalMap} className="map-workspace" id="operational-map" role="region" tabIndex={-1}>
+          <FleetMap availableComparison={availableComparison.kind === "ready" ? availableComparison : undefined} comparison={comparison?.kind === "ready" ? comparison : undefined} locale={locale} scenario={scenario} />
         </section>
         {isTablet && selectedVehicle === undefined && panelContext.mode === "overview" && !tabletOverviewOpen && <button aria-label={panelCopy.openOverview} className="tablet-overview-trigger" onClick={openTabletOverview} type="button"><ChartPieSlice aria-hidden="true" size={19} /><span>{panelCopy.operationalOverview}</span></button>}
         {selectedVehicle === undefined ? (
@@ -70,7 +78,7 @@ export function OperationalShell({ locale, onLocaleChange, onScenarioChange, ope
             {panelContext.mode === "overview" ? <OperationalOverview locale={locale} scenario={scenario} /> : <FilterResults locale={locale} scenario={scenario} />}
           </ContextPanel>
         ) : (
-          <VehicleInspection isFollowing={follow.kind === "vehicle" && follow.vehicleId === selectedVehicle.internalId} key={selectedVehicle.internalId} locale={locale} onClose={closeInspection} onRestoreFollow={() => useUiCoordinationStore.getState().restoreFollow()} onScenarioChange={onScenarioChange} onViewRoute={() => useUiCoordinationStore.getState().focusRoute(selectedVehicle.internalId)} operations={operations} scenario={scenario} vehicle={selectedVehicle} />
+          <VehicleInspection comparison={comparison} isFollowing={follow.kind === "vehicle" && follow.vehicleId === selectedVehicle.internalId} key={selectedVehicle.internalId} locale={locale} onBackFromRecovery={backFromRecovery} onClose={closeInspection} onRestoreFollow={() => useUiCoordinationStore.getState().restoreFollow()} onReviewRecovery={availableComparison.kind === "ready" && availableComparison.vehicle.id === selectedVehicle.internalId ? reviewRecovery : undefined} onScenarioChange={onScenarioChange} onViewRoute={() => useUiCoordinationStore.getState().focusRoute(selectedVehicle.internalId)} operations={operations} scenario={scenario} vehicle={selectedVehicle} />
         )}
       </main>
     </div>

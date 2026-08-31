@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createApplication } from "../../app/createApplication";
 import { createOperationsApi } from "../../domain/operations/createOperationsApi";
 import { createZustandScenarioRepository } from "../../scenario/state/createZustandScenarioRepository";
-import { createUnit211RecoveryPreviewModel } from "./unit211RecoveryPreviewModel";
+import { createUnit211RecoveryComparisonModel } from "../../features/recovery-comparison/unit211RecoveryComparisonModel";
 
 type Mutable<T> = T extends object ? { -readonly [Key in keyof T]: Mutable<T[Key]> } : T;
 
@@ -15,10 +15,10 @@ function mutableSuccessResult() {
 describe("Unit 211 recovery preview model", () => {
   it("should project the real pre-dispatch operation result without rebuilding domain data", () => {
     const result = createApplication().unit211PreDispatchContext();
-    const model = createUnit211RecoveryPreviewModel(result);
+    const model = createUnit211RecoveryComparisonModel(result, "en");
 
-    expect(model.kind).toBe("development-preview");
-    if (model.kind !== "development-preview") throw new Error(`Expected preview data, received ${model.reasonCode}.`);
+    expect(model.kind).toBe("ready");
+    if (model.kind !== "ready") throw new Error(`Expected preview data, received ${model.reasonCode}.`);
     if (!result.ok) throw new Error(`Expected domain data, received ${result.reasonCode}.`);
 
     expect(model).toMatchObject({
@@ -93,8 +93,8 @@ describe("Unit 211 recovery preview model", () => {
     (result.data.options[0] as { disposition: string }).disposition = "NEEDS_HUMAN_REVIEW";
     (result.data.options[1] as { disposition: string }).disposition = "SUPPORTED_FOR_REVIEW";
 
-    const model = createUnit211RecoveryPreviewModel(result);
-    if (model.kind !== "development-preview") throw new Error(`Expected preview data, received ${model.reasonCode}.`);
+    const model = createUnit211RecoveryComparisonModel(result, "en");
+    if (model.kind !== "ready") throw new Error(`Expected preview data, received ${model.reasonCode}.`);
 
     expect(model).toMatchObject({ scenarioClock: { instant: "2032-04-05T06:07:08.000Z" }, vehicle: { displayLabel: "Unit 987", location: "Injected origin", position: [-4.5, 39.9] }, incident: { position: [-4.4, 39.8], restrictionMeters: 3.75, exclusionRadiusMeters: 275, horizontalSeparationMeters: 2_750 }, clearance: { vehicleHeightMeters: 3.55, humanBufferMeters: 0.35, requiredMeters: 3.9, equation: "3.55 + 0.35 = 3.90 m required" }, current: { distanceMeters: 12_345, status: "NEEDS_HUMAN_REVIEW", statusLabel: "Needs human review" }, alternative: { durationSeconds: 4_321, status: "SUPPORTED_FOR_REVIEW", statusLabel: "Supported for review" } });
     expect(model.vehicle.position).not.toBe(result.data.context.position.coordinates);
@@ -112,7 +112,7 @@ describe("Unit 211 recovery preview model", () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error("Expected a structured pre-dispatch failure.");
 
-    expect(createUnit211RecoveryPreviewModel(result)).toStrictEqual({
+    expect(createUnit211RecoveryComparisonModel(result, "en")).toStrictEqual({
       kind: "operation-failure",
       reasonCode: result.reasonCode,
     });

@@ -1,6 +1,6 @@
 import { RecoveryComparisonMap } from "./RecoveryComparisonMap";
-import { RecoveryComparisonPanel } from "./RecoveryComparisonPanel";
-import type { Unit211RecoveryPreviewState } from "./unit211RecoveryPreviewModel";
+import { RecoveryComparisonFailure, RecoveryComparisonPanel } from "../../features/recovery-comparison/RecoveryComparisonPanel";
+import type { Unit211RecoveryComparisonState } from "../../features/recovery-comparison/unit211RecoveryComparisonModel";
 
 function PreviewTopbar({ context }: { context: string }) {
   return <header className="recovery-preview-topbar">
@@ -9,18 +9,12 @@ function PreviewTopbar({ context }: { context: string }) {
   </header>;
 }
 
-export function RecoveryComparisonPreview({ state }: { state: Unit211RecoveryPreviewState }) {
+export function RecoveryComparisonPreview({ state }: { state: Unit211RecoveryComparisonState }) {
   if (state.kind === "operation-failure") {
     return <div className="recovery-preview-shell">
       <PreviewTopbar context="Pre-dispatch comparison" />
       <main className="recovery-preview-error-workspace">
-        <section aria-labelledby="recovery-preview-error-heading" className="recovery-preview-error" role="alert">
-          <span>Read-only domain result</span>
-          <h1 id="recovery-preview-error-heading">Recovery comparison unavailable</h1>
-          <p>The pre-dispatch operation returned a structured failure, so route options cannot be shown safely.</p>
-          <dl><dt>Reason code</dt><dd><code>{state.reasonCode}</code></dd></dl>
-          <p className="recovery-preview-error-assurance">No route was changed.</p>
-        </section>
+        <RecoveryComparisonFailure locale="en" reasonCode={state.reasonCode} />
       </main>
     </div>;
   }
@@ -28,6 +22,6 @@ export function RecoveryComparisonPreview({ state }: { state: Unit211RecoveryPre
   return <div className="recovery-preview-shell">
     <a className="skip-link" href="#recovery-comparison-map">Skip to route comparison map</a>
     <PreviewTopbar context={`${state.vehicle.displayLabel} · Pre-dispatch`} />
-    <main className="recovery-preview-workspace"><RecoveryComparisonMap model={state} /><RecoveryComparisonPanel model={state} /></main>
+    <main className="recovery-preview-workspace"><RecoveryComparisonMap model={state} /><aside className="recovery-panel"><RecoveryComparisonPanel locale="en" model={state} showPreviewAction /></aside></main>
   </div>;
 }

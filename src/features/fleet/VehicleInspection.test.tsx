@@ -87,6 +87,15 @@ describe("VehicleInspection", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it("should expose the optional recovery review action without changing existing actions", async () => {
+    const user = userEvent.setup(); const onReviewRecovery = vi.fn<() => void>();
+    const storage = new MemoryStorage(); const operations = createOperationsApi(createZustandScenarioRepository(storage)); const scenario = resultData(operations.scenarioCurrent());
+    render(<VehicleInspection isFollowing={false} locale="en" onClose={() => undefined} onRestoreFollow={() => undefined} onReviewRecovery={onReviewRecovery} onScenarioChange={() => undefined} onViewRoute={() => undefined} operations={operations} scenario={scenario} vehicle={scenario.vehicles[0]} />);
+
+    await user.click(screen.getByRole("button", { name: "Review recovery options" }));
+    expect(onReviewRecovery).toHaveBeenCalledTimes(1);
+  });
+
   it("should localize inspection copy, values, dates, and tabs in Spanish", async () => {
     const user = userEvent.setup();
     renderInspection("es");
