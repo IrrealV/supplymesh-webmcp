@@ -14,22 +14,22 @@ type Coordinate = [number, number];
 type PointGeometry = { type: "Point"; coordinates: Coordinate };
 type LineGeometry = { type: "LineString"; coordinates: Coordinate[] };
 type PolygonGeometry = { type: "Polygon"; coordinates: Coordinate[][] };
-type RejectedAssessment = Extract<AuthoritativeVerticalClearanceAssessmentResult, { ok: true }>;
-type AlternativeRelation = { vehicleId: string; currentRouteId: string; avoidsRiskId: string; alternativeRouteId: string };
-type Avoidance = { shape: string; radiusMeters: number; steps: number; minimumClearanceMeters: number; polygon: PolygonGeometry };
-type AlternativeProvenance = { provider: string; profile: string; sourceRevision: string; generatedAt: string; avoidance: Avoidance };
+export type Unit211RejectedClearanceAssessment = Extract<AuthoritativeVerticalClearanceAssessmentResult, { ok: true }>;
+export type Unit211AlternativeRelation = { vehicleId: string; currentRouteId: string; avoidsRiskId: string; alternativeRouteId: string };
+export type Unit211AvoidanceEvidence = { shape: string; radiusMeters: number; steps: number; minimumClearanceMeters: number; polygon: PolygonGeometry };
+export type Unit211AlternativeProvenance = { provider: string; profile: string; sourceRevision: string; generatedAt: string; avoidance: Unit211AvoidanceEvidence };
 type TemporalFacts = { remainingRouteMinutes: number; remainingDriveMinutes: number; estimatedCompletionAt: string; restDeadline: string };
 type NullableTemporalFacts = { [Key in keyof TemporalFacts]: TemporalFacts[Key] | null };
-type TemporalAssessment =
+export type Unit211TemporalAssessment =
   | (TemporalFacts & { status: "PASS"; reasonCode: "TEMPORAL_WINDOW_SATISFIED" })
   | (TemporalFacts & { status: "FAIL"; reasonCode: "DRIVE_TIME_VIOLATION" | "REST_DEADLINE_VIOLATION" | "DRIVE_TIME_AND_REST_DEADLINE_VIOLATION" })
   | (NullableTemporalFacts & { status: "UNKNOWN"; reasonCode: "TEMPORAL_SOURCE_INVALID" });
-type CargoContinuityFacts = { vehicleId: string; cargoId: string; destinationId: string; refrigeration: Cargo["refrigeration"]; priority: Cargo["priority"] };
+export type Unit211CargoContinuityFacts = { vehicleId: string; cargoId: string; destinationId: string; refrigeration: Cargo["refrigeration"]; priority: Cargo["priority"] };
 type CargoContinuityMismatchReasonCode = "VEHICLE_ID_MISMATCH" | "CARGO_ID_MISMATCH" | "DESTINATION_ID_MISMATCH" | "REFRIGERATION_MISMATCH" | "PRIORITY_MISMATCH";
 type CargoContinuitySourceReasonCode = "VEHICLE_MISSING" | "VEHICLE_ID_INVALID" | "VEHICLE_ID_AMBIGUOUS" | "CARGO_ID_INVALID" | "CARGO_ID_AMBIGUOUS" | "DESTINATION_ID_INVALID" | "REFRIGERATION_INVALID" | "PRIORITY_INVALID";
-type CargoContinuityAssessment =
-  | { status: "PASS"; reasonCode: "CARGO_CONTINUITY_SATISFIED"; referenceFacts: CargoContinuityFacts; optionFacts: CargoContinuityFacts }
-  | { status: "FAIL"; reasonCode: "CARGO_CONTINUITY_MISMATCH"; mismatchReasonCodes: CargoContinuityMismatchReasonCode[]; referenceFacts: CargoContinuityFacts; optionFacts: CargoContinuityFacts }
+export type Unit211CargoContinuityAssessment =
+  | { status: "PASS"; reasonCode: "CARGO_CONTINUITY_SATISFIED"; referenceFacts: Unit211CargoContinuityFacts; optionFacts: Unit211CargoContinuityFacts }
+  | { status: "FAIL"; reasonCode: "CARGO_CONTINUITY_MISMATCH"; mismatchReasonCodes: CargoContinuityMismatchReasonCode[]; referenceFacts: Unit211CargoContinuityFacts; optionFacts: Unit211CargoContinuityFacts }
   | { status: "UNKNOWN"; reasonCode: "CARGO_CONTINUITY_SOURCE_INVALID"; source: "SCENARIO" | "REFERENCE" | "OPTION"; sourceReasonCode: CargoContinuitySourceReasonCode };
 
 export type Unit211PreDispatchContextFailureReason =
@@ -38,7 +38,7 @@ export type Unit211PreDispatchContextFailureReason =
   | "ALTERNATIVE_SOURCE_UNAVAILABLE" | "ALTERNATIVE_RELATION_INVALID" | "ALTERNATIVE_GEOMETRY_INVALID"
   | "ALTERNATIVE_SUMMARY_INVALID" | "ALTERNATIVE_PROVENANCE_INVALID" | "ALTERNATIVE_AVOIDANCE_INVALID" | "ALTERNATIVE_ADMISSION_INVALID";
 
-type Unit211PreDispatchContext = {
+export type Unit211PreDispatchContext = {
   scenarioClock: { instant: "2026-08-28T09:00:00.000Z"; mode: "deterministic-demo" };
   unit: { vehicleId: "vehicle-011"; fleetNumber: "FM-211" };
   origin: { name: "Toledo" };
@@ -49,12 +49,15 @@ type Unit211PreDispatchContext = {
   temporalSource: { remainingDriveMinutes: number; restDeadline: string };
 };
 
-type Unit211PreDispatchData = {
+export type Unit211CurrentOption = { kind: "CURRENT"; disposition: "REJECTED"; routeId: "route-011"; geometry: LineGeometry; summary: RouteSummary; clearanceAssessment: Unit211RejectedClearanceAssessment; temporalAssessment: Unit211TemporalAssessment; cargoContinuityAssessment: Unit211CargoContinuityAssessment };
+export type Unit211AlternativeOption = { kind: "ALTERNATIVE"; disposition: "SUPPORTED_FOR_COMPARISON"; alternativeRouteId: "alternative-route-011-clearance-v1"; geometry: LineGeometry; summary: RouteSummary; relation: Unit211AlternativeRelation; provenance: Unit211AlternativeProvenance; avoidsExclusionZone: true; temporalAssessment: Unit211TemporalAssessment; cargoContinuityAssessment: Unit211CargoContinuityAssessment };
+
+export type Unit211PreDispatchData = {
   context: Unit211PreDispatchContext;
   incident: { id: "incident-route-011-restriction-height-3.9"; vehicleId: "vehicle-011"; riskId: "restriction-height-3.9"; routeId: "route-011"; snapIndex: number; point: PointGeometry; exclusionPolygon: PolygonGeometry };
   options: [
-    { kind: "CURRENT"; disposition: "REJECTED"; routeId: "route-011"; geometry: LineGeometry; summary: RouteSummary; clearanceAssessment: RejectedAssessment; temporalAssessment: TemporalAssessment; cargoContinuityAssessment: CargoContinuityAssessment },
-    { kind: "ALTERNATIVE"; disposition: "SUPPORTED_FOR_COMPARISON"; alternativeRouteId: "alternative-route-011-clearance-v1"; geometry: LineGeometry; summary: RouteSummary; relation: AlternativeRelation; provenance: AlternativeProvenance; avoidsExclusionZone: true; temporalAssessment: TemporalAssessment; cargoContinuityAssessment: CargoContinuityAssessment },
+    Unit211CurrentOption,
+    Unit211AlternativeOption,
   ];
 };
 
@@ -64,11 +67,11 @@ export type Unit211PreDispatchContextResult =
 
 type Validation<T> = { ok: true; data: T } | Extract<Unit211PreDispatchContextResult, { ok: false }>;
 type CurrentSource = { scenario: OperatingRegion; identityIndex: IdentityIndex; vehicleId: string; geometry: LineGeometry; summary: RouteSummary; remainingDriveMinutes: number; restDeadline: string; routeSnaps: unknown };
-type AlternativeSource = { relation: AlternativeRelation; geometry: LineGeometry; summary: RouteSummary; provenance: AlternativeProvenance };
+type AlternativeSource = { relation: Unit211AlternativeRelation; geometry: LineGeometry; summary: RouteSummary; provenance: Unit211AlternativeProvenance };
 type SourceValidation = { ok: true } | { ok: false; sourceReasonCode: CargoContinuitySourceReasonCode };
-type CargoContinuityFactsValidation = { ok: true; data: Readonly<CargoContinuityFacts> } | { ok: false; sourceReasonCode: "VEHICLE_MISSING" };
+type CargoContinuityFactsValidation = { ok: true; data: Readonly<Unit211CargoContinuityFacts> } | { ok: false; sourceReasonCode: "VEHICLE_MISSING" };
 type CapturedField = { ok: true; isDataProperty: boolean; value: unknown } | { ok: false };
-type IdentityIndex = { validation: SourceValidation; factsByVehicleId: ReadonlyMap<string, Readonly<CargoContinuityFacts>>; sourcesByVehicleId: ReadonlyMap<string, readonly Vehicle[]>; normalizedVehicles: Vehicle[] };
+type IdentityIndex = { validation: SourceValidation; factsByVehicleId: ReadonlyMap<string, Readonly<Unit211CargoContinuityFacts>>; sourcesByVehicleId: ReadonlyMap<string, readonly Vehicle[]>; normalizedVehicles: Vehicle[] };
 
 function failure(reasonCode: Unit211PreDispatchContextFailureReason): Extract<Unit211PreDispatchContextResult, { ok: false }> {
   return { ok: false, reasonCode };
@@ -113,7 +116,7 @@ function incrementCount(counts: Map<string, number>, id: string): void {
 
 function buildIdentityIndex(values: unknown[]): IdentityIndex {
   const sourcesByVehicleId = new Map<string, Vehicle[]>(); const cargoIdCounts = new Map<string, number>(); const normalizedVehicles: Vehicle[] = [];
-  const candidates: Array<Readonly<CargoContinuityFacts>> = []; let sourceReasonCode: CargoContinuitySourceReasonCode | false = false;
+  const candidates: Array<Readonly<Unit211CargoContinuityFacts>> = []; let sourceReasonCode: CargoContinuitySourceReasonCode | false = false;
   for (const value of values) {
     if (!isRecord(value)) { if (sourceReasonCode === false) sourceReasonCode = "VEHICLE_ID_INVALID"; continue; }
     const vehicleIdField = captureField(value, "internalId"); const cargoField = captureField(value, "cargo"); const destinationField = captureField(value, "destination");
@@ -143,7 +146,7 @@ function buildIdentityIndex(values: unknown[]): IdentityIndex {
   }
   if (sourceReasonCode === false && [...sourcesByVehicleId.values()].some((sources) => sources.length !== 1)) sourceReasonCode = "VEHICLE_ID_AMBIGUOUS";
   if (sourceReasonCode === false && [...cargoIdCounts.values()].some((count) => count !== 1)) sourceReasonCode = "CARGO_ID_AMBIGUOUS";
-  const factsByVehicleId = new Map<string, Readonly<CargoContinuityFacts>>();
+  const factsByVehicleId = new Map<string, Readonly<Unit211CargoContinuityFacts>>();
   for (const facts of candidates) if (sourcesByVehicleId.get(facts.vehicleId)?.length === 1 && cargoIdCounts.get(facts.cargoId) === 1) factsByVehicleId.set(facts.vehicleId, facts);
   return { validation: sourceReasonCode === false ? { ok: true } : { ok: false, sourceReasonCode }, factsByVehicleId, sourcesByVehicleId, normalizedVehicles };
 }
@@ -198,7 +201,7 @@ function isIsoInstant(value: unknown): value is string {
   return instantMilliseconds(value) !== false;
 }
 
-function temporalAssessment(context: Unit211PreDispatchContext, durationSeconds: number): TemporalAssessment {
+function temporalAssessment(context: Unit211PreDispatchContext, durationSeconds: number): Unit211TemporalAssessment {
   const scenarioClockMilliseconds = instantMilliseconds(context.scenarioClock.instant);
   const restDeadlineMilliseconds = instantMilliseconds(context.temporalSource.restDeadline);
   const isProgressValid = isZero(context.routeProgress);
@@ -249,7 +252,7 @@ function cargoContinuityFacts(index: IdentityIndex, vehicleId: string): CargoCon
   return facts === undefined ? { ok: false, sourceReasonCode: "VEHICLE_MISSING" } : { ok: true, data: facts };
 }
 
-function cargoContinuityAssessment(scenarioValidation: SourceValidation, reference: CargoContinuityFactsValidation, option: CargoContinuityFactsValidation): CargoContinuityAssessment {
+function cargoContinuityAssessment(scenarioValidation: SourceValidation, reference: CargoContinuityFactsValidation, option: CargoContinuityFactsValidation): Unit211CargoContinuityAssessment {
   if (!scenarioValidation.ok) return { status: "UNKNOWN", reasonCode: "CARGO_CONTINUITY_SOURCE_INVALID", source: "SCENARIO", sourceReasonCode: scenarioValidation.sourceReasonCode };
   if (!reference.ok) return { status: "UNKNOWN", reasonCode: "CARGO_CONTINUITY_SOURCE_INVALID", source: "REFERENCE", sourceReasonCode: reference.sourceReasonCode };
   if (!option.ok) return { status: "UNKNOWN", reasonCode: "CARGO_CONTINUITY_SOURCE_INVALID", source: "OPTION", sourceReasonCode: option.sourceReasonCode };
@@ -324,7 +327,7 @@ function incidentFrom(routeSnaps: unknown, geometry: LineGeometry): { snapIndex:
   return { snapIndex: index, point: { type: "Point", coordinates: [coordinate[0], coordinate[1]] } };
 }
 
-function isExactRejection(assessment: RejectedAssessment): boolean {
+function isExactRejection(assessment: Unit211RejectedClearanceAssessment): boolean {
   const { data } = assessment;
   return data.vehicleId === VEHICLE_ID && data.riskId === RISK_ID && data.routeId === ROUTE_ID && data.vehicleHeightMeters === 3.8 && data.clearanceBufferMeters === 0.2 && data.requiredClearanceMeters === 4 && data.restrictionLimitMeters === 3.9 && data.status === "FAIL" && data.reasonCode === "CLEARANCE_VIOLATION";
 }
