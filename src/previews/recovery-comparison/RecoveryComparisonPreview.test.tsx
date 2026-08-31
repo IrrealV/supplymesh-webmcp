@@ -23,6 +23,17 @@ function realFailureState() {
 }
 
 describe("Recovery comparison preview", () => {
+  it("should compose the route overview and options through the public preview", () => {
+    render(<RecoveryComparisonPreview state={realPreviewModel()} />);
+
+    const overview = screen.getByRole("region", { name: "Recovery route comparison overview" });
+    const interactiveMap = screen.getByRole("region", { name: "Interactive recovery route map" });
+    expect(interactiveMap.getAttribute("aria-describedby")).toBe("recovery-map-summary");
+    expect(overview.querySelector("#recovery-map-summary")).not.toBeNull();
+    expect(screen.getByRole("heading", { level: 1, name: "Recovery comparison" })).not.toBeNull();
+    expect(screen.getByRole("article", { name: "Use alternative route, SUPPORTED_FOR_COMPARISON" })).not.toBeNull();
+  });
+
   it("should expose domain-backed comparison semantics without enabling workflow actions", () => {
     render(<RecoveryComparisonPanel model={realPreviewModel()} />);
 
@@ -43,7 +54,7 @@ describe("Recovery comparison preview", () => {
     const alert = screen.getByRole("alert", { name: "Recovery comparison unavailable" });
     expect(alert.textContent).toContain(state.reasonCode);
     expect(alert.textContent).toContain("No route was changed.");
-    expect(screen.queryByRole("region", { name: "Route comparison map" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Recovery route comparison overview" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Route options" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Prepare plan" })).toBeNull();
   });

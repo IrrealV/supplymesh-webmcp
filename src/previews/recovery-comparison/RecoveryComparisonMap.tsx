@@ -4,7 +4,7 @@ import { MapContainer, Marker, Pane, Polygon, Polyline, TileLayer, useMap } from
 import type { PreviewCoordinate, Unit211RecoveryPreviewModel } from "./unit211RecoveryPreviewModel";
 
 function latLng([longitude, latitude]: PreviewCoordinate): LatLngTuple { return [latitude, longitude]; }
-function MapAccessibility({ label }: { label: string }) { const map = useMap(); useEffect(() => { const container = map.getContainer(); container.setAttribute("aria-label", label); container.setAttribute("role", "region"); return () => { container.removeAttribute("aria-label"); container.removeAttribute("role"); }; }, [label, map]); return null; }
+function MapAccessibility({ descriptionId, label }: { descriptionId?: string; label: string }) { const map = useMap(); useEffect(() => { const container = map.getContainer(); container.setAttribute("aria-label", label); container.setAttribute("role", "region"); if (descriptionId) container.setAttribute("aria-describedby", descriptionId); return () => { container.removeAttribute("aria-describedby"); container.removeAttribute("aria-label"); container.removeAttribute("role"); }; }, [descriptionId, label, map]); return null; }
 function markerContent(label: string, text: string): HTMLElement { const span = document.createElement("span"); span.setAttribute("aria-label", label); span.setAttribute("role", "img"); span.textContent = text; return span; }
 
 export function RecoveryComparisonMap({ model }: { model: Unit211RecoveryPreviewModel }) {
@@ -14,9 +14,9 @@ export function RecoveryComparisonMap({ model }: { model: Unit211RecoveryPreview
   const unitIcon = divIcon({ className: "recovery-unit-marker", html: markerContent(unitLabel, model.vehicle.fleetNumber.replace(/^FM-/, "")), iconAnchor: [18, 18], iconSize: [36, 36] });
   const incidentIcon = divIcon({ className: "recovery-incident-marker", html: markerContent(incidentLabel, `${model.incident.restrictionMeters.toFixed(2)} m`), iconAnchor: [25, 18], iconSize: [50, 36] });
   const incidentPointIcon = divIcon({ className: "recovery-inset-marker", html: markerContent(`${incidentLabel} location`, ""), iconAnchor: [7, 7], iconSize: [14, 14] });
-  return <section aria-describedby="recovery-map-summary" aria-label="Route comparison map" className="recovery-map-shell" id="recovery-comparison-map" tabIndex={-1}><p className="visually-hidden" id="recovery-map-summary">{unitLabel}. The {model.current.status} current route, {model.alternative.status} alternative route, exclusion zone, and clearance incident are shown together.</p>
+  return <section aria-describedby="recovery-map-summary" aria-label="Recovery route comparison overview" className="recovery-map-shell" id="recovery-comparison-map" tabIndex={-1}><p className="visually-hidden" id="recovery-map-summary">{unitLabel}. The {model.current.status} current route, {model.alternative.status} alternative route, exclusion zone, and clearance incident are shown together.</p>
     <MapContainer bounds={bounds} boundsOptions={{ padding: [34, 34] }} className="recovery-map" maxZoom={13} minZoom={7} zoomControl>
-      <MapAccessibility label="Route comparison map" />
+      <MapAccessibility descriptionId="recovery-map-summary" label="Interactive recovery route map" />
       <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       <Pane name="recovery-exclusion" style={{ zIndex: 420 }} /><Pane name="recovery-routes" style={{ zIndex: 430 }} /><Pane name="recovery-markers" style={{ zIndex: 620 }} />
       <Polygon pane="recovery-exclusion" pathOptions={{ className: "recovery-exclusion", color: "#7c3aed", dashArray: "7 5", fillColor: "#8b5cf6", fillOpacity: 0.2, weight: 2.5 }} positions={exclusion} />
