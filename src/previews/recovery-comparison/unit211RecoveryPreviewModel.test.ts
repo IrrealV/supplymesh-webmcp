@@ -46,12 +46,14 @@ describe("Unit 211 recovery preview model", () => {
       current: {
         id: result.data.options[0].routeId,
         status: result.data.options[0].disposition,
+        statusLabel: "Rejected",
         distanceMeters: result.data.options[0].summary.distanceMeters,
         durationSeconds: result.data.options[0].summary.durationSeconds,
       },
       alternative: {
         id: result.data.options[1].alternativeRouteId,
         status: result.data.options[1].disposition,
+        statusLabel: "Supported for comparison",
         distanceMeters: result.data.options[1].summary.distanceMeters,
         durationSeconds: result.data.options[1].summary.durationSeconds,
         avoidsExclusionZone: result.data.options[1].avoidsExclusionZone,
@@ -88,11 +90,13 @@ describe("Unit 211 recovery preview model", () => {
     result.data.options[0].clearanceAssessment.data.restrictionLimitMeters = 3.75;
     result.data.options[1].provenance.avoidance.radiusMeters = 275;
     result.data.options[1].provenance.avoidance.minimumClearanceMeters = 2_750;
+    (result.data.options[0] as { disposition: string }).disposition = "NEEDS_HUMAN_REVIEW";
+    (result.data.options[1] as { disposition: string }).disposition = "SUPPORTED_FOR_REVIEW";
 
     const model = createUnit211RecoveryPreviewModel(result);
     if (model.kind !== "development-preview") throw new Error(`Expected preview data, received ${model.reasonCode}.`);
 
-    expect(model).toMatchObject({ scenarioClock: { instant: "2032-04-05T06:07:08.000Z" }, vehicle: { displayLabel: "Unit 987", location: "Injected origin", position: [-4.5, 39.9] }, incident: { position: [-4.4, 39.8], restrictionMeters: 3.75, exclusionRadiusMeters: 275, horizontalSeparationMeters: 2_750 }, clearance: { vehicleHeightMeters: 3.55, humanBufferMeters: 0.35, requiredMeters: 3.9, equation: "3.55 + 0.35 = 3.90 m required" }, current: { distanceMeters: 12_345 }, alternative: { durationSeconds: 4_321 } });
+    expect(model).toMatchObject({ scenarioClock: { instant: "2032-04-05T06:07:08.000Z" }, vehicle: { displayLabel: "Unit 987", location: "Injected origin", position: [-4.5, 39.9] }, incident: { position: [-4.4, 39.8], restrictionMeters: 3.75, exclusionRadiusMeters: 275, horizontalSeparationMeters: 2_750 }, clearance: { vehicleHeightMeters: 3.55, humanBufferMeters: 0.35, requiredMeters: 3.9, equation: "3.55 + 0.35 = 3.90 m required" }, current: { distanceMeters: 12_345, status: "NEEDS_HUMAN_REVIEW", statusLabel: "Needs human review" }, alternative: { durationSeconds: 4_321, status: "SUPPORTED_FOR_REVIEW", statusLabel: "Supported for review" } });
     expect(model.vehicle.position).not.toBe(result.data.context.position.coordinates);
     expect(model.incident.position).not.toBe(result.data.incident.point.coordinates);
     expect(model.incident.exclusionCoordinates).not.toBe(result.data.incident.exclusionPolygon.coordinates[0]);

@@ -31,7 +31,7 @@ describe("Recovery comparison preview", () => {
     expect(interactiveMap.getAttribute("aria-describedby")).toBe("recovery-map-summary");
     expect(overview.querySelector("#recovery-map-summary")).not.toBeNull();
     expect(screen.getByRole("heading", { level: 1, name: "Recovery comparison" })).not.toBeNull();
-    expect(screen.getByRole("article", { name: "Use alternative route, SUPPORTED_FOR_COMPARISON" })).not.toBeNull();
+    expect(screen.getByRole("article", { name: "Use alternative route, Supported for comparison" })).not.toBeNull();
   });
 
   it("should expose domain-backed comparison semantics without enabling workflow actions", () => {
@@ -40,8 +40,9 @@ describe("Recovery comparison preview", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Recovery comparison" }).textContent).toBe("Recovery comparison");
     expect(screen.getByText("3.80 + 0.20 = 4.00 m required").textContent).toBe("3.80 + 0.20 = 4.00 m required");
     expect(screen.getAllByText("CLEARANCE_VIOLATION")).toHaveLength(2);
-    expect(screen.getByRole("article", { name: "Keep current route, REJECTED" }).getAttribute("aria-disabled")).toBe("true");
-    expect(screen.getByRole("article", { name: "Use alternative route, SUPPORTED_FOR_COMPARISON" }).getAttribute("aria-disabled")).toBeNull();
+    expect(screen.getByRole("article", { name: "Keep current route, Rejected" }).getAttribute("aria-disabled")).toBe("true");
+    expect(screen.getByRole("article", { name: "Use alternative route, Supported for comparison" }).getAttribute("aria-disabled")).toBeNull();
+    expect(document.body.textContent).not.toMatch(/REJECTED|SUPPORTED_FOR_COMPARISON/);
     expect((screen.getByRole("button", { name: "Prepare plan" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText("Preview only — no plan will be prepared.").textContent).toBe("Preview only — no plan will be prepared.");
     expect(screen.queryByText(/cost|toll|fuel|emission|road name/i)).toBeNull();

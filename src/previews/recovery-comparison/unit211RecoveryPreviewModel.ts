@@ -2,7 +2,7 @@ import type { Unit211PreDispatchContextFailureReason, Unit211PreDispatchContextR
 
 export type PreviewCoordinate = readonly [number, number];
 type PreDispatchData = Extract<Unit211PreDispatchContextResult, { ok: true }>["data"];
-type PreviewRoute<Status extends string> = Readonly<{ id: string; status: Status; coordinates: readonly PreviewCoordinate[]; distance: string; duration: string; distanceMeters: number; durationSeconds: number }>;
+type PreviewRoute<Status extends string> = Readonly<{ id: string; status: Status; statusLabel: string; coordinates: readonly PreviewCoordinate[]; distance: string; duration: string; distanceMeters: number; durationSeconds: number }>;
 export type Unit211RecoveryPreviewModel = Readonly<{
   kind: "development-preview";
   scenarioClock: Readonly<{ instant: string; mode: string }>;
@@ -21,6 +21,7 @@ function formatDistance(value: number): string { return `${(value / 1_000).toFix
 function formatDuration(value: number): string { const hours = Math.floor(value / 3_600); const minutes = Math.floor((value % 3_600) / 60); const seconds = value - hours * 3_600 - minutes * 60; return `${hours} h ${minutes} min ${Number.isInteger(seconds) ? seconds.toFixed(0) : seconds.toFixed(1)} s`; }
 function formatDelta(value: number, format: (absoluteValue: number) => string, decrease: string, increase: string): string { return value === 0 ? "No change" : `${format(Math.abs(value))} ${value > 0 ? decrease : increase}`; }
 function formatUnitLabel(fleetNumber: string): string { return `Unit ${fleetNumber.replace(/^FM-/, "")}`; }
+function formatEnumTokenLabel(value: string): string { const normalized = value.toLowerCase().replaceAll("_", " "); return normalized.length === 0 ? "" : `${normalized[0].toUpperCase()}${normalized.slice(1)}`; }
 function copyCoordinate([longitude, latitude]: readonly [number, number]): PreviewCoordinate { return [longitude, latitude]; }
 function copyCoordinates(values: readonly (readonly [number, number])[]): PreviewCoordinate[] { return values.map(copyCoordinate); }
 function deepFreeze<T>(value: T): T { if (typeof value === "object" && value !== null && !Object.isFrozen(value)) { for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child); Object.freeze(value); } return value; }
@@ -37,10 +38,10 @@ export function createUnit211RecoveryPreviewModel(result: Unit211PreDispatchCont
     vehicle: { id: context.unit.vehicleId, displayLabel: formatUnitLabel(context.unit.fleetNumber), fleetNumber: context.unit.fleetNumber, location: context.origin.name, state: context.isRouteStarted ? "Route started" : "Before departure", position: copyCoordinate(context.position.coordinates) },
     incident: { id: incident.id, riskId: incident.riskId, position: copyCoordinate(incident.point.coordinates), restrictionMeters: assessment.restrictionLimitMeters, exclusionRadiusMeters: alternative.provenance.avoidance.radiusMeters, horizontalSeparationMeters, horizontalSeparation: formatDistance(horizontalSeparationMeters), exclusionCoordinates: copyCoordinates(incident.exclusionPolygon.coordinates[0]) },
     clearance: { vehicleHeightMeters: assessment.vehicleHeightMeters, humanBufferMeters: assessment.clearanceBufferMeters, requiredMeters: assessment.requiredClearanceMeters, status: assessment.status, reasonCode: assessment.reasonCode, equation: `${assessment.vehicleHeightMeters.toFixed(2)} + ${assessment.clearanceBufferMeters.toFixed(2)} = ${assessment.requiredClearanceMeters.toFixed(2)} m required` },
-    current: { id: current.routeId, status: current.disposition, coordinates: copyCoordinates(current.geometry.coordinates), distance: formatDistance(current.summary.distanceMeters), duration: formatDuration(current.summary.durationSeconds), ...current.summary },
-    alternative: { id: alternative.alternativeRouteId, status: alternative.disposition, avoidsExclusionZone: alternative.avoidsExclusionZone, coordinates: copyCoordinates(alternative.geometry.coordinates), distance: formatDistance(alternative.summary.distanceMeters), duration: formatDuration(alternative.summary.durationSeconds), ...alternative.summary },
+    current: { id: current.routeId, status: current.disposition, statusLabel: formatEnumTokenLabel(current.disposition), coordinates: copyCoordinates(current.geometry.coordinates), distance: formatDistance(current.summary.distanceMeters), duration: formatDuration(current.summary.durationSeconds), ...current.summary },
+    alternative: { id: alternative.alternativeRouteId, status: alternative.disposition, statusLabel: formatEnumTokenLabel(alternative.disposition), avoidsExclusionZone: alternative.avoidsExclusionZone, coordinates: copyCoordinates(alternative.geometry.coordinates), distance: formatDistance(alternative.summary.distanceMeters), duration: formatDuration(alternative.summary.durationSeconds), ...alternative.summary },
     delta: { distance: formatDelta(distanceDeltaMeters, formatDistance, "shorter", "longer"), duration: formatDelta(durationDeltaSeconds, (value) => `${value.toFixed(1)} s`, "faster", "slower") },
-    resolvedRisks: [`${assessment.reasonCode}: current route disposition is ${current.disposition}.`, `${alternative.relation.avoidsRiskId}: exclusion-zone avoidance is ${alternative.avoidsExclusionZone ? "confirmed" : "not confirmed"}.`, `Horizontal separation from exclusion zone: ${formatDistance(horizontalSeparationMeters)}.`],
+    resolvedRisks: [`${assessment.reasonCode}: current route disposition is ${formatEnumTokenLabel(current.disposition)}.`, `${alternative.relation.avoidsRiskId}: exclusion-zone avoidance is ${alternative.avoidsExclusionZone ? "confirmed" : "not confirmed"}.`, `Horizontal separation from exclusion zone: ${formatDistance(horizontalSeparationMeters)}.`],
     unknownData: [],
   });
 }
