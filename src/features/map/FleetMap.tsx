@@ -8,15 +8,18 @@ import { deriveMapLayers, selectVisibleRisks, type DerivedRisk, type DerivedRout
 import { MapEventCoordinator } from "./MapEventCoordinator";
 import { MapLegend } from "./MapLegend";
 import { VehicleMarkerLayer } from "./VehicleMarkerLayer";
+import { RecoveryComparisonLayers, RecoveryIncidentInset } from "../recovery-comparison/RecoveryComparisonLayers";
+import type { Unit211RecoveryComparisonModel } from "../recovery-comparison/unit211RecoveryComparisonModel";
+import { recoveryComparisonCopy } from "../../preferences/i18n/catalog";
 
 const severityColors: Record<RiskSeverity, string> = { low: "#657985", medium: "#a66a18", high: "#c4512d", critical: "#b4232d" };
 const WEATHER_RISK_COLOR = "#1268e8";
 
-function toPosition([longitude, latitude]: number[]): [number, number] { return [latitude, longitude]; }
+function toPosition([longitude, latitude]: readonly number[]): [number, number] { return [latitude, longitude]; }
 function routePositions(route: DerivedRoute["route"]): LatLngExpression[] { return route.geometry.geometry.coordinates.map(toPosition); }
 function escapeHtml(value: string): string { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;"); }
 
-function MapFocus({ coordinator, scenario }: { coordinator: MapEventCoordinator; scenario: OperatingRegion }) {
+function MapFocus({ comparison, coordinator, scenario }: { comparison?: Unit211RecoveryComparisonModel; coordinator: MapEventCoordinator; scenario: OperatingRegion }) {
   const map = useMap();
   const target = useUiCoordinationStore((state) => state.mapFocusTarget);
   useEffect(() => {
@@ -39,13 +42,15 @@ function MapFocus({ coordinator, scenario }: { coordinator: MapEventCoordinator;
     if (target.kind === "vehicle") {
       const [longitude, latitude] = vehicle.position.geometry.coordinates;
       map.flyTo([latitude, longitude], 8.5, { animate: !reduceMotion, duration: 0.85, easeLinearity: 0.22 });
+    } else if (target.kind === "comparison" && comparison !== undefined) {
+      map.fitBounds(latLngBounds([...comparison.current.coordinates, ...comparison.alternative.coordinates, ...comparison.incident.exclusionCoordinates, comparison.incident.position].map(toPosition)), { animate: !reduceMotion, duration: 0.85, maxZoom: 12, padding: [48, 48] });
     } else {
       map.fitBounds(latLngBounds(routePositions(route)), { animate: !reduceMotion, duration: 0.85, maxZoom: 8, padding: [64, 64] });
     }
 
     const timeout = window.setTimeout(finish, reduceMotion ? 100 : 1400);
     return () => { window.clearTimeout(timeout); map.off("moveend", finish); };
-  }, [coordinator, map, scenario.routes, scenario.vehicles, target]);
+  }, [comparison, coordinator, map, scenario.routes, scenario.vehicles, target]);
   return null;
 }
 
@@ -128,26 +133,28 @@ function routeStyle({ state }: DerivedRoute) {
   return { className, color: "#4c9a6a", opacity: 0.66, weight: 2.5 };
 }
 
-export function FleetMap({ locale, scenario }: { locale: Locale; scenario: OperatingRegion }) {
+export function FleetMap({ availableComparison, comparison, locale, scenario }: { availableComparison?: Unit211RecoveryComparisonModel; comparison?: Unit211RecoveryComparisonModel; locale: Locale; scenario: OperatingRegion }) {
   const activeFilters = useUiCoordinationStore((state) => state.activeFilters);
   const panelContext = useUiCoordinationStore((state) => state.panelContext);
   const selection = useUiCoordinationStore((state) => state.selection);
   const selectedVehicleId = selection.kind === "vehicle" ? selection.vehicleId : "";
   const layers = useMemo(() => deriveMapLayers(scenario, activeFilters, selectedVehicleId), [activeFilters, scenario, selectedVehicleId]);
-  const visibleRisks = useMemo(() => selectVisibleRisks(layers.risks, selectedVehicleId), [layers.risks, selectedVehicleId]);
+  const visibleRisks = useMemo(() => selectVisibleRisks(layers.risks, selectedVehicleId).filter(({ risk }) => risk.id !== availableComparison?.incident.riskId), [availableComparison, layers.risks, selectedVehicleId]);
   const coordinator = useMemo(() => new MapEventCoordinator(), []);
   const copy = catalog(locale);
   const cancelManualFollow = (): void => { coordinator.recordManualInteraction(); useUiCoordinationStore.getState().cancelFollow(); };
-  const layoutSignature = `${panelContext.mode}:${selection.kind}:${selectedVehicleId}`;
+  const layoutSignature = `${panelContext.mode}:${selection.kind}:${selectedVehicleId}:${comparison?.incident.id ?? ""}`; const recoveryCopy = recoveryComparisonCopy(locale);
   return <div aria-label={copy.currentRoute} className="map-frame" onKeyDown={(event) => { if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "+", "-", "="].includes(event.key)) cancelManualFollow(); }} onPointerDown={cancelManualFollow} onWheel={cancelManualFollow}>
     <MapContainer center={[40.1, -3.55]} className="fleet-map" maxZoom={12} minZoom={5} zoom={6.5} zoomControl zoomSnap={0.5}>
       <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       <Pane name="risk-tokens" style={{ zIndex: 620 }} /><Pane name="fleet-trucks" style={{ zIndex: 640 }} /><Pane name="fleet-labels" style={{ zIndex: 660 }} />
-      <MapEvents coordinator={coordinator} /><MapFocus coordinator={coordinator} scenario={scenario} /><MapLayout coordinator={coordinator} signature={layoutSignature} />
-      {layers.routes.map((entry) => <Polyline key={`${entry.route.id}:${entry.state}`} {...routeStyle(entry)} noClip positions={routePositions(entry.route)} smoothFactor={0} />)}
+      <MapEvents coordinator={coordinator} /><MapFocus comparison={comparison} coordinator={coordinator} scenario={scenario} /><MapLayout coordinator={coordinator} signature={layoutSignature} />
+      {layers.routes.filter((entry) => entry.route.id !== comparison?.current.id).map((entry) => <Polyline key={`${entry.route.id}:${entry.state}`} {...routeStyle(entry)} noClip positions={routePositions(entry.route)} smoothFactor={0} />)}
       <RiskLayers entries={visibleRisks} locale={locale} />
+      {(comparison ?? availableComparison) && <RecoveryComparisonLayers comparison={comparison !== undefined} locale={locale} model={(comparison ?? availableComparison)!} onIncidentSelect={comparison ? undefined : (vehicleId) => useUiCoordinationStore.getState().selectVehicle(vehicleId, "operational-map")} />}
       <VehicleMarkerLayer locale={locale} onSelect={(vehicleId) => useUiCoordinationStore.getState().selectVehicle(vehicleId)} vehicles={layers.vehicles} />
     </MapContainer>
+    {comparison && <><p className="visually-hidden" id="recovery-map-summary">{comparison.vehicle.displayLabel}. {recoveryCopy.current} · {comparison.current.statusLabel}. {recoveryCopy.alternative} · {comparison.alternative.statusLabel}. {recoveryCopy.exclusionZone}. {recoveryCopy.clearanceIncident}.</p><RecoveryIncidentInset locale={locale} model={comparison} /></>}
     <MapLegend locale={locale} />
   </div>;
 }
