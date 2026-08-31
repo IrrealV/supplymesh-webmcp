@@ -1,32 +1,75 @@
 import { describe, expect, it } from "vitest";
+import { createApplication } from "../../app/createApplication";
+import { createOperationsApi } from "../../domain/operations/createOperationsApi";
+import { createZustandScenarioRepository } from "../../scenario/state/createZustandScenarioRepository";
 import { createUnit211RecoveryPreviewModel } from "./unit211RecoveryPreviewModel";
 
 describe("Unit 211 recovery preview model", () => {
-  it("should present the authoritative failed clearance assessment and real route options", () => {
-    const model = createUnit211RecoveryPreviewModel();
+  it("should project the real pre-dispatch operation result without rebuilding domain data", () => {
+    const result = createApplication().unit211PreDispatchContext();
+    const model = createUnit211RecoveryPreviewModel(result);
+
+    expect(model.kind).toBe("development-preview");
+    if (model.kind !== "development-preview") throw new Error(`Expected preview data, received ${model.reasonCode}.`);
+    if (!result.ok) throw new Error(`Expected domain data, received ${result.reasonCode}.`);
 
     expect(model).toMatchObject({
-      kind: "development-preview",
-      vehicle: { id: "vehicle-011", label: "Unit 211", fleetNumber: "FM-211", location: "Toledo", state: "Before departure" },
-      incident: { id: "restriction-height-3.9", position: [-3.897481, 40.149232], restrictionMeters: 3.9 },
-      clearance: { vehicleHeightMeters: 3.8, humanBufferMeters: 0.2, requiredMeters: 4, status: "FAIL", equation: "3.80 + 0.20 = 4.00 m required" },
-      current: { id: "route-011", status: "rejected", distance: "99.7 km", duration: "1 h 28 min 12.1 s" },
-      alternative: { id: "alternative-route-011-clearance-v1", status: "valid", distance: "80.3 km", duration: "1 h 28 min 2.5 s" },
-      delta: { distance: "19.4 km shorter", duration: "9.6 s faster" },
+      scenarioClock: result.data.context.scenarioClock,
+      vehicle: {
+        id: result.data.context.unit.vehicleId,
+        displayLabel: "Unit 211",
+        fleetNumber: result.data.context.unit.fleetNumber,
+        location: result.data.context.origin.name,
+        state: "Before departure",
+      },
+      incident: {
+        id: result.data.incident.id,
+        riskId: result.data.incident.riskId,
+        position: result.data.incident.point.coordinates,
+        restrictionMeters: result.data.options[0].clearanceAssessment.data.restrictionLimitMeters,
+      },
+      clearance: {
+        vehicleHeightMeters: result.data.options[0].clearanceAssessment.data.vehicleHeightMeters,
+        humanBufferMeters: result.data.options[0].clearanceAssessment.data.clearanceBufferMeters,
+        requiredMeters: result.data.options[0].clearanceAssessment.data.requiredClearanceMeters,
+        status: result.data.options[0].clearanceAssessment.data.status,
+        reasonCode: result.data.options[0].clearanceAssessment.data.reasonCode,
+      },
+      current: {
+        id: result.data.options[0].routeId,
+        status: result.data.options[0].disposition,
+        distanceMeters: result.data.options[0].summary.distanceMeters,
+        durationSeconds: result.data.options[0].summary.durationSeconds,
+      },
+      alternative: {
+        id: result.data.options[1].alternativeRouteId,
+        status: result.data.options[1].disposition,
+        distanceMeters: result.data.options[1].summary.distanceMeters,
+        durationSeconds: result.data.options[1].summary.durationSeconds,
+        avoidsExclusionZone: result.data.options[1].avoidsExclusionZone,
+      },
     });
+    expect(model.vehicle.position).toStrictEqual(result.data.context.position.coordinates);
+    expect(model.current.coordinates).toStrictEqual(result.data.options[0].geometry.coordinates);
+    expect(model.alternative.coordinates).toStrictEqual(result.data.options[1].geometry.coordinates);
+    expect(model.incident.exclusionCoordinates).toStrictEqual(result.data.incident.exclusionPolygon.coordinates[0]);
     expect(model.current.coordinates).toHaveLength(1_120);
     expect(model.alternative.coordinates).toHaveLength(743);
-  });
-
-  it("should expose an immutable pre-dispatch position and exact exclusion geometry", () => {
-    const model = createUnit211RecoveryPreviewModel();
-
-    expect(model.vehicle.position).toStrictEqual(model.current.coordinates[0]);
     expect(model.incident.exclusionCoordinates).toHaveLength(65);
-    expect(model.incident.exclusionRadiusMeters).toBe(250);
-    expect(model.incident.horizontalSeparationMeters).toBeCloseTo(5_724.858608, 6);
+    expect(model.clearance.equation).toBe("3.80 + 0.20 = 4.00 m required");
     expect(Object.isFrozen(model)).toBe(true);
     expect(Object.isFrozen(model.current.coordinates)).toBe(true);
     expect(Object.isFrozen(model.incident.exclusionCoordinates)).toBe(true);
+  });
+
+  it("should preserve a structured operation failure without interpreting its reason code", () => {
+    const result = createOperationsApi(createZustandScenarioRepository()).unit211PreDispatchContext();
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("Expected a structured pre-dispatch failure.");
+
+    expect(createUnit211RecoveryPreviewModel(result)).toStrictEqual({
+      kind: "operation-failure",
+      reasonCode: result.reasonCode,
+    });
   });
 });
