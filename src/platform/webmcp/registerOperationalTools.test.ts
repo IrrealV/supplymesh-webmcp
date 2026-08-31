@@ -35,6 +35,9 @@ function failingOperations(): OperationsApi {
     },
     fleetStatus: (): DomainResult<FleetStatus> => unavailable(),
     scenarioCurrent: (): DomainResult<OperatingRegion> => unavailable(),
+    unit211PreDispatchContext: () => {
+      throw new Error("credential=not-for-tool-output");
+    },
     vehicleDelete: (): DomainResult<Vehicle> => unavailable(),
     vehicleGet: (): DomainResult<Vehicle> => unavailable(),
     vehicleRename: (): DomainResult<Vehicle> => unavailable(),
