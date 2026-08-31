@@ -1,5 +1,6 @@
 import type { OperationalRecoveryRepository } from "../ports/OperationalRecoveryRepository";
 import type { Unit211PreDispatchContextResult, Unit211PreDispatchData } from "../operations/unit211PreDispatchContext";
+import { deepDetachAndFreeze } from "../deepDetach";
 import { sha256Fingerprint, type Sha256Crypto } from "./canonicalJson";
 import {
   RecoveryErrorCodes,
@@ -26,6 +27,7 @@ import {
   recoveryPlanPayloadsEqual,
   recoveryPlansEqual,
 } from "./recoveryValidation";
+import { recoveryRouteDigest, recoveryRouteEvidenceFromOption } from "./recoveryRouteAdmission";
 
 type ComparisonReader = () => Unit211PreDispatchContextResult;
 type PlanInput = Readonly<{ selectedOptionId: string }>;
@@ -86,7 +88,9 @@ function repositoryCall(operation: () => RecoveryResult<OperationalRecoverySnaps
   }
   const normalized = normalizeRecoverySnapshotResult(result);
   if (normalized === false) return repositoryFailure(true);
-  return normalized.ok ? recoverySuccess(detachedOperationalSnapshot(normalized.data)) : normalized;
+  if (!normalized.ok) return normalized;
+  const detached = detachedOperationalSnapshot(normalized.data);
+  return detached === false ? repositoryFailure(true) : recoverySuccess(detached);
 }
 
 async function repositoryCallAsync(operation: () => Promise<RecoveryResult<OperationalRecoverySnapshot>>): Promise<RecoveryResult<OperationalRecoverySnapshot>> {
@@ -98,15 +102,14 @@ async function repositoryCallAsync(operation: () => Promise<RecoveryResult<Opera
   }
   const normalized = normalizeRecoverySnapshotResult(result);
   if (normalized === false) return repositoryFailure(true);
-  return normalized.ok ? recoverySuccess(detachedOperationalSnapshot(normalized.data)) : normalized;
+  if (!normalized.ok) return normalized;
+  const detached = detachedOperationalSnapshot(normalized.data);
+  return detached === false ? repositoryFailure(true) : recoverySuccess(detached);
 }
 
 function detachedComparison(data: Unit211PreDispatchData): RecoveryResult<Unit211PreDispatchData> {
-  try {
-    return recoverySuccess(structuredClone(data));
-  } catch {
-    return comparisonUnavailable();
-  }
+  const detached = deepDetachAndFreeze(data);
+  return detached.ok ? recoverySuccess(detached.data) : comparisonUnavailable();
 }
 
 function compare(readComparison: ComparisonReader): RecoveryResult<Unit211PreDispatchData> {
@@ -202,7 +205,7 @@ function isCurrentClearanceRejection(value: unknown): boolean {
     && value.data.reasonCode === "CLEARANCE_VIOLATION";
 }
 
-function planPayload(data: Unit211PreDispatchData, revision: number, selectedOptionId: string): RecoveryResult<RecoveryPlanPayload> {
+function planPayload(data: Unit211PreDispatchData, revision: number, selectedOptionId: string, admittedRouteDigest: `sha256:${string}`): RecoveryResult<RecoveryPlanPayload> {
   try {
     const current = data.options[0];
     const proposed = data.options[1];
@@ -233,11 +236,11 @@ function planPayload(data: Unit211PreDispatchData, revision: number, selectedOpt
     const proposedMetrics = metrics(proposed.summary, proposed.temporalAssessment);
     if (currentMetrics === false || proposedMetrics === false || !isFingerprint(`sha256:${proposed.provenance.sourceRevision}`)) return comparisonUnavailable();
     const constraintResults: RecoveryConstraintResults = {
-      currentClearance: structuredClone(current.clearanceAssessment),
+      currentClearance: current.clearanceAssessment,
       proposedClearance,
       proposedAvoidance,
-      proposedTemporal: structuredClone(proposed.temporalAssessment),
-      proposedCargoContinuity: structuredClone(proposed.cargoContinuityAssessment),
+      proposedTemporal: proposed.temporalAssessment,
+      proposedCargoContinuity: proposed.cargoContinuityAssessment,
     };
     return recoverySuccess({
       planId: `recovery-plan:vehicle-011:revision-${revision}:${selectedOptionId}`,
@@ -252,6 +255,7 @@ function planPayload(data: Unit211PreDispatchData, revision: number, selectedOpt
       metrics: { current: currentMetrics, proposed: proposedMetrics },
       createdAt: data.context.scenarioClock.instant,
       admittedRouteSourceRevision: proposed.provenance.sourceRevision,
+      admittedRouteDigest,
     });
   } catch {
     return comparisonUnavailable();
@@ -277,22 +281,27 @@ export function createRecoveryAgentCapability(repository: OperationalRecoveryRep
       if (!captured.ok) return captured;
       const comparison = compare(readComparison);
       if (!comparison.ok) return comparison;
-      const payload = planPayload(comparison.data, captured.data.scenarioRevision, selectedOptionId);
-      if (!payload.ok) return payload;
+      const provisionalPayload = planPayload(comparison.data, captured.data.scenarioRevision, selectedOptionId, `sha256:${"0".repeat(64)}`);
+      if (!provisionalPayload.ok) return provisionalPayload;
       const existingPlan = activeExistingPlan(captured.data, selectedOptionId);
+      const routeEvidence = recoveryRouteEvidenceFromOption(comparison.data.options[1]);
+      if (!routeEvidence.ok) return existingPlan === false ? routeEvidence : planConflict();
+      const routeDigest = await recoveryRouteDigest(routeEvidence.data, cryptoCapability);
+      if (!routeDigest.ok) return routeDigest;
+      const payload: RecoveryPlanPayload = { ...provisionalPayload.data, admittedRouteDigest: routeDigest.data };
       if (existingPlan !== false) {
         const existingPayload = payloadFromRecoveryPlan(existingPlan);
         if (existingPayload === false) return repositoryFailure(true);
-        if (!recoveryPlanPayloadsEqual(payload.data, existingPayload)) return planConflict();
+        if (!recoveryPlanPayloadsEqual(payload, existingPayload)) return planConflict();
         const confirmed = repositoryCall(repository.operationalRead);
         if (!confirmed.ok) return confirmed;
         if (confirmed.data.scenarioRevision !== captured.data.scenarioRevision) return revisionMismatch();
         const confirmedPlan = activeExistingPlan(confirmed.data, selectedOptionId);
         return confirmedPlan !== false && recoveryPlansEqual(existingPlan, confirmedPlan) ? recoverySuccess(confirmedPlan) : planConflict();
       }
-      const fingerprint = await sha256Fingerprint(payload.data, cryptoCapability);
+      const fingerprint = await sha256Fingerprint(payload, cryptoCapability);
       if (!fingerprint.ok) return fingerprint;
-      const plan: RecoveryPlan = { ...payload.data, fingerprint: fingerprint.data };
+      const plan: RecoveryPlan = { ...payload, fingerprint: fingerprint.data };
       const committed = await repositoryCallAsync(() => repository.operationalStage({ expectedScenarioRevision: captured.data.scenarioRevision, plan }));
       if (!committed.ok) return committed;
       return committed.data.plan !== null && recoveryPlansEqual(committed.data.plan, plan)

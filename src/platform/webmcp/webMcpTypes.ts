@@ -13,7 +13,7 @@ export type WebMcpTool = {
   name: string;
   description: string;
   inputSchema: JsonSchema;
-  execute(input: unknown): WebMcpToolResponse;
+  execute(input: unknown): WebMcpToolResponse | Promise<WebMcpToolResponse>;
 };
 
 export type ModelContext = {

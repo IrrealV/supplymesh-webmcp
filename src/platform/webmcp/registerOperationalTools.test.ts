@@ -17,8 +17,8 @@ class MemoryStorage {
   }
 }
 
-function toolResult(tool: ReturnType<typeof createOperationalTools>[number], input: unknown): DomainResult<unknown> {
-  const response = tool.execute(input);
+async function toolResult(tool: ReturnType<typeof createOperationalTools>[number], input: unknown): Promise<DomainResult<unknown>> {
+  const response = await tool.execute(input);
   expect(response.content).toHaveLength(1);
   expect(response.content[0].type).toBe("text");
   return JSON.parse(response.content[0].text) as DomainResult<unknown>;
@@ -45,7 +45,7 @@ function failingOperations(): OperationsApi {
 }
 
 describe("createOperationalTools", () => {
-  it("should expose exactly the four documented schemas and JSON text envelope", () => {
+  it("should expose exactly the four documented schemas and JSON text envelope", async () => {
     const tools = createOperationalTools(createOperationsApi(createZustandScenarioRepository(new MemoryStorage())));
 
     expect(tools.map((tool) => ({ name: tool.name, inputSchema: tool.inputSchema }))).toStrictEqual([
@@ -55,11 +55,11 @@ describe("createOperationalTools", () => {
       { name: "vehicle_rename", inputSchema: { type: "object", properties: { vehicleId: { type: "string", minLength: 1 }, label: { type: "string", minLength: 1 } }, required: ["vehicleId", "label"], additionalProperties: false } },
     ]);
 
-    const result = toolResult(tools[0], {});
+    const result = await toolResult(tools[0], {});
     expect(result.ok).toBe(true);
   });
 
-  it("should preserve shared UI query and rename outcomes through tools", () => {
+  it("should preserve shared UI query and rename outcomes through tools", async () => {
     const operations = createOperationsApi(createZustandScenarioRepository(new MemoryStorage()));
     let publishedScenario: OperatingRegion | undefined;
     const tools = createOperationalTools(operations, (scenario) => {
@@ -74,12 +74,12 @@ describe("createOperationalTools", () => {
       throw new Error("Required WebMCP tools were not created.");
     }
 
-    expect(toolResult(vehicleGet, { vehicleId })).toStrictEqual(operations.vehicleGet(vehicleId));
-    expect(toolResult(vehicleRename, { vehicleId, label: "Night Dispatch" })).toStrictEqual(operations.vehicleRename({ vehicleId, label: "Night Dispatch" }));
+    expect(await toolResult(vehicleGet, { vehicleId })).toStrictEqual(operations.vehicleGet(vehicleId));
+    expect(await toolResult(vehicleRename, { vehicleId, label: "Night Dispatch" })).toStrictEqual(operations.vehicleRename({ vehicleId, label: "Night Dispatch" }));
     expect(publishedScenario?.vehicles.find((vehicle) => vehicle.internalId === vehicleId)?.label).toBe("Night Dispatch");
   });
 
-  it("should reject invalid input and prevent operational diagnostics from reaching tool output", () => {
+  it("should reject invalid input and prevent operational diagnostics from reaching tool output", async () => {
     const tools = createOperationalTools(failingOperations());
     const vehicleGet = tools.find((tool) => tool.name === "vehicle_get");
     const scenarioCurrent = tools.find((tool) => tool.name === "scenario_current");
@@ -88,8 +88,8 @@ describe("createOperationalTools", () => {
       throw new Error("Required WebMCP tools were not created.");
     }
 
-    expect(toolResult(vehicleGet, { vehicleId: "", unexpected: true })).toStrictEqual({ ok: false, error: { code: "invalid-input", message: "The tool input is invalid." } });
-    const result = toolResult(scenarioCurrent, {});
+    expect(await toolResult(vehicleGet, { vehicleId: "", unexpected: true })).toStrictEqual({ ok: false, error: { code: "invalid-input", message: "The tool input is invalid." } });
+    const result = await toolResult(scenarioCurrent, {});
     expect(result).toStrictEqual({ ok: false, error: { code: "operation-failed", message: "The operation could not be completed." } });
     expect(JSON.stringify(result)).not.toContain("credential");
   });
