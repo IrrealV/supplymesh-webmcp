@@ -243,7 +243,7 @@ describe("OperationalShell", () => {
     const user = userEvent.setup(); const app = createRecoveryApplication({ storage: new MemoryStorage() }); useUiCoordinationStore.getState().selectVehicle("vehicle-011", "operational-map"); render(<RecoveryHarness app={app} />); await user.click(screen.getByRole("button", { name: "Review recovery options" }));
     expect(screen.queryByRole("button", { name: /Prepare plan|Request human review|Execute|Verify/ })).toBeNull(); let planId = ""; await act(async () => { planId = await stageForHumanReview(app); });
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Awaiting human review" }))); expect(screen.getByText(planId)).not.toBeNull(); expect(screen.getByRole("button", { name: "Approve" })).not.toBeNull(); expect(screen.getByRole("button", { name: "Reject" })).not.toBeNull();
-    await user.click(screen.getByRole("button", { name: "Approve" })); await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Approved" }))); expect(document.querySelector(".workflow-capability")?.textContent).toContain("Agent capability enabled: recovery_plan_execute"); expect(screen.queryByRole("button", { name: /Execute|Verify/ })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Approve" })); await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Approved" }))); expect(document.body.textContent).not.toContain("Agent capability enabled"); expect(document.querySelector(".workflow-capability")?.textContent).toContain("Human approval authorizes agent execution"); expect(screen.queryByRole("button", { name: /Execute|Verify/ })).toBeNull();
   });
 
   it("should localize human evidence and keep rejection free of execution controls", async () => {
@@ -253,6 +253,6 @@ describe("OperationalShell", () => {
 
   it("should surface a failed scenario refresh without hiding the executed snapshot", async () => {
     const user = userEvent.setup(); const app = createRecoveryApplication({ storage: new MemoryStorage() }); useUiCoordinationStore.getState().selectVehicle("vehicle-011"); render(<RecoveryHarness app={app} scenarioRefreshFailure />); await user.click(screen.getByRole("button", { name: "Review recovery options" })); let planId = ""; await act(async () => { planId = await stageForHumanReview(app); }); await user.click(screen.getByRole("button", { name: "Approve" })); await act(async () => { await app.recoveryExecution.executeApprovedPlan({ planId }); });
-    expect((await screen.findByRole("alert")).textContent).toContain("repository-data-invalid"); expect(screen.getByText("EXECUTED")).not.toBeNull(); expect(screen.getByText(/recovery_verify/)).not.toBeNull();
+    expect((await screen.findByRole("alert")).textContent).toContain("repository-data-invalid"); expect(screen.getByText("EXECUTED")).not.toBeNull(); expect(screen.getByText("Execution evidence is available for agent verification")).not.toBeNull();
   });
 });
