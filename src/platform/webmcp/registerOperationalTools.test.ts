@@ -30,6 +30,9 @@ function failingOperations(): OperationsApi {
   };
 
   return {
+    assessAuthoritativeVerticalClearance: () => {
+      throw new Error("credential=not-for-tool-output");
+    },
     fleetStatus: (): DomainResult<FleetStatus> => unavailable(),
     scenarioCurrent: (): DomainResult<OperatingRegion> => unavailable(),
     vehicleDelete: (): DomainResult<Vehicle> => unavailable(),

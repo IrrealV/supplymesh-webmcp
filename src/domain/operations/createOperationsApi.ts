@@ -1,8 +1,10 @@
 import { isVehicleLabelValid, type DomainResult, type FleetStatus, type OperatingRegion, type Vehicle, type VehicleRenameCommand, type VehicleStatus } from "../entities";
 import type { ScenarioRepository } from "../ports/ScenarioRepository";
+import { createAssessAuthoritativeVerticalClearance, type AssessAuthoritativeVerticalClearance } from "./authoritativeVerticalAssessment";
 
 export type OperationsApi = {
   scenarioCurrent(): DomainResult<OperatingRegion>;
+  assessAuthoritativeVerticalClearance: AssessAuthoritativeVerticalClearance;
   fleetStatus(): DomainResult<FleetStatus>;
   vehicleGet(vehicleId: string): DomainResult<Vehicle>;
   vehicleRename(command: VehicleRenameCommand): DomainResult<Vehicle>;
@@ -20,6 +22,7 @@ function vehicleResult(vehicle: Vehicle | undefined, vehicleId: string): DomainR
 export function createOperationsApi(repository: ScenarioRepository): OperationsApi {
   return {
     scenarioCurrent: () => ({ ok: true, data: repository.scenarioCurrent() }),
+    assessAuthoritativeVerticalClearance: createAssessAuthoritativeVerticalClearance(repository),
     fleetStatus: () => {
       const byStatus: Record<VehicleStatus, number> = { driving: 0, resting: 0, "needs-attention": 0, critical: 0 };
       for (const vehicle of repository.scenarioCurrent().vehicles) {
