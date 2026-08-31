@@ -17,6 +17,6 @@ export function App() {
   const copy = catalog(locale);
 
   return <WebMcpGate explicitFlag={import.meta.env.VITE_WEBMCP_LOCAL_BYPASS} locale={locale} onScenarioChange={publishScenario} operational={application.operational} operations={operations} recoveryAgent={application.recoveryAgent} recoveryExecution={application.recoveryExecution}>
-    {!result.ok ? <main className="console-unavailable">{copy.consoleUnavailable}</main> : <OperationalShell locale={locale} onLocaleChange={setLocale} onScenarioChange={publishScenario} operations={operations} scenario={result.data} />}
+    {!result.ok ? <main className="console-unavailable">{copy.consoleUnavailable}</main> : <OperationalShell locale={locale} onLocaleChange={setLocale} onScenarioChange={publishScenario} operational={application.operational} operations={operations} recoveryAgent={application.recoveryAgent} recoveryExecution={application.recoveryExecution} recoveryHuman={application.recoveryHuman} scenario={result.data} />}
   </WebMcpGate>;
 }

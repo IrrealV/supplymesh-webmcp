@@ -66,5 +66,7 @@ describe("FleetMap layers", () => {
     expect(sources).not.toMatch(networkCall);
     expect(sources).toContain("scenario.routes");
     expect(sources).toContain("duration: 0.85");
+    expect(sources).toContain("entry.route.id !== comparison?.alternative.id");
+    expect(sources).toContain("(comparison ?? availableComparison)?.incident.riskId");
   });
 });

@@ -10,8 +10,9 @@ import { DeleteVehicleDialog } from "./DeleteVehicleDialog";
 import { coordinateDistanceKilometers, formatDateTime, formatDuration, formatNumberUnit, formatRiskImpact, formatRiskKind, formatStatus, present, riskComparison } from "./formatters";
 import { RecoveryComparisonFailure, RecoveryComparisonPanel } from "../recovery-comparison/RecoveryComparisonPanel";
 import type { Unit211RecoveryComparisonState } from "../recovery-comparison/unit211RecoveryComparisonModel";
+import { RecoveryWorkflowPanel, type RecoveryWorkflowPanelProps } from "../recovery-comparison/RecoveryWorkflowPanel";
 
-type InspectionProps = { comparison?: Unit211RecoveryComparisonState; isFollowing: boolean; locale: Locale; onBackFromRecovery?(): void; onClose(): void; onRestoreFollow(): void; onReviewRecovery?(): void; onScenarioChange(scenario: OperatingRegion): void; onViewRoute(): void; operations: OperationsApi; recoveryUnavailableReason?: Unit211PreDispatchContextFailureReason; scenario: OperatingRegion; vehicle: Vehicle };
+type InspectionProps = { comparison?: Unit211RecoveryComparisonState; isFollowing: boolean; locale: Locale; onBackFromRecovery?(): void; onClose(): void; onDeleted?(): void; onRestoreFollow(): void; onReviewRecovery?(): void; onScenarioChange(scenario: OperatingRegion): void; onViewRoute(): void; operations: OperationsApi; recovery?: Omit<RecoveryWorkflowPanelProps, "locale">; recoveryUnavailableReason?: Unit211PreDispatchContextFailureReason; scenario: OperatingRegion; vehicle: Vehicle };
 type DetailTab = "vehicle" | "cargo" | "driver";
 const severityRank = { low: 0, medium: 1, high: 2, critical: 3 } as const;
 
@@ -34,10 +35,11 @@ function RiskCard({ locale, risk, vehicle }: { locale: Locale; risk: Operational
   return <article className="risk-card" data-severity={risk.severity}><div className="risk-card-heading"><WarningCircle aria-hidden="true" size={18} weight="fill" /><strong>{formatRiskKind(risk.kind, copy)}</strong></div><p><b>{copy.impact}:</b> {formatRiskImpact(risk.kind, copy)}</p>{comparison && <p>{comparison}</p>}{Number.isFinite(distance) && <p>{copy.approximateDistance}: {formatNumberUnit(distance, "km", locale, copy.notAvailable)}</p>}</article>;
 }
 
-export function VehicleInspection({ comparison, isFollowing, locale, onBackFromRecovery, onClose, onRestoreFollow, onReviewRecovery, onScenarioChange, onViewRoute, operations, recoveryUnavailableReason, scenario, vehicle }: InspectionProps) {
+export function VehicleInspection({ comparison, isFollowing, locale, onBackFromRecovery, onClose, onDeleted, onRestoreFollow, onReviewRecovery, onScenarioChange, onViewRoute, operations, recovery, recoveryUnavailableReason, scenario, vehicle }: InspectionProps) {
   const copy = catalog(locale);
   const inspectionRef = useRef<HTMLElement>(null);
   const usesTabletDialog = useTabletViewport();
+  const comparisonOpen = comparison !== undefined;
   const [tabletDrawerOpen, setTabletDrawerOpen] = useState(true);
   const closeTimerRef = useRef<number | undefined>(undefined);
   const [label, setLabel] = useState(vehicle.label);
@@ -56,7 +58,7 @@ export function VehicleInspection({ comparison, isFollowing, locale, onBackFromR
     if (closeTimerRef.current !== undefined) window.clearTimeout(closeTimerRef.current);
   }, []);
   useEffect(() => { if (!usesTabletDialog) inspectionRef.current?.focus(); }, [usesTabletDialog]);
-  useEffect(() => { if (comparison !== undefined) requestAnimationFrame(() => document.getElementById("recovery-comparison-heading")?.focus()); }, [comparison]);
+  useEffect(() => { if (comparisonOpen) requestAnimationFrame(() => document.getElementById("recovery-comparison-heading")?.focus()); }, [comparisonOpen]);
 
   function requestClose(): void {
     if (!usesTabletDialog) {
@@ -76,7 +78,7 @@ export function VehicleInspection({ comparison, isFollowing, locale, onBackFromR
     if (!result.ok) { setFeedback("error"); return; }
     setLabel(result.data.label); setPersistedLabel(result.data.label); setHasEdited(false); setFeedback("saved"); refreshScenario();
   }
-  function deleteVehicle(): void { const result = operations.vehicleDelete(vehicle.internalId); if (!result.ok) { setFeedback("error"); return; } refreshScenario(); onClose(); }
+  function deleteVehicle(): void { const result = operations.vehicleDelete(vehicle.internalId); if (!result.ok) { setFeedback("error"); return; } refreshScenario(); onDeleted?.(); if (onDeleted === undefined) onClose(); }
   const tabs: Array<{ id: DetailTab; label: string }> = [{ id: "vehicle", label: copy.vehicleTab }, { id: "cargo", label: copy.cargoTab }, { id: "driver", label: copy.driverTab }];
   const recoveryCopy = recoveryComparisonCopy(locale); const contents = <>
     <header className="drawer-header">{comparison !== undefined && <button className="recovery-back" onClick={onBackFromRecovery} type="button"><ArrowLeft aria-hidden="true" size={18} />{recoveryCopy.backToVehicleDetails}</button>}<div>{usesTabletDialog ? <Dialog.Title asChild><strong>{displayName}</strong></Dialog.Title> : <strong>{displayName}</strong>}<span>{vehicle.fleetNumber}</span></div><button aria-label={copy.closeInspection} className="drawer-close" onClick={requestClose} type="button"><X aria-hidden="true" size={18} /></button></header>
@@ -86,7 +88,7 @@ export function VehicleInspection({ comparison, isFollowing, locale, onBackFromR
       <section aria-labelledby="risk-heading" className="inspection-section attention-section"><h2 id="risk-heading">{copy.whyAttention}</h2>{risks.length === 0 ? <p>{copy.noCurrentRisk}</p> : risks.map((risk) => <RiskCard key={risk.id} locale={locale} risk={risk} vehicle={vehicle} />)}</section>
       <section aria-label={copy.vehicleInspection} className="inspection-secondary"><div aria-label={copy.vehicleInspection} className="inspection-tabs" role="tablist">{tabs.map((entry) => <button aria-controls="inspection-tabpanel" aria-selected={tab === entry.id} id={`inspection-tab-${entry.id}`} key={entry.id} onClick={() => setTab(entry.id)} role="tab" type="button">{entry.label}</button>)}</div><div aria-labelledby={`inspection-tab-${tab}`} id="inspection-tabpanel" role="tabpanel"><DetailList locale={locale} tab={tab} vehicle={vehicle} /></div></section>
       <section aria-labelledby="actions-heading" className="inspection-section inspection-actions"><h2 id="actions-heading">{copy.actions}</h2>{recoveryUnavailableReason && <div aria-labelledby="recovery-unavailable-heading" className="recovery-inline-failure" role="alert"><strong id="recovery-unavailable-heading">{recoveryCopy.failureTitle}</strong><p>{recoveryCopy.failureDescription}</p><code>{recoveryUnavailableReason}</code><p>{recoveryCopy.noRouteChanged}</p></div>}<div><button className="primary-action" onClick={onViewRoute} type="button">{copy.viewOnRoute}</button>{onReviewRecovery && <button id="review-recovery-options" onClick={onReviewRecovery} type="button">{recoveryCopy.reviewOptions}</button>}{!isFollowing && <button className="follow-control" onClick={onRestoreFollow} type="button">{interpolate(copy.followVehicle, { label: displayName })}</button>}<DeleteVehicleDialog locale={locale} onConfirm={deleteVehicle} vehicle={{ ...vehicle, label }} /></div></section>
-    </> : comparison.kind === "ready" ? <RecoveryComparisonPanel locale={locale} model={comparison} /> : <RecoveryComparisonFailure locale={locale} reasonCode={comparison.reasonCode} />}</div>
+    </> : comparison.kind === "ready" ? <RecoveryComparisonPanel locale={locale} model={comparison} workflow={recovery && <RecoveryWorkflowPanel {...recovery} locale={locale} />} /> : <><RecoveryComparisonFailure locale={locale} reasonCode={comparison.reasonCode} />{recovery && <RecoveryWorkflowPanel {...recovery} locale={locale} />}</>}</div>
   </>;
   if (usesTabletDialog) return <Dialog.Root modal={false} onOpenChange={(open) => { if (!open) requestClose(); }} open={tabletDrawerOpen}><Dialog.Portal><Dialog.Content aria-describedby={undefined} aria-label={copy.vehicleInspection} className="vehicle-inspection tablet-vehicle-drawer" onEscapeKeyDown={(event) => { if (comparison !== undefined) { event.preventDefault(); onBackFromRecovery?.(); } }}>{contents}</Dialog.Content></Dialog.Portal></Dialog.Root>;
   return <aside aria-label={copy.vehicleInspection} className="vehicle-inspection" onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); if (comparison === undefined) onClose(); else onBackFromRecovery?.(); } }} ref={inspectionRef} role="complementary" tabIndex={-1}>{contents}</aside>;
