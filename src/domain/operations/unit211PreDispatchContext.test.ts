@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { OperatingRegion, OperationalRisk, Route, Vehicle } from "../entities";
 import type { ScenarioRepository } from "../ports/ScenarioRepository";
 import { clearanceAlternativeCatalog } from "../../scenario/fixtures/clearanceAlternativeCatalog";
@@ -12,6 +12,8 @@ type Success = Extract<Unit211PreDispatchContextResult, { ok: true }>;
 type CatalogCase = { label: string; reasonCode: Unit211PreDispatchContextFailureReason; read(): unknown };
 type AdmissionCase = { label: string; read(): unknown };
 type ScenarioCase = { label: string; reasonCode: Unit211PreDispatchContextFailureReason; mutate(scenario: OperatingRegion): void };
+type TemporalDecision = Pick<Success["data"]["options"][number]["temporalAssessment"], "status" | "reasonCode">;
+type TemporalDecisionCase = { label: string; remainingDriveMinutes: number; restDeadline: string; expected: readonly [TemporalDecision, TemporalDecision] };
 
 function required<T>(value: T | undefined, message: string): T { if (value === undefined) throw new Error(message); return value; }
 function vehicleFrom(scenario: OperatingRegion): Vehicle { return required(scenario.vehicles.find(({ internalId }) => internalId === VEHICLE_ID), "Unit 211 is missing."); }
@@ -41,6 +43,7 @@ const catalogFailures: readonly CatalogCase[] = [
   { label: "wrong relation", reasonCode: "ALTERNATIVE_RELATION_INVALID", read: () => ({ ...clearanceAlternativeCatalog, relation: { ...clearanceAlternativeCatalog.relation, vehicleId: "vehicle-001" } }) },
   { label: "non-finite geometry", reasonCode: "ALTERNATIVE_GEOMETRY_INVALID", read: () => ({ ...clearanceAlternativeCatalog, geometry: { type: "LineString", coordinates: [[0, 0], [Number.NaN, 1]] } }) },
   { label: "non-positive summary", reasonCode: "ALTERNATIVE_SUMMARY_INVALID", read: () => ({ ...clearanceAlternativeCatalog, summary: { ...clearanceAlternativeCatalog.summary, durationSeconds: 0 } }) },
+  { label: "non-finite summary", reasonCode: "ALTERNATIVE_SUMMARY_INVALID", read: () => ({ ...clearanceAlternativeCatalog, summary: { ...clearanceAlternativeCatalog.summary, durationSeconds: Number.POSITIVE_INFINITY } }) },
   { label: "invalid provenance", reasonCode: "ALTERNATIVE_PROVENANCE_INVALID", read: () => ({ ...clearanceAlternativeCatalog, provenance: { ...clearanceAlternativeCatalog.provenance, generatedAt: "not-an-instant" } }) },
   { label: "non-positive minimum clearance", reasonCode: "ALTERNATIVE_AVOIDANCE_INVALID", read: () => ({ ...clearanceAlternativeCatalog, provenance: { ...clearanceAlternativeCatalog.provenance, avoidance: { ...clearanceAlternativeCatalog.provenance.avoidance, minimumClearanceMeters: 0 } } }) },
   { label: "open avoidance polygon", reasonCode: "ALTERNATIVE_AVOIDANCE_INVALID", read: () => ({ ...clearanceAlternativeCatalog, provenance: { ...clearanceAlternativeCatalog.provenance, avoidance: { ...clearanceAlternativeCatalog.provenance.avoidance, polygon: { type: "Polygon", coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1]]] } } } }) },
@@ -58,24 +61,38 @@ const scenarioFailures: readonly ScenarioCase[] = [
   { label: "wrong scenario", reasonCode: "SCENARIO_INVALID", mutate: (scenario) => { scenario.id = "other"; } },
   { label: "wrong fixed fleet identity", reasonCode: "UNIT_211_INVALID", mutate: (scenario) => { vehicleFrom(scenario).fleetNumber = "FM-999"; } },
   { label: "invalid current geometry", reasonCode: "CURRENT_ROUTE_INVALID", mutate: (scenario) => { const route = routeFrom(scenario); route.geometry = structuredClone(route.geometry); Reflect.set(route.geometry.geometry, "type", "Point"); } },
+  { label: "non-finite current duration", reasonCode: "CURRENT_ROUTE_INVALID", mutate: (scenario) => { const route = routeFrom(scenario); route.summary = { ...route.summary, durationSeconds: Number.NaN }; } },
+  { label: "invalid remaining drive source", reasonCode: "TEMPORAL_SOURCE_INVALID", mutate: (scenario) => { vehicleFrom(scenario).timing.remainingDriveMinutes = Number.POSITIVE_INFINITY; } },
+  { label: "invalid route progress source", reasonCode: "TEMPORAL_SOURCE_INVALID", mutate: (scenario) => { vehicleFrom(scenario).routeProgress = Number.NaN; } },
   { label: "invalid rest deadline source", reasonCode: "TEMPORAL_SOURCE_INVALID", mutate: (scenario) => { vehicleFrom(scenario).timing.restDeadline = "not-an-instant"; } },
+];
+
+const temporalDecisionCases: readonly TemporalDecisionCase[] = [
+  { label: "exact equality at the remaining drive boundary", remainingDriveMinutes: 88.20166666666667, restDeadline: "2026-08-28T16:00:00Z", expected: [{ status: "PASS", reasonCode: "TEMPORAL_WINDOW_SATISFIED" }, { status: "PASS", reasonCode: "TEMPORAL_WINDOW_SATISFIED" }] },
+  { label: "a drive-time violation", remainingDriveMinutes: 88, restDeadline: "2026-08-28T16:00:00Z", expected: [{ status: "FAIL", reasonCode: "DRIVE_TIME_VIOLATION" }, { status: "FAIL", reasonCode: "DRIVE_TIME_VIOLATION" }] },
+  { label: "a rest-deadline violation", remainingDriveMinutes: 235, restDeadline: "2026-08-28T10:00:00Z", expected: [{ status: "FAIL", reasonCode: "REST_DEADLINE_VIOLATION" }, { status: "FAIL", reasonCode: "REST_DEADLINE_VIOLATION" }] },
+  { label: "both temporal violations", remainingDriveMinutes: 88, restDeadline: "2026-08-28T10:00:00Z", expected: [{ status: "FAIL", reasonCode: "DRIVE_TIME_AND_REST_DEADLINE_VIOLATION" }, { status: "FAIL", reasonCode: "DRIVE_TIME_AND_REST_DEADLINE_VIOLATION" }] },
+  { label: "an unrounded drive-time boundary", remainingDriveMinutes: 88.2, restDeadline: "2026-08-28T16:00:00Z", expected: [{ status: "FAIL", reasonCode: "DRIVE_TIME_VIOLATION" }, { status: "PASS", reasonCode: "TEMPORAL_WINDOW_SATISFIED" }] },
 ];
 
 describe("unit211PreDispatchContext", () => {
   it("should return the exact deterministic context, incident, and two real route options", () => {
     const scenario = createSpainScenario(); const route = routeFrom(scenario); const vehicle = vehicleFrom(scenario); const routeSnap = required(route.riskSnaps.find(({ riskId }) => riskId === RISK_ID), "Route-specific snap is missing.");
+    const sourceProgress = vehicle.routeProgress; const sourcePosition = structuredClone(vehicle.position.geometry.coordinates);
     const data = success(apiFor(scenario).api.unit211PreDispatchContext()).data;
 
     expect(data).toStrictEqual({
       context: { scenarioClock: { instant: "2026-08-28T09:00:00.000Z", mode: "deterministic-demo" }, unit: { vehicleId: "vehicle-011", fleetNumber: "FM-211" }, origin: { name: "Toledo" }, currentRouteId: "route-011", routeProgress: 0, isRouteStarted: false, position: { type: "Point", coordinates: route.geometry.geometry.coordinates[0] }, temporalSource: { remainingDriveMinutes: 235, restDeadline: "2026-08-28T16:00:00Z" } },
       incident: { id: "incident-route-011-restriction-height-3.9", vehicleId: "vehicle-011", riskId: RISK_ID, routeId: ROUTE_ID, snapIndex: routeSnap.startIndex, point: { type: "Point", coordinates: routeSnap.startCoordinate }, exclusionPolygon: clearanceAlternativeCatalog.provenance.avoidance.polygon },
       options: [
-        { kind: "CURRENT", disposition: "REJECTED", routeId: ROUTE_ID, geometry: route.geometry.geometry, summary: { distanceMeters: 99706.6, durationSeconds: 5292.1 }, clearanceAssessment: { ok: true, data: { vehicleId: VEHICLE_ID, riskId: RISK_ID, routeId: ROUTE_ID, vehicleHeightMeters: 3.8, clearanceBufferMeters: 0.2, requiredClearanceMeters: 4, restrictionLimitMeters: 3.9, status: "FAIL", reasonCode: "CLEARANCE_VIOLATION" } } },
-        { kind: "ALTERNATIVE", disposition: "SUPPORTED_FOR_COMPARISON", alternativeRouteId: "alternative-route-011-clearance-v1", geometry: clearanceAlternativeCatalog.geometry, summary: { distanceMeters: 80298.9, durationSeconds: 5282.5 }, relation: clearanceAlternativeCatalog.relation, provenance: clearanceAlternativeCatalog.provenance, avoidsExclusionZone: true },
+        { kind: "CURRENT", disposition: "REJECTED", routeId: ROUTE_ID, geometry: route.geometry.geometry, summary: { distanceMeters: 99706.6, durationSeconds: 5292.1 }, clearanceAssessment: { ok: true, data: { vehicleId: VEHICLE_ID, riskId: RISK_ID, routeId: ROUTE_ID, vehicleHeightMeters: 3.8, clearanceBufferMeters: 0.2, requiredClearanceMeters: 4, restrictionLimitMeters: 3.9, status: "FAIL", reasonCode: "CLEARANCE_VIOLATION" } }, temporalAssessment: { remainingRouteMinutes: 88.20166666666667, remainingDriveMinutes: 235, estimatedCompletionAt: "2026-08-28T10:28:12.100Z", restDeadline: "2026-08-28T16:00:00Z", status: "PASS", reasonCode: "TEMPORAL_WINDOW_SATISFIED" } },
+        { kind: "ALTERNATIVE", disposition: "SUPPORTED_FOR_COMPARISON", alternativeRouteId: "alternative-route-011-clearance-v1", geometry: clearanceAlternativeCatalog.geometry, summary: { distanceMeters: 80298.9, durationSeconds: 5282.5 }, relation: clearanceAlternativeCatalog.relation, provenance: clearanceAlternativeCatalog.provenance, avoidsExclusionZone: true, temporalAssessment: { remainingRouteMinutes: 88.04166666666667, remainingDriveMinutes: 235, estimatedCompletionAt: "2026-08-28T10:28:02.500Z", restDeadline: "2026-08-28T16:00:00Z", status: "PASS", reasonCode: "TEMPORAL_WINDOW_SATISFIED" } },
       ],
     });
     expect(data.context.position.coordinates).toStrictEqual([-4.027341, 39.862774]);
-    expect(data.context.position.coordinates).not.toStrictEqual(vehicle.position.geometry.coordinates);
+    expect(sourceProgress).toBe(0.7142857142857143); expect(vehicle.routeProgress).toBe(sourceProgress); expect(vehicle.position.geometry.coordinates).toStrictEqual(sourcePosition);
+    expect(data.context.routeProgress).toBe(0); expect(data.context.routeProgress).not.toBe(sourceProgress); expect(data.context.position.coordinates).not.toStrictEqual(sourcePosition);
+    expect(data.options[0].temporalAssessment.remainingRouteMinutes).toBe(route.summary.durationSeconds / 60);
     expect(data.options[1].provenance.avoidance.minimumClearanceMeters).toBe(5724.858608188861);
   });
 
@@ -93,15 +110,64 @@ describe("unit211PreDispatchContext", () => {
     const first = success(api.unit211PreDispatchContext()); const second = success(api.unit211PreDispatchContext());
     expect(first).toStrictEqual(second); expect(first.data).not.toBe(second.data);
     expect(first.data.options[0].geometry).not.toBe(second.data.options[0].geometry); expect(first.data.options[1].geometry).not.toBe(second.data.options[1].geometry);
+    expect(first.data.options[0].temporalAssessment).not.toBe(second.data.options[0].temporalAssessment); expect(first.data.options[1].temporalAssessment).not.toBe(second.data.options[1].temporalAssessment);
     expect(first.data.incident.exclusionPolygon).not.toBe(second.data.incident.exclusionPolygon);
-    first.data.context.position.coordinates[0] = 0; first.data.options[0].geometry.coordinates[0][0] = 0; first.data.options[1].geometry.coordinates[0][0] = 0; first.data.incident.exclusionPolygon.coordinates[0][0][0] = 0;
+    first.data.context.position.coordinates[0] = 0; first.data.options[0].geometry.coordinates[0][0] = 0; first.data.options[0].temporalAssessment.remainingRouteMinutes = 0; first.data.options[1].geometry.coordinates[0][0] = 0; first.data.incident.exclusionPolygon.coordinates[0][0][0] = 0;
     expect(scenario).toStrictEqual(scenarioBefore); expect(clearanceAlternativeCatalog).toStrictEqual(catalogBefore);
-    expect(second.data.context.position.coordinates).toStrictEqual([-4.027341, 39.862774]); expect(second.data.incident.exclusionPolygon.coordinates[0][0][0]).toBe(-3.897481);
+    expect(second.data.context.position.coordinates).toStrictEqual([-4.027341, 39.862774]); expect(second.data.options[0].temporalAssessment.remainingRouteMinutes).toBe(88.20166666666667); expect(second.data.incident.exclusionPolygon.coordinates[0][0][0]).toBe(-3.897481);
   });
 
-  it("should expose no inferred temporal, cost, road, rest-decision, workflow, or mutation fields", () => {
+  it.each(temporalDecisionCases)("should decide $label from raw duration and pre-dispatch progress", ({ remainingDriveMinutes, restDeadline, expected }) => {
+    const scenario = createSpainScenario(); const vehicle = vehicleFrom(scenario); vehicle.timing.remainingDriveMinutes = remainingDriveMinutes; vehicle.timing.restDeadline = restDeadline;
+    const assessments = success(apiFor(scenario).api.unit211PreDispatchContext()).data.options.map(({ temporalAssessment: assessment }) => assessment);
+    expect(assessments.map(({ remainingRouteMinutes, estimatedCompletionAt }) => ({ remainingRouteMinutes, estimatedCompletionAt }))).toStrictEqual([
+      { remainingRouteMinutes: 88.20166666666667, estimatedCompletionAt: "2026-08-28T10:28:12.100Z" },
+      { remainingRouteMinutes: 88.04166666666667, estimatedCompletionAt: "2026-08-28T10:28:02.500Z" },
+    ]);
+    expect(assessments.map(({ remainingDriveMinutes: driveMinutes, restDeadline: deadline }) => ({ remainingDriveMinutes: driveMinutes, restDeadline: deadline }))).toStrictEqual([
+      { remainingDriveMinutes, restDeadline }, { remainingDriveMinutes, restDeadline },
+    ]);
+    expect(assessments.map(({ status, reasonCode }) => ({ status, reasonCode }))).toStrictEqual(expected);
+  });
+
+  it("should return UNKNOWN with honest fields when a finite duration cannot produce a valid completion instant", () => {
+    const scenario = createSpainScenario(); const route = routeFrom(scenario); route.summary = { ...route.summary, durationSeconds: Number.MAX_VALUE };
+    const data = success(apiFor(scenario).api.unit211PreDispatchContext()).data;
+    expect(data.options[0].temporalAssessment).toStrictEqual({ remainingRouteMinutes: Number.MAX_VALUE / 60, remainingDriveMinutes: 235, estimatedCompletionAt: null, restDeadline: "2026-08-28T16:00:00Z", status: "UNKNOWN", reasonCode: "TEMPORAL_SOURCE_INVALID" });
+    expect(data.options[1].temporalAssessment).toStrictEqual({ remainingRouteMinutes: 88.04166666666667, remainingDriveMinutes: 235, estimatedCompletionAt: "2026-08-28T10:28:02.500Z", restDeadline: "2026-08-28T16:00:00Z", status: "PASS", reasonCode: "TEMPORAL_WINDOW_SATISFIED" });
+  });
+
+  it.each([
+    { label: "an underflowing Number.MIN_VALUE duration", durationSeconds: Number.MIN_VALUE, remainingRouteMinutes: null },
+    { label: "a positive sub-millisecond duration", durationSeconds: 0.0001, remainingRouteMinutes: 0.0000016666666666666667 },
+  ])("should return UNKNOWN with honest fields for $label", ({ durationSeconds, remainingRouteMinutes }) => {
+    const scenario = createSpainScenario(); const route = routeFrom(scenario); route.summary = { ...route.summary, durationSeconds };
+    const data = success(apiFor(scenario).api.unit211PreDispatchContext()).data;
+    expect(data.options[0].temporalAssessment).toStrictEqual({ remainingRouteMinutes, remainingDriveMinutes: 235, estimatedCompletionAt: null, restDeadline: "2026-08-28T16:00:00Z", status: "UNKNOWN", reasonCode: "TEMPORAL_SOURCE_INVALID" });
+    expect(data.options[1].temporalAssessment.status).toBe("PASS");
+  });
+
+  it("should return UNKNOWN without discarding derivable fields for an incoherent rest deadline", () => {
+    const scenario = createSpainScenario(); vehicleFrom(scenario).timing.restDeadline = "2026-08-28T08:59:59Z";
+    const assessments = success(apiFor(scenario).api.unit211PreDispatchContext()).data.options.map(({ temporalAssessment: assessment }) => assessment);
+    expect(assessments).toStrictEqual([
+      { remainingRouteMinutes: 88.20166666666667, remainingDriveMinutes: 235, estimatedCompletionAt: "2026-08-28T10:28:12.100Z", restDeadline: "2026-08-28T08:59:59Z", status: "UNKNOWN", reasonCode: "TEMPORAL_SOURCE_INVALID" },
+      { remainingRouteMinutes: 88.04166666666667, remainingDriveMinutes: 235, estimatedCompletionAt: "2026-08-28T10:28:02.500Z", restDeadline: "2026-08-28T08:59:59Z", status: "UNKNOWN", reasonCode: "TEMPORAL_SOURCE_INVALID" },
+    ]);
+  });
+
+  it("should return UNKNOWN when the fixed scenario clock cannot produce a valid instant", () => {
+    const parseInstant = Date.parse.bind(Date); vi.spyOn(Date, "parse").mockImplementation((value) => value === "2026-08-28T09:00:00.000Z" ? Number.NaN : parseInstant(value));
+    const assessments = success(apiFor(createSpainScenario()).api.unit211PreDispatchContext()).data.options.map(({ temporalAssessment: assessment }) => assessment);
+    expect(assessments).toStrictEqual([
+      { remainingRouteMinutes: 88.20166666666667, remainingDriveMinutes: 235, estimatedCompletionAt: null, restDeadline: "2026-08-28T16:00:00Z", status: "UNKNOWN", reasonCode: "TEMPORAL_SOURCE_INVALID" },
+      { remainingRouteMinutes: 88.04166666666667, remainingDriveMinutes: 235, estimatedCompletionAt: null, restDeadline: "2026-08-28T16:00:00Z", status: "UNKNOWN", reasonCode: "TEMPORAL_SOURCE_INVALID" },
+    ]);
+  });
+
+  it("should expose no reserve, rest toggle, policy scheduling, workflow, or mutation fields", () => {
     const outputFields = new Set(fields(success(apiFor(createSpainScenario()).api.unit211PreDispatchContext()).data));
-    for (const prohibited of ["eta", "delay", "delayMinutes", "completionTime", "reserve", "cost", "costs", "toll", "tolls", "road", "roads", "restFeasible", "restCompliant", "restDecision", "feasible", "selected", "applied", "workflow", "mutation"]) expect(outputFields.has(prohibited), prohibited).toBe(false);
+    for (const prohibited of ["eta", "delay", "delayMinutes", "completionTime", "reserve", "cost", "costs", "toll", "tolls", "road", "roads", "restFeasible", "restCompliant", "restDecision", "restProtection", "restProtectionEnabled", "restToggle", "protectionEnabled", "policy", "schedule", "restSchedule", "plan", "approval", "execution", "receipt", "movement", "reset", "feasible", "selected", "applied", "workflow", "mutation", "wallClock", "dateNow"]) expect(outputFields.has(prohibited), prohibited).toBe(false);
   });
 
   it.each(catalogFailures)("should fail closed without throwing for $label", ({ read, reasonCode }) => {

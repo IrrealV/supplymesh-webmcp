@@ -8,6 +8,7 @@ const ROUTE_ID = "route-011";
 const RISK_ID = "restriction-height-3.9";
 const ALTERNATIVE_ROUTE_ID = "alternative-route-011-clearance-v1";
 const COORDINATE_COUNT_MAX = 10_000;
+const PRE_DISPATCH_ROUTE_PROGRESS = 0;
 
 type Coordinate = [number, number];
 type PointGeometry = { type: "Point"; coordinates: Coordinate };
@@ -17,6 +18,12 @@ type RejectedAssessment = Extract<AuthoritativeVerticalClearanceAssessmentResult
 type AlternativeRelation = { vehicleId: string; currentRouteId: string; avoidsRiskId: string; alternativeRouteId: string };
 type Avoidance = { shape: string; radiusMeters: number; steps: number; minimumClearanceMeters: number; polygon: PolygonGeometry };
 type AlternativeProvenance = { provider: string; profile: string; sourceRevision: string; generatedAt: string; avoidance: Avoidance };
+type TemporalFacts = { remainingRouteMinutes: number; remainingDriveMinutes: number; estimatedCompletionAt: string; restDeadline: string };
+type NullableTemporalFacts = { [Key in keyof TemporalFacts]: TemporalFacts[Key] | null };
+type TemporalAssessment =
+  | (TemporalFacts & { status: "PASS"; reasonCode: "TEMPORAL_WINDOW_SATISFIED" })
+  | (TemporalFacts & { status: "FAIL"; reasonCode: "DRIVE_TIME_VIOLATION" | "REST_DEADLINE_VIOLATION" | "DRIVE_TIME_AND_REST_DEADLINE_VIOLATION" })
+  | (NullableTemporalFacts & { status: "UNKNOWN"; reasonCode: "TEMPORAL_SOURCE_INVALID" });
 
 export type Unit211PreDispatchContextFailureReason =
   | "SCENARIO_INVALID" | "UNIT_211_INVALID" | "CURRENT_ROUTE_INVALID" | "CURRENT_RISK_INVALID" | "TEMPORAL_SOURCE_INVALID"
@@ -39,8 +46,8 @@ type Unit211PreDispatchData = {
   context: Unit211PreDispatchContext;
   incident: { id: "incident-route-011-restriction-height-3.9"; vehicleId: "vehicle-011"; riskId: "restriction-height-3.9"; routeId: "route-011"; snapIndex: number; point: PointGeometry; exclusionPolygon: PolygonGeometry };
   options: [
-    { kind: "CURRENT"; disposition: "REJECTED"; routeId: "route-011"; geometry: LineGeometry; summary: RouteSummary; clearanceAssessment: RejectedAssessment },
-    { kind: "ALTERNATIVE"; disposition: "SUPPORTED_FOR_COMPARISON"; alternativeRouteId: "alternative-route-011-clearance-v1"; geometry: LineGeometry; summary: RouteSummary; relation: AlternativeRelation; provenance: AlternativeProvenance; avoidsExclusionZone: true },
+    { kind: "CURRENT"; disposition: "REJECTED"; routeId: "route-011"; geometry: LineGeometry; summary: RouteSummary; clearanceAssessment: RejectedAssessment; temporalAssessment: TemporalAssessment },
+    { kind: "ALTERNATIVE"; disposition: "SUPPORTED_FOR_COMPARISON"; alternativeRouteId: "alternative-route-011-clearance-v1"; geometry: LineGeometry; summary: RouteSummary; relation: AlternativeRelation; provenance: AlternativeProvenance; avoidsExclusionZone: true; temporalAssessment: TemporalAssessment },
   ];
 };
 
@@ -62,6 +69,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isPositiveFinite(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+function isZero(value: unknown): value is 0 {
+  return typeof value === "number" && Object.is(value, 0);
 }
 
 function isCoordinate(value: unknown): value is Coordinate {
@@ -102,10 +113,62 @@ function copySummary(value: unknown): RouteSummary | false {
   return { distanceMeters: value.distanceMeters, durationSeconds: value.durationSeconds };
 }
 
-function isIsoInstant(value: unknown): value is string {
+function instantMilliseconds(value: unknown): number | false {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value)) return false;
   const milliseconds = Date.parse(value); const canonical = value.includes(".") ? value : value.replace("Z", ".000Z");
-  return Number.isFinite(milliseconds) && new Date(milliseconds).toISOString() === canonical;
+  if (!Number.isFinite(milliseconds)) return false;
+  const instant = new Date(milliseconds);
+  return Number.isFinite(instant.getTime()) && instant.toISOString() === canonical ? milliseconds : false;
+}
+
+function isIsoInstant(value: unknown): value is string {
+  return instantMilliseconds(value) !== false;
+}
+
+function temporalAssessment(context: Unit211PreDispatchContext, durationSeconds: number): TemporalAssessment {
+  const scenarioClockMilliseconds = instantMilliseconds(context.scenarioClock.instant);
+  const restDeadlineMilliseconds = instantMilliseconds(context.temporalSource.restDeadline);
+  const isProgressValid = isZero(context.routeProgress);
+  const remainingDriveMinutes = Number.isFinite(context.temporalSource.remainingDriveMinutes) && context.temporalSource.remainingDriveMinutes >= 0 ? context.temporalSource.remainingDriveMinutes : null;
+  const restDeadline = restDeadlineMilliseconds === false ? null : context.temporalSource.restDeadline;
+  let remainingRouteSeconds: number | null = null;
+  let remainingRouteMinutes: number | null = null;
+  if (Number.isFinite(durationSeconds) && durationSeconds > 0 && isProgressValid) {
+    const seconds = durationSeconds * (1 - context.routeProgress);
+    const minutes = seconds / 60;
+    if (Number.isFinite(seconds) && seconds > 0 && Number.isFinite(minutes) && minutes > 0) {
+      remainingRouteSeconds = seconds; remainingRouteMinutes = minutes;
+    }
+  }
+  let completionDeltaMilliseconds: number | null = null;
+  if (remainingRouteSeconds !== null) {
+    const milliseconds = remainingRouteSeconds * 1_000;
+    if (Number.isFinite(milliseconds) && milliseconds > 0 && Number.isSafeInteger(milliseconds)) completionDeltaMilliseconds = milliseconds;
+  }
+  let estimatedCompletionMilliseconds: number | null = null;
+  let estimatedCompletionAt: string | null = null;
+  if (scenarioClockMilliseconds !== false && completionDeltaMilliseconds !== null) {
+    const milliseconds = scenarioClockMilliseconds + completionDeltaMilliseconds;
+    if (Number.isFinite(milliseconds) && Number.isSafeInteger(milliseconds) && milliseconds > scenarioClockMilliseconds && milliseconds - scenarioClockMilliseconds === completionDeltaMilliseconds) {
+      const instant = new Date(milliseconds);
+      if (instant.getTime() === milliseconds) {
+        const isoInstant = instant.toISOString();
+        if (instantMilliseconds(isoInstant) === milliseconds) {
+          estimatedCompletionMilliseconds = milliseconds; estimatedCompletionAt = isoInstant;
+        }
+      }
+    }
+  }
+  const facts = { remainingRouteMinutes, remainingDriveMinutes, estimatedCompletionAt, restDeadline };
+  if (scenarioClockMilliseconds === false || restDeadlineMilliseconds === false || restDeadlineMilliseconds < scenarioClockMilliseconds || remainingRouteMinutes === null || remainingDriveMinutes === null || completionDeltaMilliseconds === null || estimatedCompletionMilliseconds === null || estimatedCompletionAt === null || restDeadline === null) {
+    return { ...facts, status: "UNKNOWN", reasonCode: "TEMPORAL_SOURCE_INVALID" };
+  }
+  const knownFacts: TemporalFacts = { remainingRouteMinutes, remainingDriveMinutes, estimatedCompletionAt, restDeadline };
+  const isDriveTimeViolated = remainingRouteMinutes > remainingDriveMinutes;
+  const isRestDeadlineViolated = estimatedCompletionMilliseconds > restDeadlineMilliseconds;
+  if (!isDriveTimeViolated && !isRestDeadlineViolated) return { ...knownFacts, status: "PASS", reasonCode: "TEMPORAL_WINDOW_SATISFIED" };
+  if (isDriveTimeViolated && isRestDeadlineViolated) return { ...knownFacts, status: "FAIL", reasonCode: "DRIVE_TIME_AND_REST_DEADLINE_VIOLATION" };
+  return { ...knownFacts, status: "FAIL", reasonCode: isDriveTimeViolated ? "DRIVE_TIME_VIOLATION" : "REST_DEADLINE_VIOLATION" };
 }
 
 function validateCurrentSource(value: unknown): Validation<CurrentSource> {
@@ -115,6 +178,7 @@ function validateCurrentSource(value: unknown): Validation<CurrentSource> {
   if (units.length !== 1) return failure("UNIT_211_INVALID");
   const unit = units[0];
   if (unit.fleetNumber !== FLEET_NUMBER || unit.routeId !== ROUTE_ID || !isRecord(unit.origin) || unit.origin.name !== "Toledo") return failure("UNIT_211_INVALID");
+  if (typeof unit.routeProgress !== "number" || !Number.isFinite(unit.routeProgress) || unit.routeProgress < 0 || unit.routeProgress > 1) return failure("TEMPORAL_SOURCE_INVALID");
   if (!isRecord(unit.timing) || typeof unit.timing.remainingDriveMinutes !== "number" || !Number.isFinite(unit.timing.remainingDriveMinutes) || unit.timing.remainingDriveMinutes < 0 || !isIsoInstant(unit.timing.restDeadline)) return failure("TEMPORAL_SOURCE_INVALID");
   const routes = scenario.routes.filter((candidate: unknown) => isRecord(candidate) && candidate.id === ROUTE_ID);
   if (routes.length !== 1) return failure("CURRENT_ROUTE_INVALID");
@@ -185,12 +249,13 @@ export function createUnit211PreDispatchContext(repository: Pick<ScenarioReposit
     if (!alternative.ok) return alternative;
     if (alternativeValue !== admittedAlternativeCatalog) return failure("ALTERNATIVE_ADMISSION_INVALID");
     const firstCoordinate = current.data.geometry.coordinates[0]; const exclusionPolygon = alternative.data.provenance.avoidance.polygon;
+    const context: Unit211PreDispatchContext = { scenarioClock: { instant: "2026-08-28T09:00:00.000Z", mode: "deterministic-demo" }, unit: { vehicleId: VEHICLE_ID, fleetNumber: FLEET_NUMBER }, origin: { name: "Toledo" }, currentRouteId: ROUTE_ID, routeProgress: PRE_DISPATCH_ROUTE_PROGRESS, isRouteStarted: false, position: { type: "Point", coordinates: [firstCoordinate[0], firstCoordinate[1]] }, temporalSource: { remainingDriveMinutes: current.data.remainingDriveMinutes, restDeadline: current.data.restDeadline } };
     return { ok: true, data: {
-      context: { scenarioClock: { instant: "2026-08-28T09:00:00.000Z", mode: "deterministic-demo" }, unit: { vehicleId: VEHICLE_ID, fleetNumber: FLEET_NUMBER }, origin: { name: "Toledo" }, currentRouteId: ROUTE_ID, routeProgress: 0, isRouteStarted: false, position: { type: "Point", coordinates: [firstCoordinate[0], firstCoordinate[1]] }, temporalSource: { remainingDriveMinutes: current.data.remainingDriveMinutes, restDeadline: current.data.restDeadline } },
+      context,
       incident: { id: "incident-route-011-restriction-height-3.9", vehicleId: VEHICLE_ID, riskId: RISK_ID, routeId: ROUTE_ID, snapIndex: incident.snapIndex, point: incident.point, exclusionPolygon },
       options: [
-        { kind: "CURRENT", disposition: "REJECTED", routeId: ROUTE_ID, geometry: current.data.geometry, summary: current.data.summary, clearanceAssessment },
-        { kind: "ALTERNATIVE", disposition: "SUPPORTED_FOR_COMPARISON", alternativeRouteId: ALTERNATIVE_ROUTE_ID, geometry: alternative.data.geometry, summary: alternative.data.summary, relation: alternative.data.relation, provenance: alternative.data.provenance, avoidsExclusionZone: true },
+        { kind: "CURRENT", disposition: "REJECTED", routeId: ROUTE_ID, geometry: current.data.geometry, summary: current.data.summary, clearanceAssessment, temporalAssessment: temporalAssessment(context, current.data.summary.durationSeconds) },
+        { kind: "ALTERNATIVE", disposition: "SUPPORTED_FOR_COMPARISON", alternativeRouteId: ALTERNATIVE_ROUTE_ID, geometry: alternative.data.geometry, summary: alternative.data.summary, relation: alternative.data.relation, provenance: alternative.data.provenance, avoidsExclusionZone: true, temporalAssessment: temporalAssessment(context, alternative.data.summary.durationSeconds) },
       ],
     } };
   };
