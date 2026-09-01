@@ -39,6 +39,13 @@ function failureCode(result: RecoveryResult<unknown>): string {
   return result.error.code;
 }
 
+function expectDeepFrozen(value: unknown, seen = new WeakSet<object>()): void {
+  if (typeof value !== "object" || value === null || seen.has(value)) return;
+  seen.add(value);
+  expect(Object.isFrozen(value)).toBe(true);
+  for (const child of Object.values(value)) expectDeepFrozen(child, seen);
+}
+
 function application(options: Parameters<typeof createRecoveryApplication>[0] = {}) {
   return createRecoveryApplication({ storage: new MemoryStorage(), ...options });
 }
@@ -103,9 +110,10 @@ function constantCrypto(byte = 0xab): Sha256Crypto {
 }
 
 function repositoryReturning(result: unknown): OperationalRecoveryRepository {
-  const repository = createZustandScenarioRepository(new MemoryStorage());
-  return { ...repository, operationalRead: () => result as RecoveryResult<OperationalRecoverySnapshot> };
+  return { ...repositoryBoundaryBase, operationalRead: () => result as RecoveryResult<OperationalRecoverySnapshot> };
 }
+
+const repositoryBoundaryBase = createZustandScenarioRepository(new MemoryStorage());
 
 describe("recovery planning authority", () => {
   it("should expose capability-separated APIs and the exact initial operational state", () => {
@@ -113,12 +121,18 @@ describe("recovery planning authority", () => {
 
     expect(Object.keys(app.recoveryAgent).sort()).toStrictEqual(["compareOptions", "planStatus", "requestReview", "stagePlan"]);
     expect(Object.keys(app.recoveryHuman).sort()).toStrictEqual(["approvePlan", "rejectPlan"]);
-    expect(success(app.recoveryAgent.planStatus())).toStrictEqual({
+    const initial = success(app.recoveryAgent.planStatus());
+    expectDeepFrozen(initial);
+    expect(initial).toStrictEqual({
       scenarioRevision: 1,
       workflowStatus: "IDLE",
       incident: { id: "incident-route-011-restriction-height-3.9", vehicleId: "vehicle-011", riskId: "restriction-height-3.9", routeId: "route-011", status: "OPEN" },
       plan: null,
       approvalGrant: null,
+      executionRecord: null,
+      executionEffects: [],
+      verificationReport: null,
+      receipt: null,
     });
   });
 
@@ -130,6 +144,9 @@ describe("recovery planning authority", () => {
     expect(first.options.map((option) => option.kind)).toStrictEqual(["CURRENT", "ALTERNATIVE"]);
     expect(first.options[0].summary).toStrictEqual({ distanceMeters: 99706.6, durationSeconds: 5292.1 });
     expect(first.options[1].summary).toStrictEqual({ distanceMeters: 80298.9, durationSeconds: 5282.5 });
+    expectDeepFrozen(first);
+    expect(Object.isFrozen(first.options[1].geometry.coordinates)).toBe(true);
+    expect(Reflect.set(first.options[1].geometry.coordinates[0], "0", 99)).toBe(false);
     expect(first).toStrictEqual(second);
     expect(first).not.toBe(second);
   });
@@ -178,10 +195,13 @@ describe("recovery planning authority", () => {
       },
       createdAt: "2026-08-28T09:00:00.000Z",
       admittedRouteSourceRevision: "688161cb725d59117a55243b78e41b8191e5b0d718f7eff0c51fe783e680fdd0",
-      fingerprint: "sha256:676bd0734c1a609051b9524880484cf849f01595db5795e6fb4ee4f47901a8be",
+      admittedRouteDigest: "sha256:33ce42625f7ff7bb1497ff6cb8ee9fb6bd2883c591bb936b780d31ae290dca18",
+      fingerprint: "sha256:8f1d35ff329fdd549ac9a5cf29dd918f848dcaa7465ef5bdccbeff7091f21b13",
     });
-    expect(status).toStrictEqual({ scenarioRevision: 1, workflowStatus: "STAGED", incident: { id: "incident-route-011-restriction-height-3.9", vehicleId: "vehicle-011", riskId: "restriction-height-3.9", routeId: "route-011", status: "OPEN" }, plan, approvalGrant: null });
-    expect(plan.fingerprint).toBe("sha256:676bd0734c1a609051b9524880484cf849f01595db5795e6fb4ee4f47901a8be");
+    expect(status).toStrictEqual({ scenarioRevision: 1, workflowStatus: "STAGED", incident: { id: "incident-route-011-restriction-height-3.9", vehicleId: "vehicle-011", riskId: "restriction-height-3.9", routeId: "route-011", status: "OPEN" }, plan, approvalGrant: null, executionRecord: null, executionEffects: [], verificationReport: null, receipt: null });
+    expect(plan.fingerprint).toBe("sha256:8f1d35ff329fdd549ac9a5cf29dd918f848dcaa7465ef5bdccbeff7091f21b13");
+    expectDeepFrozen(plan);
+    expectDeepFrozen(status);
     expect(app.operations.scenarioCurrent()).toStrictEqual(scenarioBefore);
   });
 
@@ -197,7 +217,10 @@ describe("recovery planning authority", () => {
     unsubscribe();
 
     expect(second).toStrictEqual(first);
-    expect(digestCalls).toBe(2);
+    expect(second).not.toBe(first);
+    expectDeepFrozen(first);
+    expectDeepFrozen(second);
+    expect(digestCalls).toBe(5);
     expect(transitionCount).toBe(1);
     expect(success(app.recoveryAgent.planStatus()).scenarioRevision).toBe(1);
   });
@@ -234,6 +257,18 @@ describe("recovery planning authority", () => {
     expect(success(repository.operationalRead()).plan).toBeNull();
   });
 
+  it("should reject a recomputed plan fingerprint with a mismatched admitted route digest", async () => {
+    const { plan } = await stagedPlan();
+    const payload: RecoveryPlanPayload = { ...payloadFrom(plan), admittedRouteDigest: `sha256:${"0".repeat(64)}` };
+    const fingerprint = success(await sha256Fingerprint(payload));
+    const repository = createZustandScenarioRepository(new MemoryStorage());
+
+    const result = await repository.operationalStage({ expectedScenarioRevision: 1, plan: { ...payload, fingerprint } });
+
+    expect(failureCode(result)).toBe("PLAN_MISMATCH");
+    expect(success(repository.operationalRead()).plan).toBeNull();
+  });
+
   it.each([
     ["FAIL", "FAIL", "SAFETY_EVIDENCE_FAILED"],
     ["UNKNOWN", "UNKNOWN", "SAFETY_EVIDENCE_UNKNOWN"],
@@ -251,7 +286,7 @@ describe("recovery planning authority", () => {
     const repeated = await agent.stagePlan({ selectedOptionId: "alternative-route-011-clearance-v1" });
 
     expect(failureCode(repeated)).toBe(expectedCode);
-    expect(digestCalls).toBe(2);
+    expect(digestCalls).toBe(4);
     expect(success(repository.operationalRead()).plan).toStrictEqual(plan);
   });
 
@@ -296,11 +331,20 @@ describe("recovery planning authority", () => {
   it("should reject an async stage CAS after a concurrent relevant vehicle deletion", async () => {
     let digestBytes: Uint8Array<ArrayBuffer> | undefined;
     let resolveDigest: ((value: ArrayBuffer) => void) | undefined;
-    const cryptoCapability: Sha256Crypto = { digest: (bytes) => { digestBytes = bytes; return new Promise((resolve) => { resolveDigest = resolve; }); } };
+    let digestCalls = 0;
+    let markStarted = (): void => undefined;
+    const started = new Promise<void>((resolve) => { markStarted = resolve; });
+    const cryptoCapability: Sha256Crypto = { digest: (bytes) => {
+      digestCalls += 1;
+      if (digestCalls !== 3) return globalThis.crypto.subtle.digest("SHA-256", bytes);
+      digestBytes = bytes;
+      markStarted();
+      return new Promise((resolve) => { resolveDigest = resolve; });
+    } };
     const app = application({ cryptoCapability });
 
     const staging = app.recoveryAgent.stagePlan({ selectedOptionId: "alternative-route-011-clearance-v1" });
-    await Promise.resolve();
+    await started;
     if (digestBytes === undefined || resolveDigest === undefined) throw new Error("The digest did not start.");
     const deleted = app.operations.vehicleDelete("vehicle-001");
     resolveDigest(await globalThis.crypto.subtle.digest("SHA-256", digestBytes));
@@ -537,8 +581,8 @@ describe("recovery fail-closed boundaries", () => {
     const { plan } = await stagedPlan();
     const payload = payloadFrom(plan);
 
+    const repository = createZustandScenarioRepository(new MemoryStorage());
     for (const path of leafPaths(payload)) {
-      const repository = createZustandScenarioRepository(new MemoryStorage());
       const tampered: RecoveryPlan = { ...changeAtPath(payload, path), fingerprint: plan.fingerprint };
       const result = await repository.operationalStage({ expectedScenarioRevision: 1, plan: tampered });
 
@@ -594,11 +638,20 @@ describe("recovery fail-closed boundaries", () => {
     const { plan } = await stagedPlan();
     let digestBytes: Uint8Array<ArrayBuffer> | undefined;
     let resolveDigest: ((value: ArrayBuffer) => void) | undefined;
-    const cryptoCapability: Sha256Crypto = { digest: (bytes) => { digestBytes = bytes; return new Promise((resolve) => { resolveDigest = resolve; }); } };
+    let markStarted = (): void => undefined;
+    const started = new Promise<void>((resolve) => { markStarted = resolve; });
+    let digestCalls = 0;
+    const cryptoCapability: Sha256Crypto = { digest: (bytes) => {
+      digestCalls += 1;
+      if (digestCalls !== 1) return globalThis.crypto.subtle.digest("SHA-256", bytes);
+      digestBytes = bytes;
+      markStarted();
+      return new Promise((resolve) => { resolveDigest = resolve; });
+    } };
     const repository = createZustandScenarioRepository(new MemoryStorage(), cryptoCapability);
 
     const staging = repository.operationalStage({ expectedScenarioRevision: 1, plan });
-    await Promise.resolve();
+    await started;
     if (digestBytes === undefined || resolveDigest === undefined) throw new Error("The repository digest did not start.");
     success(repository.operationalInvalidateForScenarioMutation({ expectedScenarioRevision: 1, mutation: "RISK" }));
     resolveDigest(await globalThis.crypto.subtle.digest("SHA-256", digestBytes));

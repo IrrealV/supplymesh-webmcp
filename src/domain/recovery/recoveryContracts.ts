@@ -1,4 +1,5 @@
 import type {
+  Unit211AlternativeOption,
   Unit211CargoContinuityAssessment,
   Unit211PreDispatchData,
   Unit211RejectedClearanceAssessment,
@@ -10,6 +11,9 @@ export const RecoveryWorkflowStatuses = {
   staged: "STAGED",
   reviewRequested: "REVIEW_REQUESTED",
   approved: "APPROVED",
+  executed: "EXECUTED",
+  verified: "VERIFIED",
+  verificationFailed: "VERIFICATION_FAILED",
   rejected: "REJECTED",
   invalidated: "INVALIDATED",
 } as const;
@@ -30,10 +34,11 @@ export const RecoveryErrorCodes = {
   planMismatch: "PLAN_MISMATCH",
   repositoryFailure: "REPOSITORY_FAILURE",
   malformedRepositoryData: "MALFORMED_REPOSITORY_DATA",
+  receiptUnavailable: "RECEIPT_UNAVAILABLE",
 } as const;
 
 export type RecoveryErrorCode = (typeof RecoveryErrorCodes)[keyof typeof RecoveryErrorCodes];
-export type RecoveryAction = "COMPARE_OPTIONS" | "SELECT_ADMITTED_OPTION" | "STAGE_PLAN" | "REQUEST_REVIEW" | "RETRY" | "CONTACT_OPERATOR";
+export type RecoveryAction = "COMPARE_OPTIONS" | "SELECT_ADMITTED_OPTION" | "STAGE_PLAN" | "REQUEST_REVIEW" | "EXECUTE_PLAN" | "VERIFY_EXECUTION" | "GET_RECEIPT" | "RESET" | "RETRY" | "CONTACT_OPERATOR";
 
 export type RecoveryResult<T> =
   | Readonly<{ ok: true; data: T }>
@@ -44,7 +49,7 @@ export type RecoveryIncident = Readonly<{
   vehicleId: "vehicle-011";
   riskId: "restriction-height-3.9";
   routeId: "route-011";
-  status: "OPEN";
+  status: "OPEN" | "RESOLVED";
 }>;
 
 export type RecoveryHardConstraints = Readonly<{
@@ -96,6 +101,7 @@ export type RecoveryPlanPayload = Readonly<{
   metrics: Readonly<{ current: RecoveryRouteMetrics; proposed: RecoveryRouteMetrics }>;
   createdAt: string;
   admittedRouteSourceRevision: string;
+  admittedRouteDigest: `sha256:${string}`;
 }>;
 
 export type RecoveryPlan = Readonly<RecoveryPlanPayload & { fingerprint: `sha256:${string}` }>;
@@ -106,7 +112,81 @@ export type ApprovalGrant = Readonly<{
   scenarioRevision: number;
   approvedAt: string;
   approvedBy: "human-ui";
-  used: false;
+  used: boolean;
+}>;
+
+export type RecoveryExecutionRecord = Readonly<{
+  executionId: string;
+  planId: string;
+  fingerprint: `sha256:${string}`;
+  approvalSource: "human-ui";
+  approvedAt: string;
+  beforeRevision: number;
+  afterRevision: number;
+  previousRouteId: "route-011";
+  appliedRouteId: "alternative-route-011-clearance-v1";
+  createdAt: string;
+}>;
+
+export type RecoveryExecutionEffect = Readonly<{
+  effectId: string;
+  executionId: string;
+  planId: string;
+  vehicleId: "vehicle-011";
+  previousRouteId: "route-011";
+  appliedRouteId: "alternative-route-011-clearance-v1";
+  beforeRevision: number;
+  afterRevision: number;
+}>;
+
+export const RecoveryVerificationCheckNames = [
+  "UNIT_ROUTE_SINGLETON",
+  "ACTIVE_ROUTE_BINDING",
+  "PREVIOUS_ROUTE_ABSENT",
+  "CATALOG_GEOMETRY",
+  "CATALOG_SUMMARY",
+  "EXCLUSION_CLEARANCE",
+  "HARD_CLEARANCE_BOUND",
+  "TEMPORAL_PASS",
+  "CARGO_CONTINUITY",
+  "PLAN_FINGERPRINT",
+  "GRANT_CONSUMED",
+  "SINGLE_EXECUTION_EFFECT",
+  "INCIDENT_RESOLVED",
+  "REVISION_INCREMENTED",
+  "ROUTE_DIGEST",
+] as const;
+
+export type RecoveryVerificationCheckName = (typeof RecoveryVerificationCheckNames)[number];
+export type RecoveryVerificationCheck = Readonly<{ name: RecoveryVerificationCheckName; status: "PASS" | "FAIL" }>;
+export type RecoveryVerificationReport = Readonly<{
+  verificationId: string;
+  executionId: string;
+  planId: string;
+  fingerprint: `sha256:${string}`;
+  status: "PASS" | "FAIL";
+  checks: readonly RecoveryVerificationCheck[];
+  createdAt: string;
+}>;
+
+export type RecoveryReceipt = Readonly<{
+  receiptId: string;
+  planId: string;
+  fingerprint: `sha256:${string}`;
+  approvalSource: "human-ui";
+  approvedAt: string;
+  beforeRevision: number;
+  afterRevision: number;
+  previousRouteId: "route-011";
+  appliedRouteId: "alternative-route-011-clearance-v1";
+  executionId: string;
+  verificationReport: RecoveryVerificationReport;
+  createdAt: string;
+}>;
+
+export type RecoveryExecutionOutcome = Readonly<{
+  status: "EXECUTED" | "ALREADY_EXECUTED";
+  execution: RecoveryExecutionRecord;
 }>;
 
 export type OperationalRecoverySnapshot = Readonly<{
@@ -115,6 +195,10 @@ export type OperationalRecoverySnapshot = Readonly<{
   incident: RecoveryIncident;
   plan: RecoveryPlan | null;
   approvalGrant: ApprovalGrant | null;
+  executionRecord: RecoveryExecutionRecord | null;
+  executionEffects: readonly RecoveryExecutionEffect[];
+  verificationReport: RecoveryVerificationReport | null;
+  receipt: RecoveryReceipt | null;
 }>;
 
 export type RecoveryAgentCapability = Readonly<{
@@ -129,10 +213,20 @@ export type RecoveryHumanCapability = Readonly<{
   rejectPlan(input: unknown): RecoveryResult<OperationalRecoverySnapshot>;
 }>;
 
+export type RecoveryExecutionCapability = Readonly<{
+  executeApprovedPlan(input: unknown): Promise<RecoveryResult<RecoveryExecutionOutcome>>;
+  verifyExecution(input: unknown): Promise<RecoveryResult<RecoveryVerificationReport>>;
+  receiptGet(input: unknown): RecoveryResult<RecoveryReceipt>;
+  reset(input: unknown): RecoveryResult<OperationalRecoverySnapshot>;
+}>;
+
+export type RecoveryRouteEvidencePayload = Readonly<Pick<Unit211AlternativeOption, "geometry" | "summary" | "relation" | "provenance" | "avoidsExclusionZone" | "temporalAssessment" | "cargoContinuityAssessment">>;
+export type AdmittedRecoveryRoute = RecoveryRouteEvidencePayload;
+
 export function recoveryFailure<T>(code: RecoveryErrorCode, message: string, actions: readonly RecoveryAction[]): RecoveryResult<T> {
-  return { ok: false, error: { code, message, actions: [...actions] } };
+  return Object.freeze({ ok: false, error: Object.freeze({ code, message, actions: Object.freeze([...actions]) }) });
 }
 
 export function recoverySuccess<T>(data: T): RecoveryResult<T> {
-  return { ok: true, data };
+  return Object.freeze({ ok: true, data });
 }

@@ -23,7 +23,7 @@ function createVehicleMarkerIcons(vehicle: DerivedVehicle["vehicle"], state: Lay
     }),
     label: divIcon({
       className: `fleet-label-icon map-layer-${state}`,
-      html: `<span data-vehicle-label="${vehicle.internalId}" class="fleet-marker-label">${label}</span>`,
+      html: `<span data-vehicle-label="${vehicle.internalId}" class="fleet-marker-label" aria-hidden="true">${label}</span>`,
       iconAnchor: [52, 50], iconSize: [112, 30],
     }),
   };
@@ -67,8 +67,8 @@ export function VehicleMarkerLayer({ locale, onSelect, vehicles }: { locale: Loc
     const icons = createVehicleMarkerIcons(vehicle, state);
     const eventHandlers = { click: () => onSelect(vehicle.internalId) };
     return <Fragment key={vehicle.internalId}>
-      <Marker alt={`${selectName} ${suffix.truck}`} eventHandlers={eventHandlers} icon={icons.truck} keyboard pane="fleet-trucks" position={[latitude, longitude]} title={`${selectName} ${suffix.truck}`} zIndexOffset={zIndex} />
-      <Marker alt={`${selectName} ${suffix.label}`} eventHandlers={eventHandlers} icon={icons.label} keyboard pane="fleet-labels" position={[latitude, longitude]} title={`${selectName} ${suffix.label}`} zIndexOffset={zIndex + 1} />
+      <Marker alt={displayName} eventHandlers={eventHandlers} icon={icons.truck} key={`truck:${vehicle.internalId}:${displayName}`} keyboard pane="fleet-trucks" position={[latitude, longitude]} title={displayName} zIndexOffset={zIndex} />
+      <Marker alt={`${selectName} ${suffix.label}`} eventHandlers={eventHandlers} icon={icons.label} key={`label:${vehicle.internalId}:${displayName}`} keyboard pane="fleet-labels" position={[latitude, longitude]} title={`${selectName} ${suffix.label}`} zIndexOffset={zIndex + 1} />
     </Fragment>;
   });
 }

@@ -1,4 +1,5 @@
 import { isVehicleLabelValid, type DomainResult, type FleetStatus, type OperatingRegion, type Vehicle, type VehicleRenameCommand, type VehicleStatus } from "../entities";
+import { deepDetachAndFreeze } from "../deepDetach";
 import type { ScenarioRepository } from "../ports/ScenarioRepository";
 import { createAssessAuthoritativeVerticalClearance, type AssessAuthoritativeVerticalClearance } from "./authoritativeVerticalAssessment";
 import { createUnit211PreDispatchContext, type Unit211PreDispatchContextResult } from "./unit211PreDispatchContext";
@@ -20,12 +21,21 @@ function failure<T>(code: string, message: string): DomainResult<T> {
 }
 
 function vehicleResult(vehicle: Vehicle | undefined, vehicleId: string): DomainResult<Vehicle> {
-  return vehicle === undefined ? failure("vehicle-not-found", `Vehicle ${vehicleId} was not found.`) : { ok: true, data: vehicle };
+  if (vehicle === undefined) return failure("vehicle-not-found", `Vehicle ${vehicleId} was not found.`);
+  const detached = deepDetachAndFreeze(vehicle);
+  return detached.ok ? { ok: true, data: detached.data } : failure("repository-data-invalid", "The vehicle repository returned malformed data.");
 }
 
 export function createOperationsApi(repository: ScenarioRepository, options?: OperationsApiOptions): OperationsApi {
   return {
-    scenarioCurrent: () => ({ ok: true, data: repository.scenarioCurrent() }),
+    scenarioCurrent: () => {
+      try {
+        const detached = deepDetachAndFreeze(repository.scenarioCurrent());
+        return detached.ok ? { ok: true, data: detached.data } : failure("repository-data-invalid", "The scenario repository returned malformed data.");
+      } catch {
+        return failure("repository-data-invalid", "The scenario repository returned malformed data.");
+      }
+    },
     assessAuthoritativeVerticalClearance: createAssessAuthoritativeVerticalClearance(repository),
     unit211PreDispatchContext: createUnit211PreDispatchContext(repository, options?.readAlternativeCatalog ?? (() => undefined), options?.admittedAlternativeCatalog),
     fleetStatus: () => {
