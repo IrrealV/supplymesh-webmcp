@@ -1,11 +1,15 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useUiCoordinationStore } from "../../app/state/useUiCoordinationStore";
 import { createSpainScenario } from "../../scenario/fixtures/spain-v1";
+import { clearanceAlternativeCatalog } from "../../scenario/fixtures/clearanceAlternativeCatalog";
 import { createOperationsApi } from "../../domain/operations/createOperationsApi";
+import type { OperationsApi } from "../../domain/operations/createOperationsApi";
+import { createApplication, createRecoveryApplication } from "../../app/createApplication";
+import type { RecoveryApplication } from "../../app/createApplication";
 import { createZustandScenarioRepository } from "../../scenario/state/createZustandScenarioRepository";
 import { OperationalShell } from "./OperationalShell";
 import { Topbar } from "./Topbar";
@@ -13,11 +17,20 @@ import { TABLET_MEDIA_QUERY } from "../../app/presentation/useTabletViewport";
 
 const styles = readFileSync("src/styles.css", "utf8");
 
-vi.mock("../map/FleetMap", () => ({ FleetMap: () => <div data-testid="fleet-map" /> }));
+vi.mock("../map/FleetMap", () => ({ FleetMap: ({ availableComparison, comparison }: { availableComparison?: { kind: string }; comparison?: { kind: string } }) => <div data-available-comparison={availableComparison?.kind ?? "none"} data-comparison={comparison?.kind ?? "none"} data-testid="fleet-map" /> }));
 
 function resetUi(): void {
   useUiCoordinationStore.setState(useUiCoordinationStore.getInitialState(), true);
 }
+
+class MemoryStorage { private value: string | null = null; getItem(): string | null { return this.value; } setItem(_key: string, value: string): void { this.value = value; } }
+function RecoveryHarness({ app: supplied, locale = "en", scenarioRefreshFailure }: { app?: RecoveryApplication; locale?: "en" | "es"; scenarioRefreshFailure?: true }) {
+  const [app] = useState(() => supplied ?? createRecoveryApplication({ storage: new MemoryStorage() })); const initial = app.operations.scenarioCurrent();
+  if (!initial.ok) throw new Error(initial.error.code); const [scenario, setScenario] = useState(initial.data);
+  const operations: OperationsApi = scenarioRefreshFailure ? { ...app.operations, scenarioCurrent: () => ({ ok: false, error: { code: "repository-data-invalid", message: "Authoritative scenario refresh failed." } }) } : app.operations;
+  return <OperationalShell locale={locale} onLocaleChange={() => undefined} onScenarioChange={setScenario} operational={app.operational} operations={operations} recoveryAgent={app.recoveryAgent} recoveryExecution={app.recoveryExecution} recoveryHuman={app.recoveryHuman} scenario={scenario} />;
+}
+async function stageForHumanReview(app: RecoveryApplication): Promise<string> { const compared = app.recoveryAgent.compareOptions(); if (!compared.ok) throw new Error(compared.error.code); const staged = await app.recoveryAgent.stagePlan({ selectedOptionId: compared.data.options[1].alternativeRouteId }); if (!staged.ok) throw new Error(staged.error.code); const reviewed = app.recoveryAgent.requestReview({ planId: staged.data.planId }); if (!reviewed.ok) throw new Error(reviewed.error.code); return staged.data.planId; }
 
 describe("OperationalShell", () => {
   beforeEach(resetUi);
@@ -160,5 +173,86 @@ describe("OperationalShell", () => {
       await user.click(screen.getByRole("button", { name: "Close operational overview" }));
       await waitFor(() => expect(screen.queryByRole("dialog", { name: "Operational overview" })).toBeNull());
     } finally { Object.defineProperty(window, "matchMedia", { configurable: true, value: originalMatchMedia }); }
+  });
+
+  it.each([
+    ["en", "Review recovery options", "Recovery comparison", "Back to vehicle details", "3.80 + 0.20 = 4.00 m required", "Ambient", "Standard"],
+    ["es", "Revisar opciones de recuperación", "Comparación de recuperación", "Volver al detalle del vehículo", "3,80 + 0,20 = 4,00 m requeridos", "Ambiente", "Estándar"],
+  ] as const)("should present authoritative recovery evidence in %s and restore focus", async (locale, actionLabel, heading, backLabel, equation, refrigeration, priority) => {
+    const user = userEvent.setup(); const operation = vi.fn(createApplication().unit211PreDispatchContext); const operations: OperationsApi = { ...createApplication(), unit211PreDispatchContext: operation };
+    useUiCoordinationStore.getState().selectVehicle("vehicle-011", "operational-map");
+    render(<OperationalShell locale={locale} onLocaleChange={() => undefined} onScenarioChange={() => undefined} operations={operations} scenario={createSpainScenario()} />);
+
+    await user.click(screen.getByRole("button", { name: actionLabel }));
+    expect(screen.getByRole("heading", { name: heading })).not.toBeNull();
+    expect(screen.getByText(equation)).not.toBeNull();
+    expect(screen.getAllByText("PASS").length).toBeGreaterThanOrEqual(4);
+    expect(screen.getAllByText("CARGO_CONTINUITY_SATISFIED")).toHaveLength(2);
+    expect(screen.getAllByText(refrigeration)).toHaveLength(2);
+    expect(screen.getAllByText(priority)).toHaveLength(2);
+    expect(document.body.textContent).toContain("cargo-011");
+    expect(document.body.textContent).toContain("2026-08-28T10:28:02.500Z");
+    expect(screen.getByTestId("fleet-map").dataset.comparison).toBe("ready");
+    expect(screen.queryByRole("button", { name: /prepare|approve|execute|preparar|aprobar|ejecutar/i })).toBeNull();
+    expect(operation).toHaveBeenCalledTimes(2);
+
+    await user.click(screen.getByRole("button", { name: backLabel }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: actionLabel })));
+    await user.keyboard("{Escape}");
+    expect(useUiCoordinationStore.getState().selection).toEqual({ kind: "none" });
+  });
+
+  it("should remove stale recovery map affordances after Unit 211 is deleted", async () => {
+    const user = userEvent.setup(); const repository = createZustandScenarioRepository({ getItem: () => null, setItem: () => undefined }); const operations = createOperationsApi(repository, { admittedAlternativeCatalog: clearanceAlternativeCatalog, readAlternativeCatalog: () => clearanceAlternativeCatalog }); const initial = operations.scenarioCurrent();
+    if (!initial.ok) throw new Error(initial.error.code); const initialScenario = initial.data;
+    function ScenarioHarness() { const [scenario, setScenario] = useState(initialScenario); return <OperationalShell locale="en" onLocaleChange={() => undefined} onScenarioChange={setScenario} operations={operations} scenario={scenario} />; }
+    useUiCoordinationStore.getState().selectVehicle("vehicle-011", "operational-map"); render(<ScenarioHarness />);
+    expect(screen.getByTestId("fleet-map").dataset.availableComparison).toBe("ready");
+
+    await user.click(screen.getByRole("button", { name: "Delete vehicle" })); await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(screen.getByTestId("fleet-map").dataset.availableComparison).toBe("none"));
+    expect(screen.queryByRole("button", { name: "Review recovery options" })).toBeNull();
+  });
+
+  it("should show an accessible structured failure returned by the operation", () => {
+    const real = createApplication(); const operations: OperationsApi = { ...real, unit211PreDispatchContext: () => ({ ok: false, reasonCode: "ALTERNATIVE_SOURCE_UNAVAILABLE" }) };
+    useUiCoordinationStore.getState().selectVehicle("vehicle-011", "operational-map");
+    render(<OperationalShell locale="en" onLocaleChange={() => undefined} onScenarioChange={() => undefined} operations={operations} scenario={createSpainScenario()} />);
+
+    const alert = screen.getByRole("alert", { name: "Recovery comparison unavailable" });
+    expect(alert.textContent).toContain("ALTERNATIVE_SOURCE_UNAVAILABLE");
+    expect(alert.textContent).toContain("No route was changed.");
+    expect(screen.queryByRole("button", { name: "Review recovery options" })).toBeNull();
+  });
+
+  it("should keep recovery inside the tablet dialog and use Escape as Back first", async () => {
+    const originalMatchMedia = window.matchMedia; Object.defineProperty(window, "matchMedia", { configurable: true, value: () => ({ addEventListener: () => undefined, matches: true, removeEventListener: () => undefined }) });
+    try {
+      const user = userEvent.setup(); useUiCoordinationStore.getState().selectVehicle("vehicle-011", "operational-map");
+      render(<OperationalShell locale="en" onLocaleChange={() => undefined} onScenarioChange={() => undefined} operations={createApplication()} scenario={createSpainScenario()} />);
+      await user.click(screen.getByRole("button", { name: "Review recovery options" }));
+      expect(screen.getByRole("dialog", { name: "Unit 211" }).getAttribute("aria-label")).toBe("Vehicle inspection");
+      await user.keyboard("{Escape}");
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Review recovery options" })));
+      await user.keyboard("{Escape}"); await waitFor(() => expect(useUiCoordinationStore.getState().selection).toEqual({ kind: "none" }));
+    } finally { Object.defineProperty(window, "matchMedia", { configurable: true, value: originalMatchMedia }); }
+  });
+
+  it("should expose only human authority and focus each authoritative transition", async () => {
+    const user = userEvent.setup(); const app = createRecoveryApplication({ storage: new MemoryStorage() }); useUiCoordinationStore.getState().selectVehicle("vehicle-011", "operational-map"); render(<RecoveryHarness app={app} />); await user.click(screen.getByRole("button", { name: "Review recovery options" }));
+    expect(screen.queryByRole("button", { name: /Prepare plan|Request human review|Execute|Verify/ })).toBeNull(); let planId = ""; await act(async () => { planId = await stageForHumanReview(app); });
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Awaiting human review" }))); expect(screen.getByText(planId)).not.toBeNull(); expect(screen.getByRole("button", { name: "Approve" })).not.toBeNull(); expect(screen.getByRole("button", { name: "Reject" })).not.toBeNull();
+    await user.click(screen.getByRole("button", { name: "Approve" })); await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Approved" }))); expect(document.body.textContent).not.toContain("Agent capability enabled"); expect(document.querySelector(".workflow-capability")?.textContent).toContain("Human approval authorizes agent execution"); expect(screen.queryByRole("button", { name: /Execute|Verify/ })).toBeNull();
+  });
+
+  it("should localize human evidence and keep rejection free of execution controls", async () => {
+    const user = userEvent.setup(); const app = createRecoveryApplication({ storage: new MemoryStorage() }); useUiCoordinationStore.getState().selectVehicle("vehicle-011"); render(<RecoveryHarness app={app} locale="es" />); await user.click(screen.getByRole("button", { name: "Revisar opciones de recuperación" })); await act(async () => { await stageForHumanReview(app); });
+    expect(document.body.textContent).toContain("Margen de gálibo"); expect(document.body.textContent).toContain("Distancia / duración de ruta actual"); expect(document.body.textContent).not.toMatch(/clearanceBufferMeters|currentClearance|current distance \/ duration|used:/); await user.click(screen.getByRole("button", { name: "Rechazar" })); await screen.findByText("Rechazado"); expect(screen.queryByRole("button", { name: /Ejecutar|Verificar/ })).toBeNull();
+  });
+
+  it("should surface a failed scenario refresh without hiding the executed snapshot", async () => {
+    const user = userEvent.setup(); const app = createRecoveryApplication({ storage: new MemoryStorage() }); useUiCoordinationStore.getState().selectVehicle("vehicle-011"); render(<RecoveryHarness app={app} scenarioRefreshFailure />); await user.click(screen.getByRole("button", { name: "Review recovery options" })); let planId = ""; await act(async () => { planId = await stageForHumanReview(app); }); await user.click(screen.getByRole("button", { name: "Approve" })); await act(async () => { await app.recoveryExecution.executeApprovedPlan({ planId }); });
+    expect((await screen.findByRole("alert")).textContent).toContain("repository-data-invalid"); expect(screen.getByText("EXECUTED")).not.toBeNull(); expect(screen.getByText("Execution evidence is available for agent verification")).not.toBeNull();
   });
 });
