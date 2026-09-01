@@ -100,7 +100,7 @@ describe("VehicleInspection", () => {
   });
 
   it("should use localized fallbacks for absent optional values", () => {
-    renderInspection("es", { plate: "", cargo: { description: "", priority: "standard", refrigeration: "ambient" }, dimensions: { heightMeters: 3.8, lengthMeters: 16.5, vehicleType: "", weightTonnes: 18 } });
+    renderInspection("es", { plate: "", cargo: { id: "cargo-001", description: "", priority: "standard", refrigeration: "ambient" }, dimensions: { heightMeters: 3.8, lengthMeters: 16.5, vehicleType: "", weightTonnes: 18 } });
 
     expect(screen.getAllByText("No disponible").length).toBeGreaterThanOrEqual(2);
   });

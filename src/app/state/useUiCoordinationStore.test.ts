@@ -63,6 +63,15 @@ describe("useUiCoordinationStore", () => {
     expect(useUiCoordinationStore.getState().mapFocusTarget).toEqual({ kind: "none" });
   });
 
+  it("should request comparison focus without changing the selected vehicle", () => {
+    const store = useUiCoordinationStore.getState();
+    store.selectVehicle("vehicle-011", "operational-map");
+    store.focusComparison("vehicle-011");
+
+    expect(useUiCoordinationStore.getState().mapFocusTarget).toEqual({ kind: "comparison", requestId: 2, vehicleId: "vehicle-011" });
+    expect(useUiCoordinationStore.getState().selection).toEqual({ kind: "vehicle", vehicleId: "vehicle-011" });
+  });
+
   it("should restore the prior context and focus target when inspection closes", () => {
     const store = useUiCoordinationStore.getState();
     store.toggleFilter("resting", "filter-resting");

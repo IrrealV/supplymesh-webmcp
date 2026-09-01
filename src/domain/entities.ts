@@ -28,8 +28,8 @@ export type RiskKind =
   | "severe-snow"
   | "rest-deadline";
 
-export type Place = { name: string; position: GeoPoint };
-export type Cargo = { description: string; refrigeration: "ambient" | "chilled" | "frozen"; priority: "standard" | "priority" | "critical" };
+export type Place = { id: string; name: string; position: GeoPoint };
+export type Cargo = { id: string; description: string; refrigeration: "ambient" | "chilled" | "frozen"; priority: "standard" | "priority" | "critical" };
 export type Dimensions = { vehicleType: string; lengthMeters: number; heightMeters: number; weightTonnes: number };
 export type Timing = { remainingDriveMinutes: number; restDeadline: string; eta: string; delayMinutes: number };
 export type Vehicle = {

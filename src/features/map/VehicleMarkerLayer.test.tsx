@@ -40,7 +40,7 @@ describe("VehicleMarkerLayer", () => {
     const layers = deriveMapLayers(createSpainScenario(), new Set(["critical"]), "vehicle-004");
     render(<VehicleMarkerLayer locale="en" onSelect={onSelect} vehicles={layers.vehicles} />);
 
-    const truckControls = screen.getAllByRole("button", { name: /^Select .* truck$/ });
+    const truckControls = screen.getAllByRole("button", { name: /^(?:FM-201|Unit \d{3})$/ });
     const labelControls = screen.getAllByRole("button", { name: /^Select .* label$/ });
     expect(truckControls).toHaveLength(15);
     expect(labelControls).toHaveLength(15);

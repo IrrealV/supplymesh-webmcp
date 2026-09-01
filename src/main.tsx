@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "leaflet/dist/leaflet.css";
 import "./styles.css";
+import "./features/recovery-comparison/recoveryComparison.css";
 import { App } from "./app/App";
 
 const rootElement = document.getElementById("root");
