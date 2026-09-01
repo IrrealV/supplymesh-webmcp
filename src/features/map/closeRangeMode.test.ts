@@ -1,33 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { CLOSE_RANGE_ZOOM_MIN, detectWebGlSupport, resolveCloseRangeVehicleId } from "./closeRangeMode";
 
+const activeVehicle = {
+  followedVehicleId: "vehicle-011",
+  isWebGlAvailable: true,
+  selectedVehicleId: "vehicle-011",
+  zoom: CLOSE_RANGE_ZOOM_MIN,
+};
+
 describe("close range mode", () => {
   it("should activate only for the same selected and followed vehicle at close zoom", () => {
-    expect(resolveCloseRangeVehicleId({
-      followedVehicleId: "vehicle-011",
-      isWebGlAvailable: true,
-      selectedVehicleId: "vehicle-011",
-      zoom: CLOSE_RANGE_ZOOM_MIN,
-    })).toBe("vehicle-011");
+    expect(resolveCloseRangeVehicleId(activeVehicle)).toBe("vehicle-011");
+  });
 
-    expect(resolveCloseRangeVehicleId({
-      followedVehicleId: "vehicle-011",
-      isWebGlAvailable: true,
-      selectedVehicleId: "vehicle-011",
-      zoom: CLOSE_RANGE_ZOOM_MIN - 0.5,
-    })).toBe("");
-    expect(resolveCloseRangeVehicleId({
-      followedVehicleId: "vehicle-004",
-      isWebGlAvailable: true,
-      selectedVehicleId: "vehicle-011",
-      zoom: CLOSE_RANGE_ZOOM_MIN,
-    })).toBe("");
-    expect(resolveCloseRangeVehicleId({
-      followedVehicleId: "vehicle-011",
-      isWebGlAvailable: false,
-      selectedVehicleId: "vehicle-011",
-      zoom: CLOSE_RANGE_ZOOM_MIN,
-    })).toBe("");
+  it.each([
+    ["zoom is too far", { zoom: CLOSE_RANGE_ZOOM_MIN - 0.5 }],
+    ["another vehicle is followed", { followedVehicleId: "vehicle-004" }],
+    ["WebGL is unavailable", { isWebGlAvailable: false }],
+  ])("should remain 2D when %s", (_reason, overrides) => {
+    expect(resolveCloseRangeVehicleId({ ...activeVehicle, ...overrides })).toBe("");
   });
 
   it("should probe WebGL without retaining or attaching the probe canvas", () => {

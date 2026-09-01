@@ -27,8 +27,8 @@ function createVehicleMarkerIcons(vehicle: DerivedVehicle["vehicle"], state: Lay
     truck: divIcon({
       className: `fleet-truck-icon map-layer-${state}${closeRangeClass}`,
       html: `<span data-vehicle-truck="${vehicle.internalId}" class="fleet-status-pin fleet-vehicle-pin status-${status}" aria-hidden="true"><span class="fleet-selection-aura"></span><svg class="fleet-vehicle-glyph" viewBox="0 0 28 28"><path d="M4.5 7.5h12.3v9.4H4.5z"/><path d="M16.8 10.2h4.1l2.6 3.2v3.5h-6.7z"/><circle cx="8" cy="19.2" r="2.1"/><circle cx="20.2" cy="19.2" r="2.1"/></svg>${closeRangeModel}</span>`,
-      iconAnchor: isCloseRangeActive ? [48, 46] : [20, 20],
-      iconSize: isCloseRangeActive ? [96, 78] : [40, 40],
+      iconAnchor: isCloseRangeActive ? [56, 54] : [20, 20],
+      iconSize: isCloseRangeActive ? [112, 92] : [40, 40],
     }),
     label: divIcon({
       className: `fleet-label-icon map-layer-${state}`,
@@ -85,7 +85,7 @@ export function VehicleMarkerLayer({ locale, onSelect, vehicles }: { locale: Loc
         const roots = labelNodes.map((node) => node.closest<HTMLElement>(".fleet-label-icon")!).filter(Boolean);
         roots.forEach((root) => { root.style.translate = "0 0"; });
         const trucks = new Map([...map.getContainer().querySelectorAll<HTMLElement>("[data-vehicle-truck]")].map((node) => [node.dataset.vehicleTruck!, node.closest<HTMLElement>(".fleet-truck-icon")!.getBoundingClientRect()]));
-        const obstacles: ScreenRect[] = [...trucks.values(), ...[...map.getContainer().querySelectorAll<HTMLElement>(".risk-marker")].map((node) => node.getBoundingClientRect())];
+        const obstacles: ScreenRect[] = [...trucks.values(), ...[...map.getContainer().querySelectorAll<HTMLElement>(".risk-marker")].map((node) => node.getBoundingClientRect())].map(({ height, width, x, y }) => ({ height: height + 16, width: width + 16, x: x - 8, y: y - 8 }));
         const points = labelNodes.map((node) => { const truck = trucks.get(node.dataset.vehicleLabel!)!; return { id: node.dataset.vehicleLabel!, x: truck.x + truck.width / 2, y: truck.y + truck.height / 2 }; });
         const placements = new Map(placeLabels(points, { x: containerRect.x + 8, y: containerRect.y + 8, width: containerRect.width - 16, height: containerRect.height - 16 }, obstacles).map((entry) => [entry.id, entry.rect]));
         labelNodes.forEach((node) => { const root = node.closest<HTMLElement>(".fleet-label-icon")!; const base = root.getBoundingClientRect(); const target = placements.get(node.dataset.vehicleLabel!)!; root.style.translate = `${target.x - base.x}px ${target.y - base.y}px`; });
@@ -93,7 +93,7 @@ export function VehicleMarkerLayer({ locale, onSelect, vehicles }: { locale: Loc
     };
     map.on("moveend zoomend resize", place); place();
     return () => { cancelAnimationFrame(frame); map.off("moveend zoomend resize", place); };
-  }, [map, vehicles]);
+  }, [closeRangeVehicleId, map, vehicles]);
 
   return vehicles.map(({ vehicle, state, zIndex }) => {
     const [longitude, latitude] = vehicle.position.geometry.coordinates;

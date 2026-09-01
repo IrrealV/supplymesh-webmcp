@@ -1,22 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 
 async function installWebMcp(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    type Tool = { name: string };
-    const tools: Tool[] = [];
-    Object.defineProperty(document, "modelContext", {
-      configurable: true,
-      value: {
-        registerTool: async (tool: Tool, options: { signal: AbortSignal }) => {
-          tools.push(tool);
-          options.signal.addEventListener("abort", () => {
-            const index = tools.indexOf(tool);
-            if (index >= 0) tools.splice(index, 1);
-          }, { once: true });
-        },
-      },
-    });
-  });
+  await page.addInitScript(() => Object.defineProperty(document, "modelContext", { configurable: true, value: {
+    registerTool: async (_tool: { name: string }, options: { signal: AbortSignal }) => options.signal.addEventListener("abort", () => undefined, { once: true }),
+  } }));
 }
 
 async function openConsole(page: Page, width: number, height: number): Promise<void> {
@@ -30,6 +17,20 @@ async function selectUnit211(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Select Unit 211 clearance incident", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(page.locator(".fleet-map")).toHaveAttribute("data-close-range-mode", "active");
+}
+
+async function expectUnit211LabelClear(page: Page): Promise<void> {
+  const label = page.locator("[data-vehicle-label=vehicle-011]");
+  await expect(label).toBeVisible();
+  const clearance = await label.evaluate((node) => {
+    const labelRect = node.getBoundingClientRect();
+    const mapRect = node.closest(".fleet-map")!.getBoundingClientRect();
+    const truckRect = document.querySelector("[data-vehicle-truck=vehicle-011]")!.closest(".fleet-truck-icon")!.getBoundingClientRect();
+    const separate = labelRect.right <= truckRect.left || labelRect.left >= truckRect.right || labelRect.bottom <= truckRect.top || labelRect.top >= truckRect.bottom;
+    return { contained: labelRect.left >= mapRect.left && labelRect.right <= mapRect.right && labelRect.top >= mapRect.top && labelRect.bottom <= mapRect.bottom, label: [labelRect.left, labelRect.top, labelRect.right, labelRect.bottom], separate, truck: [truckRect.left, truckRect.top, truckRect.right, truckRect.bottom] };
+  });
+  expect(clearance.contained).toBe(true);
+  expect(clearance.separate, JSON.stringify(clearance)).toBe(true);
 }
 
 test.beforeEach(async ({ page }) => page.emulateMedia({ reducedMotion: "reduce" }));
@@ -51,10 +52,12 @@ test("selected follow swaps exactly one 2D marker for a static close-range truck
   await expect(page.locator("[data-close-range-model=vehicle-011]")).toBeVisible();
   await expect(page.getByRole("button", { name: "Unit 211", exact: true })).toHaveCount(1);
   await expect(page.locator(".close-range-truck-rig")).toHaveCSS("animation-name", "none");
+  await expectUnit211LabelClear(page);
 
   await page.locator(".map-frame").dispatchEvent("wheel");
   await expect(map).toHaveAttribute("data-close-range-mode", "inactive");
   await expect(page.locator("[data-close-range-model]")).toHaveCount(0);
+  await expectUnit211LabelClear(page);
 
   await page.getByRole("button", { name: "Follow Unit 211" }).click();
   await expect(map).toHaveAttribute("data-close-range-mode", "active");
@@ -78,6 +81,13 @@ test("tablet keeps the close-range truck behind its usable inspection drawer", a
   await expect(page.locator("[data-close-range-model=vehicle-011]")).toBeVisible();
   await expect(page.locator(".fleet-label-icon")).toHaveCount(15);
   expect(await page.evaluate(() => document.body.scrollWidth)).toBeLessThanOrEqual(900);
+
+  await page.locator(".map-frame").dispatchEvent("wheel");
+  await page.getByRole("button", { name: "Follow Unit 211" }).click();
+  await expect(drawer).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(drawer).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Operational map" })).toBeFocused();
 });
 
 test("forced WebGL absence retains the selected 2D marker", async ({ page }) => {

@@ -70,5 +70,6 @@ describe("FleetMap layers", () => {
     expect(sources).toContain("(comparison ?? availableComparison)?.incident.riskId");
     expect(sources).toContain("maxZoom={18}");
     expect(sources).toContain("CLOSE_RANGE_FOCUS_ZOOM");
+    expect(sources).toContain("}, [closeRangeVehicleId, map, vehicles]);");
   });
 });
