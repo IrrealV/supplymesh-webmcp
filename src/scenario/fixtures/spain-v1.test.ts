@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { routeCatalog } from "./routeCatalog";
 import { createSpainScenario, getVehicleDisplayName } from "./spain-v1";
 
 describe("Spain scenario fixture", () => {
@@ -26,6 +27,22 @@ describe("Spain scenario fixture", () => {
     const unlabeledVehicle = { ...vehicle, label: "  " };
 
     expect(getVehicleDisplayName(unlabeledVehicle)).toBe(vehicle.fleetNumber);
+  });
+
+  it("should expose required stable cargo and route-catalog place identities", () => {
+    const scenario = createSpainScenario();
+    expect(scenario.vehicles.map(({ cargo }) => cargo.id)).toStrictEqual([
+      "cargo-001", "cargo-002", "cargo-003", "cargo-004", "cargo-005", "cargo-006", "cargo-007", "cargo-008",
+      "cargo-009", "cargo-010", "cargo-011", "cargo-012", "cargo-013", "cargo-014", "cargo-015",
+    ]);
+    for (const vehicle of scenario.vehicles) {
+      const route = routeCatalog.get(vehicle.routeId);
+      if (route === undefined) throw new Error(`Missing protected route ${vehicle.routeId}.`);
+      expect({ originId: vehicle.origin.id, destinationId: vehicle.destination.id }).toStrictEqual({ originId: route.originId, destinationId: route.destinationId });
+    }
+    const unit211 = scenario.vehicles[10];
+    expect({ vehicleId: unit211.internalId, cargoId: unit211.cargo.id, originId: unit211.origin.id, destinationId: unit211.destination.id }).toStrictEqual({ vehicleId: "vehicle-011", cargoId: "cargo-011", originId: "toledo", destinationId: "alcobendas" });
+    expect(scenario.vehicles.flatMap(({ origin, destination }) => [origin.id, destination.id]).filter((id) => id === "madrid")).toHaveLength(4);
   });
 
   it("covers operational fields, all statuses, routes, and controlled risks", () => {
