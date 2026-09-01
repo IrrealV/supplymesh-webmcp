@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import path from "node:path";
 
 const expectedToolNames = ["fleet_status", "recovery_operations_context", "recovery_options_compare", "recovery_plan_stage", "scenario_current", "vehicle_get", "vehicle_rename"];
@@ -81,10 +81,12 @@ async function selectUnit204(page: Page): Promise<void> {
   await expect(page.locator(".risk-marker.map-layer-selected")).not.toHaveCount(0);
 }
 
-async function capture(page: Page, name: string): Promise<void> {
+async function capture(page: Page, testInfo: TestInfo, name: string): Promise<void> {
   await page.evaluate(async () => document.fonts.ready);
   await page.waitForTimeout(300);
-  await page.screenshot({ animations: "disabled", path: path.join(process.cwd(), "docs/evidence/phase1-1", name) });
+  const evidenceDirectory = process.env.SUPPLYMESH_EVIDENCE_DIR;
+  const screenshotPath = evidenceDirectory === undefined ? testInfo.outputPath(name) : path.resolve(evidenceDirectory, name);
+  await page.screenshot({ animations: "disabled", path: screenshotPath });
 }
 
 async function assertOverviewLabelsHidden(page: Page): Promise<void> {
@@ -275,27 +277,27 @@ test("should suppress nonessential motion and exclude prohibited or Phase 2 chro
   await expect(page.locator("footer, .bottom-bar, canvas")).toHaveCount(0);
 });
 
-test("should capture exactly the six accepted real-application evidence states", async ({ page }) => {
+test("should capture exactly the six accepted real-application evidence states", async ({ page }, testInfo) => {
   await installModelContextSeam(page);
   await resetApplication(page, 1440, 900);
   await assertOverviewLabelsHidden(page);
-  await capture(page, "desktop-overview.png");
+  await capture(page, testInfo, "desktop-overview.png");
   await resetApplication(page, 1440, 900);
   await page.getByRole("button", { name: "Weather affected" }).click();
   await assertOverviewLabelsHidden(page);
-  await capture(page, "desktop-weather-filter.png");
+  await capture(page, testInfo, "desktop-weather-filter.png");
   await resetApplication(page, 1440, 900);
   await selectUnit204(page);
-  await capture(page, "desktop-selected-route-risk.png");
+  await capture(page, testInfo, "desktop-selected-route-risk.png");
   await resetApplication(page, 1440, 900);
   await page.getByRole("button", { name: "Weather affected" }).click();
   await page.getByRole("button", { name: "Critical" }).click();
   await assertOverviewLabelsHidden(page);
-  await capture(page, "desktop-two-filters.png");
+  await capture(page, testInfo, "desktop-two-filters.png");
   await resetApplication(page, 900, 900);
   await page.getByRole("button", { name: "Weather affected" }).click();
-  await capture(page, "tablet-results.png");
+  await capture(page, testInfo, "tablet-results.png");
   await resetApplication(page, 900, 900);
   await selectUnit204(page);
-  await capture(page, "tablet-detail.png");
+  await capture(page, testInfo, "tablet-detail.png");
 });
