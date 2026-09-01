@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
 
-const expectedToolNames = ["fleet_status", "scenario_current", "vehicle_get", "vehicle_rename"];
+const expectedToolNames = ["fleet_status", "recovery_operations_context", "recovery_options_compare", "recovery_plan_stage", "scenario_current", "vehicle_get", "vehicle_rename"];
 const scenarioTrace = [
   "Render operational desktop", "Exclude unsupported chrome", "Respect reduced motion", "Navigate shell semantics",
   "Change locale", "Switch back to English", "Use the menu by keyboard", "Toggle multiple filters",
@@ -32,7 +32,10 @@ async function installModelContextSeam(page: Page): Promise<void> {
       value: {
         registerTool: async (tool: RegisteredTool, options: { signal: AbortSignal }) => {
           tools.push(tool);
-          options.signal.addEventListener("abort", () => tools.splice(0), { once: true });
+          options.signal.addEventListener("abort", () => {
+            const index = tools.indexOf(tool);
+            if (index >= 0) tools.splice(index, 1);
+          }, { once: true });
         },
       },
     });
@@ -60,12 +63,14 @@ async function registeredTools(page: Page): Promise<ToolSnapshot[]> {
 }
 
 async function executeTool(page: Page, name: string, input: unknown): Promise<unknown> {
-  return page.evaluate(({ input, name }) => {
-    type RegisteredTool = { name: string; execute(value: unknown): { content: [{ text: string }] } };
+  return page.evaluate(async ({ input, name }) => {
+    type ToolResponse = { content: [{ text: string }] };
+    type RegisteredTool = { name: string; execute(value: unknown): ToolResponse | Promise<ToolResponse> };
     const tools = (window as unknown as { __webMcpEvidence: { tools: RegisteredTool[] } }).__webMcpEvidence.tools;
     const tool = tools.find((candidate) => candidate.name === name);
     if (tool === undefined) throw new Error(`Missing tool ${name}.`);
-    return JSON.parse(tool.execute(input).content[0].text) as unknown;
+    const response = await tool.execute(input);
+    return JSON.parse(response.content[0].text) as unknown;
   }, { input, name });
 }
 
@@ -130,7 +135,7 @@ test("should block the console when WebMCP is unavailable and preserve the local
   await expect(page.getByText(/continue manually|skip|disable ai/i)).toHaveCount(0);
 });
 
-test("should preserve exactly four WebMCP schemas, responses, parity, and cleanup", async ({ page }) => {
+test("should preserve base and initial recovery WebMCP schemas, responses, parity, and cleanup", async ({ page }) => {
   await installModelContextSeam(page);
   await resetApplication(page, 1440, 900);
   const tools = await registeredTools(page);
@@ -139,6 +144,9 @@ test("should preserve exactly four WebMCP schemas, responses, parity, and cleanu
   expect(tools.find(({ name }) => name === "fleet_status")?.inputSchema).toEqual({ type: "object", properties: {}, additionalProperties: false });
   expect(tools.find(({ name }) => name === "vehicle_get")?.inputSchema).toEqual({ type: "object", properties: { vehicleId: { type: "string", minLength: 1 } }, required: ["vehicleId"], additionalProperties: false });
   expect(tools.find(({ name }) => name === "vehicle_rename")?.inputSchema).toEqual({ type: "object", properties: { vehicleId: { type: "string", minLength: 1 }, label: { type: "string", minLength: 1 } }, required: ["vehicleId", "label"], additionalProperties: false });
+  expect(tools.find(({ name }) => name === "recovery_operations_context")?.inputSchema).toEqual({ type: "object", properties: {}, additionalProperties: false });
+  expect(tools.find(({ name }) => name === "recovery_options_compare")?.inputSchema).toEqual({ type: "object", properties: {}, additionalProperties: false });
+  expect(tools.find(({ name }) => name === "recovery_plan_stage")?.inputSchema).toEqual({ type: "object", properties: { selectedOptionId: { type: "string", minLength: 1 } }, required: ["selectedOptionId"], additionalProperties: false });
   await expect.poll(async () => executeTool(page, "fleet_status", {})).toMatchObject({ ok: true, data: { total: 15 } });
   expect(await executeTool(page, "scenario_current", { extra: true })).toMatchObject({ ok: false, error: { code: "invalid-input" } });
   expect(await executeTool(page, "vehicle_rename", { vehicleId: "vehicle-002", label: "" })).toMatchObject({ ok: false, error: { code: "invalid-input" } });
@@ -166,7 +174,8 @@ test("should complete the desktop filters, map, inspection, locale, and restorat
   await assertOverviewLabelsHidden(page);
   await revealVehicleLabels(page);
   await assertCollisionFreeLabels(page);
-  await expect(page.locator(".risk-marker-symbol")).toHaveCount(4);
+  await expect(page.locator(".risk-marker-symbol")).toHaveCount(3);
+  await expect(page.getByRole("button", { name: "Select Unit 211 clearance incident", exact: true })).toHaveCount(1);
   await expect(page.locator(".risk-marker-label:visible")).toHaveCount(0);
   const panes = await page.evaluate(() => ["risk-tokens", "fleet-trucks", "fleet-labels"].map((name) => Number(getComputedStyle(document.querySelector<HTMLElement>(`.leaflet-${name}-pane`)!).zIndex)));
   expect(panes).toEqual([620, 640, 660]);
