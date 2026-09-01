@@ -6,7 +6,7 @@ export type FleetFilter = Exclude<FilterCategory, "all">;
 export type PanelContext = { mode: "overview" | "results"; returnFocusId: string };
 export type Selection = { kind: "none" } | { kind: "vehicle"; vehicleId: string };
 export type Follow = { kind: "none" } | { kind: "vehicle"; vehicleId: string };
-export type MapFocusTarget = { kind: "none" } | { kind: "vehicle" | "route"; requestId: number; vehicleId: string };
+export type MapFocusTarget = { kind: "none" } | { kind: "vehicle" | "route" | "comparison"; requestId: number; vehicleId: string };
 export type RailState = "compact" | "expanded";
 
 type UiCoordinationState = {
@@ -21,6 +21,7 @@ type UiCoordinationState = {
   cancelFollow(): void;
   clearFilters(returnFocusId: string): void;
   closeSelection(): string;
+  focusComparison(vehicleId: string): void;
   focusRoute(vehicleId: string): void;
   restoreFollow(): void;
   selectVehicle(vehicleId: string, returnFocusId?: string): void;
@@ -48,6 +49,7 @@ export const useUiCoordinationStore = create<UiCoordinationState>()((set, get) =
     set({ follow: noFollow, mapFocusTarget: noFocus, selection: noSelection });
     return returnFocusId;
   },
+  focusComparison: (vehicleId) => set((state) => { const requestId = state.focusRequestId + 1; return { focusRequestId: requestId, mapFocusTarget: { kind: "comparison", requestId, vehicleId } }; }),
   focusRoute: (vehicleId) => set((state) => {
     const requestId = state.focusRequestId + 1;
     return { focusRequestId: requestId, mapFocusTarget: { kind: "route", requestId, vehicleId } };

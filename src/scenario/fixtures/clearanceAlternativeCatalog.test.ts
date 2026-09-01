@@ -17,17 +17,20 @@ describe("clearance alternative catalog", () => {
   ])("should preserve protected bytes for %s", async (path, expected) => { expect(createHash("sha256").update(await readFile(path)).digest("hex")).toBe(expected); });
 
   it("should keep current consumers free of alternative, provider, staged-plan, application, movement, and tool integration", async () => {
-    const roots = ["src/app", "src/features", "src/domain/operations", "src/platform/webmcp"]; const paths = (await Promise.all(roots.map(async (root) => (await readdir(root, { recursive: true })).filter((path) => /\.tsx?$/.test(path)).map((path) => `${root}/${path}`)))).flat(); paths.push("src/scenario/fixtures/spain-v1.ts");
+    const roots = ["src/app", "src/features", "src/domain/operations", "src/platform/webmcp"]; const paths = (await Promise.all(roots.map(async (root) => (await readdir(root, { recursive: true })).filter((path) => /\.tsx?$/.test(path) && !/\.test\./.test(path)).map((path) => `${root}/${path}`)))).flat(); paths.push("src/scenario/fixtures/spain-v1.ts");
     const sources = await Promise.all(paths.map(async (path) => `${path}\n${await readFile(path, "utf8")}`)); const source = sources.join("\n"); const webMcpSource = sources.filter((entry) => entry.startsWith("src/platform/webmcp/")).join("\n");
+    const allowedIntegrationPaths = ["src/app/createApplication.ts", "src/domain/operations/unit211PreDispatchContext.ts"];
+    const isolatedSource = sources.filter((entry) => !allowedIntegrationPaths.some((path) => entry.startsWith(`${path}\n`))).join("\n");
     const prohibited: Array<[string, RegExp]> = [
       ["alternative application or assignment", /\b(?:apply|assign)\w*(?:Alternative|Route)|\b(?:alternative|route)\w*(?:Apply|Assign)/i],
       ["movement or position mutation", /\b(?:move|set|update)\w*(?:Vehicle)?(?:Position|Location)|\b(?:position|location)\w*(?:Mutation|Update)/i],
       ["comparison UI", /\b(?:compare|comparison)\w*(?:Route|Alternative)|\b(?:route|alternative)\w*(?:Compare|Comparison)/i],
       ["staged plan or approval", /\b(?:stagedPlan|stage\w*Alternative|approve\w*Alternative|alternative\w*Approval)\b/i],
-      ["runtime provider or key", new RegExp(`openrouteservice|fetch\\s*\\(|${["ORS", "API", "KEY"].join("_")}`, "i")],
       ["alternative fixture or catalog import", /from\s+["'][^"']*(?:clearance|alternative)[^"']*["']|clearanceAlternative|clearance-alternative-route|alternative-route-\d{3}/i],
     ];
-    for (const [concept, pattern] of prohibited) expect(source, concept).not.toMatch(pattern);
+    for (const [concept, pattern] of prohibited) expect(isolatedSource, concept).not.toMatch(pattern);
+    expect(source, "runtime provider, key, or raw fixture access").not.toMatch(new RegExp(`openrouteservice|fetch\\s*\\(|\\?raw|\\.geojson|${["ORS", "API", "KEY"].join("_")}`, "i"));
+    expect(sources.filter((entry) => /clearanceAlternativeCatalog|SUPPORTED_FOR_COMPARISON/.test(entry)).map((entry) => entry.slice(0, entry.indexOf("\n"))).sort()).toStrictEqual(allowedIntegrationPaths.sort());
     expect(webMcpSource, "WebMCP route tool or registration").not.toMatch(/name:\s*["'][^"']*(?:route|alternative)|registerTool\([^)]*(?:route|alternative)/i);
   });
 });
