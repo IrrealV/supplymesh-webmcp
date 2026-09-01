@@ -54,7 +54,15 @@ export const useUiCoordinationStore = create<UiCoordinationState>()((set, get) =
     const requestId = state.focusRequestId + 1;
     return { focusRequestId: requestId, mapFocusTarget: { kind: "route", requestId, vehicleId } };
   }),
-  restoreFollow: () => set((state) => ({ follow: state.selection.kind === "vehicle" ? { kind: "vehicle", vehicleId: state.selection.vehicleId } : noFollow })),
+  restoreFollow: () => set((state) => {
+    if (state.selection.kind !== "vehicle") return { follow: noFollow };
+    const requestId = state.focusRequestId + 1;
+    return {
+      focusRequestId: requestId,
+      follow: { kind: "vehicle", vehicleId: state.selection.vehicleId },
+      mapFocusTarget: { kind: "vehicle", requestId, vehicleId: state.selection.vehicleId },
+    };
+  }),
   selectVehicle: (vehicleId, returnFocusId) => set((state) => {
     const requestId = state.focusRequestId + 1;
     return {

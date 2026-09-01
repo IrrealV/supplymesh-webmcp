@@ -46,6 +46,20 @@ describe("useUiCoordinationStore", () => {
     expect([...state.activeFilters]).toEqual(["critical"]);
   });
 
+  it("should restore follow by requesting a fresh vehicle focus", () => {
+    const store = useUiCoordinationStore.getState();
+    store.selectVehicle("vehicle-011", "operational-map");
+    store.cancelFollow();
+    const requestIdBeforeRestore = useUiCoordinationStore.getState().focusRequestId;
+
+    store.restoreFollow();
+
+    const state = useUiCoordinationStore.getState();
+    expect(state.follow).toEqual({ kind: "vehicle", vehicleId: "vehicle-011" });
+    expect(state.focusRequestId).toBe(requestIdBeforeRestore + 1);
+    expect(state.mapFocusTarget).toEqual({ kind: "vehicle", requestId: requestIdBeforeRestore + 1, vehicleId: "vehicle-011" });
+  });
+
   it("should acknowledge only the current map focus request", () => {
     const store = useUiCoordinationStore.getState();
     store.selectVehicle("vehicle-001", "vehicle-001-control");

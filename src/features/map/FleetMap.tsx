@@ -11,6 +11,7 @@ import { VehicleMarkerLayer } from "./VehicleMarkerLayer";
 import { RecoveryComparisonLayers, RecoveryIncidentInset } from "../recovery-comparison/RecoveryComparisonLayers";
 import type { Unit211RecoveryComparisonModel } from "../recovery-comparison/unit211RecoveryComparisonModel";
 import { recoveryComparisonCopy } from "../../preferences/i18n/catalog";
+import { CLOSE_RANGE_FOCUS_ZOOM } from "./closeRangeMode";
 
 const severityColors: Record<RiskSeverity, string> = { low: "#657985", medium: "#a66a18", high: "#c4512d", critical: "#b4232d" };
 const WEATHER_RISK_COLOR = "#1268e8";
@@ -41,7 +42,7 @@ function MapFocus({ comparison, coordinator, scenario }: { comparison?: Unit211R
     map.once("moveend", finish);
     if (target.kind === "vehicle") {
       const [longitude, latitude] = vehicle.position.geometry.coordinates;
-      map.flyTo([latitude, longitude], 8.5, { animate: !reduceMotion, duration: 0.85, easeLinearity: 0.22 });
+      map.flyTo([latitude, longitude], CLOSE_RANGE_FOCUS_ZOOM, { animate: !reduceMotion, duration: 0.85, easeLinearity: 0.22 });
     } else if (target.kind === "comparison" && comparison !== undefined) {
       map.fitBounds(latLngBounds([...comparison.current.coordinates, ...comparison.alternative.coordinates, ...comparison.incident.exclusionCoordinates, comparison.incident.position].map(toPosition)), { animate: !reduceMotion, duration: 0.85, maxZoom: 12, padding: [48, 48] });
     } else {
@@ -145,7 +146,7 @@ export function FleetMap({ availableComparison, comparison, locale, recoveryExec
   const cancelManualFollow = (): void => { coordinator.recordManualInteraction(); useUiCoordinationStore.getState().cancelFollow(); };
   const layoutSignature = `${panelContext.mode}:${selection.kind}:${selectedVehicleId}:${comparison?.incident.id ?? ""}`; const recoveryCopy = recoveryComparisonCopy(locale); const hasExecuted = recoveryExecuted;
   return <div aria-label={copy.currentRoute} className="map-frame" onKeyDown={(event) => { if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "+", "-", "="].includes(event.key)) cancelManualFollow(); }} onPointerDown={cancelManualFollow} onWheel={cancelManualFollow}>
-    <MapContainer center={[40.1, -3.55]} className="fleet-map" maxZoom={12} minZoom={5} zoom={6.5} zoomControl zoomSnap={0.5}>
+    <MapContainer center={[40.1, -3.55]} className="fleet-map" maxZoom={18} minZoom={5} zoom={6.5} zoomControl zoomSnap={0.5}>
       <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       <Pane name="risk-tokens" style={{ zIndex: 620 }} /><Pane name="fleet-trucks" style={{ zIndex: 640 }} /><Pane name="fleet-labels" style={{ zIndex: 660 }} />
       <MapEvents coordinator={coordinator} /><MapFocus comparison={comparison} coordinator={coordinator} scenario={scenario} /><MapLayout coordinator={coordinator} signature={layoutSignature} />

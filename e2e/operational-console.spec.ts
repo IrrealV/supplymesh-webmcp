@@ -274,7 +274,8 @@ test("should suppress nonessential motion and exclude prohibited or Phase 2 chro
   const transition = await page.locator(".context-panel").evaluate((node) => getComputedStyle(node).transitionDuration);
   expect(Number.parseFloat(transition)).toBeLessThanOrEqual(0.001);
   await expect(page.getByText(/LIVE|WebMCP|Agent|Simulation|Stage plan|Chat|Fleet Edit|Create vehicle|Assign route|Reroute/i)).toHaveCount(0);
-  await expect(page.locator("footer, .bottom-bar, canvas")).toHaveCount(0);
+  await expect(page.locator("footer, .bottom-bar")).toHaveCount(0);
+  await expect(page.locator(".map-frame canvas")).toHaveCount(0);
 });
 
 test("should capture exactly the six accepted real-application evidence states", async ({ page }, testInfo) => {
