@@ -33,9 +33,18 @@ async function expectUnit211LabelClear(page: Page): Promise<void> {
   expect(clearance.separate, JSON.stringify(clearance)).toBe(true);
 }
 
+async function readMotion(page: Page): Promise<{ bearing: number; progress: number; routeId: string }> {
+  return page.locator(".fleet-map").evaluate((node) => ({
+    bearing: Number((node as HTMLElement).dataset.closeRangeBearing),
+    progress: Number((node as HTMLElement).dataset.closeRangeProgress),
+    routeId: (node as HTMLElement).dataset.closeRangeRouteId ?? "",
+  }));
+}
+
 test.beforeEach(async ({ page }) => page.emulateMedia({ reducedMotion: "reduce" }));
 
 test("selected follow swaps exactly one 2D marker for a static close-range truck", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-08-28T10:00:00Z") });
   await openConsole(page, 1440, 900);
   const map = page.locator(".fleet-map");
 
@@ -52,6 +61,10 @@ test("selected follow swaps exactly one 2D marker for a static close-range truck
   await expect(page.locator("[data-close-range-model=vehicle-011]")).toBeVisible();
   await expect(page.getByRole("button", { name: "Unit 211", exact: true })).toHaveCount(1);
   await expect(page.locator(".close-range-truck-rig")).toHaveCSS("animation-name", "none");
+  await expect(map).toHaveAttribute("data-close-range-camera", "static");
+  const staticMotion = await readMotion(page);
+  await page.clock.fastForward(2_000);
+  expect(await readMotion(page)).toStrictEqual(staticMotion);
   await expectUnit211LabelClear(page);
 
   await page.locator(".map-frame").dispatchEvent("wheel");
@@ -67,6 +80,27 @@ test("selected follow swaps exactly one 2D marker for a static close-range truck
   await expect(map).toHaveAttribute("data-close-range-mode", "inactive");
   await expect(page.locator("[data-close-range-model]")).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Operational map" })).toBeFocused();
+});
+
+test("follow motion advances along the active route with bearing and camera tracking", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await openConsole(page, 1440, 900);
+  await selectUnit211(page);
+  const map = page.locator(".fleet-map");
+  await expect(map).toHaveAttribute("data-close-range-camera", "following");
+  const initial = await readMotion(page);
+
+  await expect.poll(async () => (await readMotion(page)).progress).toBeGreaterThan(initial.progress);
+  await expect.poll(async () => Math.abs((await readMotion(page)).bearing - initial.bearing)).toBeGreaterThan(0.01);
+  const mapBox = await map.boundingBox();
+  const truckBox = await page.locator(".fleet-truck-icon.close-range-vehicle-active").boundingBox();
+  expect(Math.abs((truckBox!.x + truckBox!.width / 2) - (mapBox!.x + mapBox!.width / 2))).toBeLessThan(8);
+  expect(initial.routeId).toBe("route-011");
+
+  await page.locator(".map-frame").dispatchEvent("wheel");
+  await expect(map).toHaveAttribute("data-close-range-mode", "inactive");
+  await expect(map).not.toHaveAttribute("data-close-range-progress");
+  await expect(page.locator("[data-close-range-model]")).toHaveCount(0);
 });
 
 test("tablet keeps the close-range truck behind its usable inspection drawer", async ({ page }) => {

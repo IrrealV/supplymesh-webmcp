@@ -1,12 +1,14 @@
-import { divIcon, type DivIcon } from "leaflet";
-import { Fragment, useEffect, useState } from "react";
+import { divIcon, type DivIcon, type Marker as LeafletMarker } from "leaflet";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Marker, useMap } from "react-leaflet";
 import { useUiCoordinationStore } from "../../app/state/useUiCoordinationStore";
-import { getVehicleDisplayName } from "../../domain/entities";
+import { getVehicleDisplayName, type Route } from "../../domain/entities";
 import { catalog, interpolate, type Locale } from "../../preferences/i18n/catalog";
+import { advanceRouteProgress, prepareRoutePath, resolveActiveRoute, sampleRoutePath, startFrameLoop } from "./closeRangeMotion";
 import { detectWebGlSupport, resolveCloseRangeVehicleId } from "./closeRangeMode";
 import type { DerivedVehicle, LayerState } from "./layers";
 import { placeLabels, type ScreenRect } from "./labelPlacement";
+import type { MapEventCoordinator } from "./MapEventCoordinator";
 
 const LABEL_ZOOM_THRESHOLD = 7.5;
 
@@ -38,8 +40,10 @@ function createVehicleMarkerIcons(vehicle: DerivedVehicle["vehicle"], state: Lay
   };
 }
 
-export function VehicleMarkerLayer({ locale, onSelect, vehicles }: { locale: Locale; onSelect(vehicleId: string): void; vehicles: readonly DerivedVehicle[] }) {
+export function VehicleMarkerLayer({ coordinator, locale, onSelect, routes, vehicles }: { coordinator: MapEventCoordinator; locale: Locale; onSelect(vehicleId: string): void; routes: readonly Route[]; vehicles: readonly DerivedVehicle[] }) {
   const map = useMap();
+  const labelMarkers = useRef(new Map<string, LeafletMarker>());
+  const truckMarkers = useRef(new Map<string, LeafletMarker>());
   const follow = useUiCoordinationStore((state) => state.follow);
   const selection = useUiCoordinationStore((state) => state.selection);
   const [mapZoom, setMapZoom] = useState(() => map.getZoom());
@@ -94,6 +98,48 @@ export function VehicleMarkerLayer({ locale, onSelect, vehicles }: { locale: Loc
     map.on("moveend zoomend resize", place); place();
     return () => { cancelAnimationFrame(frame); map.off("moveend zoomend resize", place); };
   }, [closeRangeVehicleId, map, vehicles]);
+  useEffect(() => {
+    if (closeRangeVehicleId === "") { return; }
+    const activeVehicle = vehicles.find(({ vehicle }) => vehicle.internalId === closeRangeVehicleId)?.vehicle;
+    const activeRoute = activeVehicle === undefined ? undefined : resolveActiveRoute(routes, activeVehicle.internalId, activeVehicle.routeId);
+    const truck = truckMarkers.current.get(closeRangeVehicleId); const label = labelMarkers.current.get(closeRangeVehicleId);
+    if (activeVehicle === undefined || activeRoute === undefined || truck === undefined || label === undefined) { return; }
+    const path = prepareRoutePath(activeRoute.geometry.geometry.coordinates);
+    const container = map.getContainer(); const model = container.querySelector<HTMLElement>("[data-close-range-model]");
+    const [authoritativeLongitude, authoritativeLatitude] = activeVehicle.position.geometry.coordinates;
+    let progress = activeVehicle.routeProgress; let previousTime = 0; let lastPanTime = Number.NEGATIVE_INFINITY;
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+    const renderFrame = (): [number, number] => {
+      const sample = sampleRoutePath(path, progress); const [longitude, latitude] = sample.coordinate;
+      truck.setLatLng([latitude, longitude]); label.setLatLng([latitude, longitude]);
+      const bearing = sample.bearing.toFixed(2); const renderedProgress = sample.progress.toFixed(6);
+      container.dataset.closeRangeBearing = bearing; container.dataset.closeRangeProgress = renderedProgress; container.dataset.closeRangeRouteId = activeRoute.id;
+      if (model !== null) { model.dataset.routeBearing = bearing; model.dataset.routeProgress = renderedProgress; model.style.setProperty("--close-range-bearing", `${sample.bearing - 63}deg`); }
+      return [latitude, longitude];
+    };
+    const reset = (): void => {
+      truck.setLatLng([authoritativeLatitude, authoritativeLongitude]); label.setLatLng([authoritativeLatitude, authoritativeLongitude]);
+      delete container.dataset.closeRangeBearing; delete container.dataset.closeRangeProgress; delete container.dataset.closeRangeRouteId; delete container.dataset.closeRangeCamera;
+      if (model !== null) { delete model.dataset.routeBearing; delete model.dataset.routeProgress; model.style.removeProperty("--close-range-bearing"); }
+    };
+    renderFrame(); container.dataset.closeRangeCamera = reduceMotion ? "static" : "following";
+    if (reduceMotion) { return reset; }
+    const scheduler = { cancel: window.cancelAnimationFrame.bind(window), request: window.requestAnimationFrame.bind(window) };
+    const stop = startFrameLoop(scheduler, (time) => {
+      if (document.hidden) { previousTime = 0; return; }
+      const elapsed = previousTime === 0 ? 0 : Math.min(100, time - previousTime); previousTime = time;
+      progress = advanceRouteProgress(progress, elapsed, activeRoute.summary.distanceMeters, 24);
+      const position = renderFrame();
+      if (time - lastPanTime >= 120) {
+        coordinator.beginProgrammaticChange();
+        try { map.panTo(position, { animate: false }); } finally { coordinator.settleProgrammaticChange(); }
+        lastPanTime = time;
+      }
+    });
+    const handleVisibility = (): void => { previousTime = 0; container.dataset.closeRangeCamera = document.hidden ? "paused" : "following"; };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => { stop(); document.removeEventListener("visibilitychange", handleVisibility); reset(); };
+  }, [closeRangeVehicleId, coordinator, locale, map, routes, vehicles]);
 
   return vehicles.map(({ vehicle, state, zIndex }) => {
     const [longitude, latitude] = vehicle.position.geometry.coordinates;
@@ -102,8 +148,8 @@ export function VehicleMarkerLayer({ locale, onSelect, vehicles }: { locale: Loc
     const icons = createVehicleMarkerIcons(vehicle, state, vehicle.internalId === closeRangeVehicleId);
     const eventHandlers = { click: () => onSelect(vehicle.internalId) };
     return <Fragment key={vehicle.internalId}>
-      <Marker alt={displayName} eventHandlers={eventHandlers} icon={icons.truck} key={`truck:${vehicle.internalId}:${displayName}`} keyboard pane="fleet-trucks" position={[latitude, longitude]} title={displayName} zIndexOffset={zIndex} />
-      <Marker alt={`${selectName} ${suffix.label}`} eventHandlers={eventHandlers} icon={icons.label} key={`label:${vehicle.internalId}:${displayName}`} keyboard pane="fleet-labels" position={[latitude, longitude]} title={`${selectName} ${suffix.label}`} zIndexOffset={zIndex + 1} />
+      <Marker alt={displayName} eventHandlers={eventHandlers} icon={icons.truck} key={`truck:${vehicle.internalId}:${displayName}`} keyboard pane="fleet-trucks" position={[latitude, longitude]} ref={(marker) => { if (marker === null) truckMarkers.current.delete(vehicle.internalId); else truckMarkers.current.set(vehicle.internalId, marker); }} title={displayName} zIndexOffset={zIndex} />
+      <Marker alt={`${selectName} ${suffix.label}`} eventHandlers={eventHandlers} icon={icons.label} key={`label:${vehicle.internalId}:${displayName}`} keyboard pane="fleet-labels" position={[latitude, longitude]} ref={(marker) => { if (marker === null) labelMarkers.current.delete(vehicle.internalId); else labelMarkers.current.set(vehicle.internalId, marker); }} title={`${selectName} ${suffix.label}`} zIndexOffset={zIndex + 1} />
     </Fragment>;
   });
 }

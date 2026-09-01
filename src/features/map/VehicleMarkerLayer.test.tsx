@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createSpainScenario } from "../../scenario/fixtures/spain-v1";
 import { deriveMapLayers } from "./layers";
+import { MapEventCoordinator } from "./MapEventCoordinator";
 import { VehicleMarkerLayer } from "./VehicleMarkerLayer";
 
 const styles = readFileSync("src/styles.css", "utf8");
@@ -37,8 +38,8 @@ describe("VehicleMarkerLayer", () => {
   it("should render separate accessible truck and label controls with status pins", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
-    const layers = deriveMapLayers(createSpainScenario(), new Set(["critical"]), "vehicle-004");
-    render(<VehicleMarkerLayer locale="en" onSelect={onSelect} vehicles={layers.vehicles} />);
+    const scenario = createSpainScenario(); const layers = deriveMapLayers(scenario, new Set(["critical"]), "vehicle-004");
+    render(<VehicleMarkerLayer coordinator={new MapEventCoordinator()} locale="en" onSelect={onSelect} routes={scenario.routes} vehicles={layers.vehicles} />);
 
     const truckControls = screen.getAllByRole("button", { name: /^(?:FM-201|Unit \d{3})$/ });
     const labelControls = screen.getAllByRole("button", { name: /^Select .* label$/ });
@@ -63,8 +64,8 @@ describe("VehicleMarkerLayer", () => {
   });
 
   it("should reveal labels only once the map reaches zoom 7.5", () => {
-    const layers = deriveMapLayers(createSpainScenario(), new Set(), "");
-    render(<VehicleMarkerLayer locale="en" onSelect={vi.fn()} vehicles={layers.vehicles} />);
+    const scenario = createSpainScenario(); const layers = deriveMapLayers(scenario, new Set(), "");
+    render(<VehicleMarkerLayer coordinator={new MapEventCoordinator()} locale="en" onSelect={vi.fn()} routes={scenario.routes} vehicles={layers.vehicles} />);
 
     expect(mapMock.container?.classList.contains("map-labels-visible")).toBe(false);
 

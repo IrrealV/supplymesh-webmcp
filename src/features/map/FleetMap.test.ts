@@ -52,13 +52,16 @@ describe("FleetMap layers", () => {
     expect(mapSource).toContain('<Polygon key={shapeKey} {...pathOptions}');
     expect(mapSource).toContain('key={`${entry.route.id}:${entry.state}`} {...routeStyle(entry)}');
     expect(styles).toContain(".risk-severe-snow .risk-marker-label { display: none; }");
+    expect(styles).toContain('.fleet-map[data-close-range-mode="active"] .leaflet-tile-pane');
+    expect(styles).toContain('.fleet-map[data-close-range-mode="active"] .route-corridor-selected');
+    expect(styles).toContain('.fleet-map[data-close-range-mode="active"]::after');
   });
 
   it("should allow only presentation and accepted scenario dependencies in visual map files", () => {
-    const sources = ["FleetMap.tsx", "layers.ts", "VehicleMarkerLayer.tsx", "closeRangeMode.ts", "labelPlacement.ts", "MapLegend.tsx", "MapEventCoordinator.ts"]
+    const sources = ["FleetMap.tsx", "layers.ts", "VehicleMarkerLayer.tsx", "closeRangeMode.ts", "closeRangeMotion.ts", "labelPlacement.ts", "MapLegend.tsx", "MapEventCoordinator.ts"]
       .map((file) => readFileSync(`src/features/map/${file}`, "utf8"))
       .join("\n");
-    const allowedImports = new Set(["@phosphor-icons/react", "leaflet", "react", "react-leaflet", "../../app/presentation/useTabletViewport", "../../app/state/useUiCoordinationStore", "../../domain/entities", "../../preferences/i18n/catalog", "../fleet/filtering", "../recovery-comparison/RecoveryComparisonLayers", "../recovery-comparison/unit211RecoveryComparisonModel", "./closeRangeMode", "./layers", "./labelPlacement", "./MapEventCoordinator", "./MapLegend", "./VehicleMarkerLayer"]);
+    const allowedImports = new Set(["@phosphor-icons/react", "leaflet", "react", "react-leaflet", "../../app/presentation/useTabletViewport", "../../app/state/useUiCoordinationStore", "../../domain/entities", "../../preferences/i18n/catalog", "../fleet/filtering", "../recovery-comparison/RecoveryComparisonLayers", "../recovery-comparison/unit211RecoveryComparisonModel", "./closeRangeMode", "./closeRangeMotion", "./layers", "./labelPlacement", "./MapEventCoordinator", "./MapLegend", "./VehicleMarkerLayer"]);
     const imports = [...sources.matchAll(/from\s+["']([^"']+)["']/g)].map((match) => match[1]);
     const networkCall = new RegExp(`\\b${["fet", "ch"].join("")}\\s*\\(`);
 

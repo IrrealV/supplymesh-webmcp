@@ -153,7 +153,7 @@ export function FleetMap({ availableComparison, comparison, locale, recoveryExec
       {layers.routes.filter((entry) => entry.route.id !== comparison?.current.id && entry.route.id !== comparison?.alternative.id).map((entry) => <Polyline key={`${entry.route.id}:${entry.state}`} {...routeStyle(entry)} noClip positions={routePositions(entry.route)} smoothFactor={0} />)}
       <RiskLayers entries={visibleRisks} locale={locale} />
       {(comparison ?? availableComparison) && <RecoveryComparisonLayers comparison={comparison !== undefined} executed={hasExecuted} locale={locale} model={(comparison ?? availableComparison)!} onIncidentSelect={comparison ? undefined : (vehicleId) => useUiCoordinationStore.getState().selectVehicle(vehicleId, "operational-map")} />}
-      <VehicleMarkerLayer locale={locale} onSelect={(vehicleId) => useUiCoordinationStore.getState().selectVehicle(vehicleId)} vehicles={layers.vehicles} />
+      <VehicleMarkerLayer coordinator={coordinator} locale={locale} onSelect={(vehicleId) => useUiCoordinationStore.getState().selectVehicle(vehicleId)} routes={scenario.routes} vehicles={layers.vehicles} />
     </MapContainer>
     {comparison && <><p className="visually-hidden" data-route-state={hasExecuted ? "applied" : "comparison"} id="recovery-map-summary">{comparison.vehicle.displayLabel}. {recoveryCopy.current} · {comparison.current.statusLabel}. {recoveryCopy.alternative} · {comparison.alternative.statusLabel}. {recoveryCopy.exclusionZone}. {recoveryCopy.clearanceIncident}.</p><RecoveryIncidentInset locale={locale} model={comparison} /></>}
     <MapLegend locale={locale} />

@@ -873,6 +873,10 @@ body { background: var(--chrome); }
 }
 
 /* Close-range selected vehicle */
+.fleet-map[data-close-range-mode="active"] .leaflet-tile-pane { filter: saturate(.26) contrast(.86) brightness(.88); }
+.fleet-map[data-close-range-mode="active"] .route-corridor-selected,
+.fleet-map[data-close-range-mode="active"] .recovery-applied-route { filter: drop-shadow(0 0 4px rgb(18 104 232 / 78%)); opacity: 1; stroke: #0879e8; stroke-linecap: round; stroke-width: 7; }
+.fleet-map[data-close-range-mode="active"]::after { background: radial-gradient(circle at 50% 46%, transparent 38%, rgb(7 20 38 / 26%) 100%); content: ""; inset: 0; pointer-events: none; position: absolute; z-index: 390; }
 .fleet-truck-icon.close-range-vehicle-active { overflow: visible; pointer-events: auto; }
 .fleet-truck-icon.close-range-vehicle-active .fleet-status-pin.fleet-vehicle-pin {
   background: transparent; border-color: transparent; box-shadow: none;
@@ -889,7 +893,7 @@ body { background: var(--chrome); }
   height: 72px; left: 50%;
   perspective: 300px;
   pointer-events: none; position: absolute;
-  top: 50%; transform: translate3d(-50%, -55%, 0);
+  top: 55%; transform: translate3d(-50%, -55%, 0) rotate(var(--close-range-bearing, 0deg)); transform-origin: center; will-change: transform;
   width: 112px;
 }
 .close-range-truck-shadow {
@@ -908,7 +912,7 @@ body { background: var(--chrome); }
   left: 18px;
   position: absolute;
   top: 10px;
-  transform: rotateX(57deg) rotateZ(-27deg) scale(1.22);
+  transform: rotateX(61deg) rotateZ(-27deg) scale(1.34);
   transform-style: preserve-3d;
   width: 76px;
   animation: close-range-truck-enter 360ms cubic-bezier(.16, 1, .3, 1) both;
@@ -987,5 +991,5 @@ body { background: var(--chrome); }
   content: ""; inset: 3px; position: absolute;
 }
 .close-range-truck-wheel.wheel-rear { left: 14px; } .close-range-truck-wheel.wheel-front { left: 59px; }
-@keyframes close-range-truck-enter { from { opacity: 0; transform: rotateX(57deg) rotateZ(-27deg) scale(.88); } to { opacity: 1; transform: rotateX(57deg) rotateZ(-27deg) scale(1.22); } }
+@keyframes close-range-truck-enter { from { opacity: 0; transform: rotateX(61deg) rotateZ(-27deg) scale(.92); } to { opacity: 1; transform: rotateX(61deg) rotateZ(-27deg) scale(1.34); } }
 @media (prefers-reduced-motion: reduce) { .close-range-truck-rig { animation: none; } }
