@@ -1,4 +1,4 @@
-import { isVehicleLabelValid, type DomainResult, type FleetStatus, type OperatingRegion, type Vehicle, type VehicleRenameCommand, type VehicleStatus } from "../entities";
+import { isVehicleLabelValid, type DomainResult, type FleetStatus, type OperatingRegion, type Vehicle, type VehicleRenameCommand, type VehicleStatus, type VehicleCreateCommand, type VehicleUpdateCommand, type VehicleAssignRouteCommand } from "../entities";
 import { deepDetachAndFreeze } from "../deepDetach";
 import type { ScenarioRepository } from "../ports/ScenarioRepository";
 import { createAssessAuthoritativeVerticalClearance, type AssessAuthoritativeVerticalClearance } from "./authoritativeVerticalAssessment";
@@ -14,6 +14,9 @@ export type OperationsApi = {
   vehicleGet(vehicleId: string): DomainResult<Vehicle>;
   vehicleRename(command: VehicleRenameCommand): DomainResult<Vehicle>;
   vehicleDelete(vehicleId: string): DomainResult<Vehicle>;
+  vehicleCreate(command: VehicleCreateCommand): DomainResult<Vehicle>;
+  vehicleUpdate(command: VehicleUpdateCommand): DomainResult<Vehicle>;
+  vehicleAssignRoute(command: VehicleAssignRouteCommand): DomainResult<Vehicle>;
 };
 
 function failure<T>(code: string, message: string): DomainResult<T> {
@@ -54,5 +57,32 @@ export function createOperationsApi(repository: ScenarioRepository, options?: Op
       return vehicleResult(repository.vehicleRename(vehicleId, normalizedLabel), vehicleId);
     },
     vehicleDelete: (vehicleId) => vehicleResult(repository.vehicleDelete(vehicleId), vehicleId),
+    vehicleCreate: (command) => {
+      const internalId = `vehicle-${crypto.randomUUID()}`;
+      const newVehicle: Vehicle = {
+        internalId,
+        fleetNumber: command.fleetNumber,
+        label: command.label,
+        plate: command.plate,
+        position: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [0, 0] } },
+        status: command.routeId ? "driving" : "resting",
+        cargo: { ...command.cargo, id: `cargo-${crypto.randomUUID()}` },
+        dimensions: command.dimensions,
+        timing: { remainingDriveMinutes: 0, restDeadline: "", eta: "", delayMinutes: 0 },
+        origin: { id: "origin", name: "Origin", position: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [0, 0] } } },
+        destination: { id: "dest", name: "Destination", position: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [0, 0] } } },
+        currentRoute: command.routeId || "",
+        routeId: command.routeId || "",
+        routeProgress: 0,
+        riskIds: [],
+      };
+      return vehicleResult(repository.vehicleCreate(newVehicle), internalId);
+    },
+    vehicleUpdate: (command) => {
+      const existing = repository.vehicleGet(command.vehicleId);
+      const cargoId = existing?.cargo.id ?? `cargo-${crypto.randomUUID()}`;
+      return vehicleResult(repository.vehicleUpdate(command.vehicleId, { plate: command.plate, label: command.label, dimensions: command.dimensions, cargo: { ...command.cargo, id: cargoId } }), command.vehicleId);
+    },
+    vehicleAssignRoute: (command) => vehicleResult(repository.vehicleAssignRoute(command.vehicleId, command.routeId), command.vehicleId),
   };
 }

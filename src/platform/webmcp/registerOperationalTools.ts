@@ -103,5 +103,61 @@ export function createOperationalTools(operations: OperationsApi, onScenarioChan
         return executeRename(operations, input, onScenarioChange);
       },
     },
+    {
+      name: "fleet_vehicle_create",
+      description: "Creates a new vehicle.",
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      execute: (input: any) => {
+        try {
+          const result = operations.vehicleCreate(input);
+          if (result.ok) publishScenario(operations, onScenarioChange);
+          return toolResponse(result);
+        } catch {
+          return toolResponse(failure("operation-failed", "The operation could not be completed."));
+        }
+      },
+    },
+    {
+      name: "fleet_vehicle_update",
+      description: "Updates an existing vehicle.",
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      execute: (input: any) => {
+        try {
+          const result = operations.vehicleUpdate(input);
+          if (result.ok) publishScenario(operations, onScenarioChange);
+          return toolResponse(result);
+        } catch {
+          return toolResponse(failure("operation-failed", "The operation could not be completed."));
+        }
+      },
+    },
+    {
+      name: "fleet_vehicle_assign_route",
+      description: "Assigns a route to a vehicle.",
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      execute: (input: any) => {
+        try {
+          const result = operations.vehicleAssignRoute(input);
+          if (result.ok) publishScenario(operations, onScenarioChange);
+          return toolResponse(result);
+        } catch {
+          return toolResponse(failure("operation-failed", "The operation could not be completed."));
+        }
+      },
+    },
+    {
+      name: "fleet_vehicle_delete",
+      description: "Deletes a vehicle.",
+      inputSchema: vehicleGetInputSchema,
+      execute: (input: any) => {
+        try {
+          const result = operations.vehicleDelete(input.vehicleId);
+          if (result.ok) publishScenario(operations, onScenarioChange);
+          return toolResponse(result);
+        } catch {
+          return toolResponse(failure("operation-failed", "The operation could not be completed."));
+        }
+      },
+    },
   ];
 }

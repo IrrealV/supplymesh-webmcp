@@ -125,9 +125,27 @@ function applyRecoveryRoute(scenario: OperatingRegion, route: AdmittedRecoveryRo
 function applyOverrides(overrides: ScenarioOverrides, route?: AdmittedRecoveryRoute): OperatingRegion {
   const fixture = createSpainScenario();
   const deleted = new Set(overrides.deletedVehicleIds);
+  const baseVehicles = fixture.vehicles
+    .filter((vehicle) => !deleted.has(vehicle.internalId))
+    .map((vehicle) => {
+      const updated = overrides.updatedVehicles?.[vehicle.internalId] || {};
+      const assignedRoute = overrides.assignedRoutes?.[vehicle.internalId];
+      const routeId = assignedRoute !== undefined ? (assignedRoute || "") : vehicle.routeId;
+      const status = assignedRoute === null || (assignedRoute === undefined && !vehicle.routeId) ? "resting" : vehicle.status;
+      return { 
+        ...vehicle, 
+        ...updated, 
+        label: overrides.labels[vehicle.internalId] ?? updated.label ?? vehicle.label,
+        routeId,
+        status: status as Vehicle["status"]
+      };
+    });
+
+  const createdVehicles = overrides.createdVehicles || [];
+  
   const scenario = {
     ...fixture,
-    vehicles: fixture.vehicles.filter((vehicle) => !deleted.has(vehicle.internalId)).map((vehicle) => ({ ...vehicle, label: overrides.labels[vehicle.internalId] ?? vehicle.label })),
+    vehicles: [...baseVehicles, ...createdVehicles],
     routes: fixture.routes.filter((route) => !deleted.has(route.vehicleId)),
   };
   return overrides.recoveryRouteApplied === true && route !== undefined ? applyRecoveryRoute(scenario, route) : scenario;
@@ -258,6 +276,54 @@ export function createZustandScenarioRepository(storage: StorageLike = browserSt
         return { overrides: nextOverrides, scenario: applyOverrides(nextOverrides, admittedRoute ?? undefined), operational };
       });
       return deletedVehicle === undefined ? undefined : detached(deletedVehicle);
+    },
+    vehicleCreate: (vehicle) => {
+      let createdVehicle: Vehicle | undefined;
+      store.setState((state) => {
+        if (!isOperationalRecoverySnapshot(state.operational)) return state;
+        const createdVehicles = [...(state.overrides.createdVehicles || []), vehicle];
+        const baseOverrides = { ...state.overrides, createdVehicles };
+        const operational = invalidatedAfterMutation(state.operational);
+        const nextOverrides: ScenarioOverrides = state.overrides.recoveryRouteApplied === true ? { ...baseOverrides, operationalSnapshot: operational, recoveryRouteApplied: true } : baseOverrides;
+        if (!saveScenarioOverrides(storage, nextOverrides)) return state;
+        const detachedVehicle = deepDetachAndFreeze(vehicle);
+        if (!detachedVehicle.ok) return state;
+        createdVehicle = detachedVehicle.data;
+        return { overrides: nextOverrides, scenario: applyOverrides(nextOverrides, admittedRoute ?? undefined), operational };
+      });
+      return createdVehicle ?? detached(vehicle);
+    },
+    vehicleUpdate: (vehicleId, updates) => {
+      let updatedVehicle: Vehicle | undefined;
+      store.setState((state) => {
+        if (!isOperationalRecoverySnapshot(state.operational)) return state;
+        const vehicle = findVehicle(state.scenario, vehicleId);
+        if (vehicle === undefined) return state;
+        const updatedVehicles = { ...state.overrides.updatedVehicles, [vehicleId]: { ...(state.overrides.updatedVehicles?.[vehicleId] || {}), ...updates } };
+        const baseOverrides = { ...state.overrides, updatedVehicles };
+        const operational = invalidatedAfterMutation(state.operational);
+        const nextOverrides: ScenarioOverrides = state.overrides.recoveryRouteApplied === true ? { ...baseOverrides, operationalSnapshot: operational, recoveryRouteApplied: true } : baseOverrides;
+        if (!saveScenarioOverrides(storage, nextOverrides)) return state;
+        updatedVehicle = { ...vehicle, ...updates };
+        return { overrides: nextOverrides, scenario: applyOverrides(nextOverrides, admittedRoute ?? undefined), operational };
+      });
+      return updatedVehicle === undefined ? undefined : detached(updatedVehicle);
+    },
+    vehicleAssignRoute: (vehicleId, routeId) => {
+      let updatedVehicle: Vehicle | undefined;
+      store.setState((state) => {
+        if (!isOperationalRecoverySnapshot(state.operational)) return state;
+        const vehicle = findVehicle(state.scenario, vehicleId);
+        if (vehicle === undefined) return state;
+        const assignedRoutes = { ...state.overrides.assignedRoutes, [vehicleId]: routeId ?? null };
+        const baseOverrides = { ...state.overrides, assignedRoutes };
+        const operational = invalidatedAfterMutation(state.operational);
+        const nextOverrides: ScenarioOverrides = state.overrides.recoveryRouteApplied === true ? { ...baseOverrides, operationalSnapshot: operational, recoveryRouteApplied: true } : baseOverrides;
+        if (!saveScenarioOverrides(storage, nextOverrides)) return state;
+        updatedVehicle = { ...vehicle, routeId: routeId ?? "", status: routeId ? vehicle.status : "resting" };
+        return { overrides: nextOverrides, scenario: applyOverrides(nextOverrides, admittedRoute ?? undefined), operational };
+      });
+      return updatedVehicle === undefined ? undefined : detached(updatedVehicle);
     },
     operationalRead: () => {
       try {

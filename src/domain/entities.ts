@@ -71,6 +71,25 @@ export type OperatingRegion = { id: string; name: string; vehicles: Vehicle[]; r
 export type FleetStatus = { total: number; byStatus: Record<VehicleStatus, number> };
 export type DomainResult<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
 export type VehicleRenameCommand = { vehicleId: string; label: string };
+export type VehicleCreateCommand = {
+  fleetNumber: string;
+  plate: string;
+  label: string;
+  dimensions: Dimensions;
+  cargo: Omit<Cargo, "id">;
+  routeId?: string;
+};
+export type VehicleUpdateCommand = {
+  vehicleId: string;
+  plate: string;
+  label: string;
+  dimensions: Dimensions;
+  cargo: Omit<Cargo, "id">;
+};
+export type VehicleAssignRouteCommand = {
+  vehicleId: string;
+  routeId: string | undefined;
+};
 
 export function getVehicleDisplayName(vehicle: Vehicle): string {
   return vehicle.label.trim() || vehicle.fleetNumber;

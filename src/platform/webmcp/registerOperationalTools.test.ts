@@ -53,6 +53,10 @@ describe("createOperationalTools", () => {
       { name: "fleet_status", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
       { name: "vehicle_get", inputSchema: { type: "object", properties: { vehicleId: { type: "string", minLength: 1 } }, required: ["vehicleId"], additionalProperties: false } },
       { name: "vehicle_rename", inputSchema: { type: "object", properties: { vehicleId: { type: "string", minLength: 1 }, label: { type: "string", minLength: 1 } }, required: ["vehicleId", "label"], additionalProperties: false } },
+      { name: "fleet_vehicle_create", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+      { name: "fleet_vehicle_update", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+      { name: "fleet_vehicle_assign_route", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+      { name: "fleet_vehicle_delete", inputSchema: { type: "object", properties: { vehicleId: { type: "string", minLength: 1 } }, required: ["vehicleId"], additionalProperties: false } },
     ]);
 
     const result = await toolResult(tools[0], {});

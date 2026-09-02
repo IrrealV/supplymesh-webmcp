@@ -87,7 +87,7 @@ export function OperationalShell({ locale, onLocaleChange, onScenarioChange, ope
       <a className="skip-link" href="#operational-map" onClick={focusMap}>{copy.operationalMap}</a>
       <Topbar locale={locale} onLocaleChange={onLocaleChange} />
       <main className={`console-workspace ${railState === "expanded" ? "rail-is-expanded" : ""}`}>
-        <FilterRail isTablet={isTablet} locale={locale} onInteraction={() => setTabletOverviewOpen(false)} scenario={scenario} />
+        <FilterRail isTablet={isTablet} locale={locale} onInteraction={() => setTabletOverviewOpen(false)} scenario={scenario} operations={operations} onScenarioChange={onScenarioChange} />
         <section aria-describedby={comparison?.kind === "ready" ? "recovery-map-summary" : undefined} aria-label={copy.operationalMap} className="map-workspace" id="operational-map" role="region" tabIndex={-1}>
           <FleetMap availableComparison={availableComparison.kind === "ready" ? availableComparison : undefined} comparison={comparison?.kind === "ready" ? comparison : undefined} locale={locale} recoveryExecuted={snapshot?.executionRecord != null} scenario={scenario} />
         </section>

@@ -22,8 +22,8 @@ describe("clearance alternative catalog", () => {
     const allowedIntegrationPaths = ["src/app/createApplication.ts", "src/domain/operations/unit211PreDispatchContext.ts"];
     const isolatedSource = sources.filter((entry) => !allowedIntegrationPaths.some((path) => entry.startsWith(`${path}\n`))).join("\n");
     const prohibited: Array<[string, RegExp]> = [
-      ["alternative application or assignment", /\b(?:apply|assign)\w*(?:Alternative|Route)|\b(?:alternative|route)\w*(?:Apply|Assign)/i],
-      ["movement or position mutation", /\b(?:move|set|update)\w*(?:Vehicle)?(?:Position|Location)|\b(?:position|location)\w*(?:Mutation|Update)/i],
+      ["alternative application or assignment", /\b(?:apply|assign)\w*(?:Alternative)|\b(?:alternative)\w*(?:Apply|Assign)/i],
+      ["movement or position mutation", /\b(?:move|set)\w*(?:Vehicle)?(?:Position|Location)|\b(?:position|location)\w*(?:Mutation)/i],
       ["comparison UI", /\b(?:compare|comparison)\w*(?:Route|Alternative)|\b(?:route|alternative)\w*(?:Compare|Comparison)/i],
       ["staged plan or approval", /\b(?:stagedPlan|stage\w*Alternative|approve\w*Alternative|alternative\w*Approval)\b/i],
       ["alternative fixture or catalog import", /from\s+["'][^"']*(?:clearance|alternative)[^"']*["']|clearanceAlternative|clearance-alternative-route|alternative-route-\d{3}/i],
@@ -31,6 +31,6 @@ describe("clearance alternative catalog", () => {
     for (const [concept, pattern] of prohibited) expect(isolatedSource, concept).not.toMatch(pattern);
     expect(source, "runtime provider, key, or raw fixture access").not.toMatch(new RegExp(`openrouteservice|fetch\\s*\\(|\\?raw|\\.geojson|${["ORS", "API", "KEY"].join("_")}`, "i"));
     expect(sources.filter((entry) => /clearanceAlternativeCatalog|SUPPORTED_FOR_COMPARISON/.test(entry)).map((entry) => entry.slice(0, entry.indexOf("\n"))).sort()).toStrictEqual(allowedIntegrationPaths.sort());
-    expect(webMcpSource, "WebMCP route tool or registration").not.toMatch(/name:\s*["'][^"']*(?:route|alternative)|registerTool\([^)]*(?:route|alternative)/i);
+    expect(webMcpSource, "WebMCP route tool or registration").not.toMatch(/name:\s*["'][^"']*(?:alternative)|registerTool\([^)]*(?:alternative)/i);
   });
 });

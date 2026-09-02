@@ -8,7 +8,7 @@ import { createRecoveryTools } from "./registerRecoveryTools";
 import type { WebMcpTool } from "./webMcpTypes";
 import { assertUniqueToolNames } from "./toolRegistry";
 
-type WebMcpGateState = "checking" | "registering" | "ready" | "unsupported" | "failed";
+type WebMcpGateState = "checking" | "registering" | "ready" | "simulation" | "unsupported" | "failed";
 
 type WebMcpGateProps = {
   children: ReactNode;
@@ -54,6 +54,31 @@ export function WebMcpGate({ children, explicitFlag, locale, onScenarioChange, o
 
       const modelContext = document.modelContext;
       if (modelContext === undefined) {
+        if (import.meta.env.DEV) {
+          const opsTools = createOperationalTools(operations, onScenarioChange);
+          let recTools: WebMcpTool[] = [];
+
+          const updateWindowTools = () => {
+            (window as any).__recoveryTools = [...opsTools, ...recTools];
+          };
+
+          const schedule = (snapshot: OperationalRecoverySnapshot): void => {
+            if (isStopped) return;
+            recTools = createRecoveryTools(snapshot, { operations, recoveryAgent, recoveryExecution, onScenarioChange });
+            updateWindowTools();
+          };
+
+          unsubscribe = operational.subscribe(schedule);
+          if (isStopped) {
+            unsubscribe();
+            return;
+          }
+          const initial = operational.read();
+          if (!initial.ok) throw new Error("Recovery state is unavailable.");
+          schedule(initial.data);
+          setState("simulation");
+          return;
+        }
         setState("unsupported");
         return;
       }
@@ -149,8 +174,17 @@ export function WebMcpGate({ children, explicitFlag, locale, onScenarioChange, o
     };
   }, [attempt, explicitFlag, onScenarioChange, operational, operations, recoveryAgent, recoveryExecution]);
 
-  if (state === "ready") {
-    return children;
+  if (state === "ready" || state === "simulation") {
+    return (
+      <>
+        {state === "simulation" && (
+          <div className="webmcp-simulation-banner" style={{ backgroundColor: "#ffcc00", color: "#000", padding: "8px", textAlign: "center", fontWeight: "bold" }}>
+            ⚠️ DEV MODE — WebMCP Unavailable (Simulation Only)
+          </div>
+        )}
+        {children}
+      </>
+    );
   }
 
   if (state === "checking" || state === "registering") {
