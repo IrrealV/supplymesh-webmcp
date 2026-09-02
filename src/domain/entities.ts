@@ -26,6 +26,9 @@ export type RiskKind =
   | "weight-restriction"
   | "road-closure"
   | "severe-snow"
+  | "heavy-rain"
+  | "severe-storm"
+  | "calima"
   | "rest-deadline"
   | "landslide";
 

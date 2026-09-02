@@ -9,9 +9,9 @@ export type DerivedRisk = { risk: OperationalRisk; state: LayerState };
 export type MapLayers = { vehicles: DerivedVehicle[]; routes: DerivedRoute[]; risks: DerivedRisk[] };
 
 function riskMatchesFilters(risk: OperationalRisk, activeFilters: ReadonlySet<FleetFilter>): boolean {
-  return (risk.kind === "severe-snow" && activeFilters.has("weather-affected"))
+  return (["severe-snow", "heavy-rain", "severe-storm", "calima"].includes(risk.kind) && activeFilters.has("weather-affected"))
     || (risk.kind === "rest-deadline" && activeFilters.has("driving-rest-risk"))
-    || (!["severe-snow", "rest-deadline"].includes(risk.kind) && activeFilters.has("road-restriction-issues"));
+    || (!["severe-snow", "heavy-rain", "severe-storm", "calima", "rest-deadline"].includes(risk.kind) && activeFilters.has("road-restriction-issues"));
 }
 
 function layerState(vehicleId: string, matchingIds: ReadonlySet<string>, selectedVehicleId: string, hasFilters: boolean): LayerState {

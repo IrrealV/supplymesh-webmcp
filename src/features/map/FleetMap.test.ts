@@ -11,7 +11,7 @@ describe("FleetMap layers", () => {
 
     expect(layers.vehicles).toHaveLength(15);
     expect(layers.routes).toHaveLength(15);
-    expect(layers.risks).toHaveLength(20);
+    expect(layers.risks).toHaveLength(23);
     expect(getVehicleDisplayName(scenario.vehicles[0])).toBe("FM-201");
     expect(layers.routes.every((entry, index) => entry.route.geometry.geometry.coordinates === scenario.routes[index].geometry.geometry.coordinates)).toBe(true);
     expect(layers.vehicles.every((entry) => entry.state === "normal")).toBe(true);
@@ -24,7 +24,7 @@ describe("FleetMap layers", () => {
 
     expect(filtered.vehicles.filter((entry) => entry.state === "matched")).toHaveLength(5);
     expect(filtered.vehicles.filter((entry) => entry.state === "muted")).toHaveLength(10);
-    expect(filtered.risks.filter((entry) => entry.state === "matched").every((entry) => entry.risk.kind === "severe-snow")).toBe(true);
+    expect(filtered.risks.filter((entry) => entry.state === "matched").every((entry) => ["severe-snow", "heavy-rain", "severe-storm", "calima"].includes(entry.risk.kind))).toBe(true);
     expect(filtered.risks.filter((entry) => entry.risk.kind === "rest-deadline").every((entry) => entry.state === "muted")).toBe(true);
     expect(selected.vehicles.find((entry) => entry.state === "selected")?.zIndex).toBeGreaterThan(1000);
     expect(selected.routes.at(-1)?.state).toBe("selected");

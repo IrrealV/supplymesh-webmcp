@@ -93,20 +93,23 @@ function riskLabel(risk: OperationalRisk, locale: Locale): string {
   if (risk.kind === "height-restriction") return `${operations.lowClearance} ${risk.limitMeters ?? 0} m`;
   if (risk.kind === "weight-restriction") return `${operations.weightRestriction} ${risk.limitTonnes ?? 0} t`;
   if (risk.kind === "road-closure") return operations.roadClosure;
-  if (risk.kind === "severe-snow") return operations.severeWeather;
+  if (risk.kind === "severe-snow") return operations.severeSnow ?? operations.severeWeather;
+  if (risk.kind === "heavy-rain") return operations.heavyRain ?? operations.severeWeather;
+  if (risk.kind === "severe-storm") return operations.severeStorm ?? operations.severeWeather;
+  if (risk.kind === "calima") return operations.calima ?? operations.severeWeather;
   return `${copy.drivingRestRisk} ${risk.deadline?.slice(11, 16) ?? ""}`.trim();
 }
 
 function riskIcon(entry: DerivedRisk, locale: Locale) {
   const { risk, state } = entry; const label = escapeHtml(riskLabel(risk, locale));
-  const symbol = risk.kind === "height-restriction" ? `${risk.limitMeters}m` : risk.kind === "weight-restriction" ? `${risk.limitTonnes}t` : risk.kind === "road-closure" ? "×" : risk.kind === "severe-snow" ? String.fromCodePoint(0x2744) : `REST ${risk.deadline?.slice(11, 16) ?? ""}`.trim();
+  const symbol = risk.kind === "height-restriction" ? `${risk.limitMeters}m` : risk.kind === "weight-restriction" ? `${risk.limitTonnes}t` : risk.kind === "road-closure" ? "×" : risk.kind === "severe-snow" ? String.fromCodePoint(0x2744) : risk.kind === "heavy-rain" ? String.fromCodePoint(0x1F327) : risk.kind === "severe-storm" ? String.fromCodePoint(0x26A1) : risk.kind === "calima" ? String.fromCodePoint(0x1F32B) : `REST ${risk.deadline?.slice(11, 16) ?? ""}`.trim();
   return divIcon({ className: `risk-marker risk-${risk.kind} map-layer-${state}`, html: `<span class="risk-marker-symbol">${symbol}</span><span class="risk-marker-label">${label}</span>`, iconAnchor: [14, 14], iconSize: [state === "selected" ? 120 : 64, 28] });
 }
 
 function RiskLayers({ entries, locale }: { entries: readonly DerivedRisk[]; locale: Locale }) {
   return entries.map((entry) => {
     const { risk, state } = entry;
-    const isWeatherRisk = risk.kind === "severe-snow";
+    const isWeatherRisk = ["severe-snow", "heavy-rain", "severe-storm", "calima"].includes(risk.kind);
     const color = isWeatherRisk ? WEATHER_RISK_COLOR : severityColors[risk.severity];
     const opacity = state === "muted" ? 0.18 : state === "selected" ? 1 : 0.72;
     const fillOpacity = isWeatherRisk ? state === "muted" ? 0.06 : state === "selected" ? 0.26 : state === "matched" ? 0.22 : 0.18 : 0;
@@ -123,7 +126,12 @@ function RiskLayers({ entries, locale }: { entries: readonly DerivedRisk[]; loca
     const shape = risk.geometry.geometry.type === "Polygon"
       ? <Polygon key={shapeKey} {...pathOptions} positions={risk.geometry.geometry.coordinates[0].map(toPosition)} />
       : <Polyline key={shapeKey} {...pathOptions} noClip positions={risk.geometry.geometry.coordinates.map(toPosition)} smoothFactor={0} />;
-    return <Fragment key={risk.id}>{shape}<Marker alt={riskLabel(risk, locale)} icon={riskIcon(entry, locale)} interactive={false} keyboard={false} pane="risk-tokens" position={riskPosition(risk)} title={riskLabel(risk, locale)} zIndexOffset={state === "selected" ? 1300 : 500} /></Fragment>;
+      
+    const weatherFx = isWeatherRisk && state !== "muted" ? (
+      <Marker key={`fx-${shapeKey}`} alt="" interactive={false} keyboard={false} pane="weather-effects" position={riskPosition(risk)} icon={divIcon({ className: `weather-fx-container`, html: `<div class="weather-fx-zone weather-fx-${risk.kind}"></div>`, iconSize: [0, 0] })} />
+    ) : null;
+    
+    return <Fragment key={risk.id}>{shape}{weatherFx}<Marker alt={riskLabel(risk, locale)} icon={riskIcon(entry, locale)} interactive={false} keyboard={false} pane="risk-tokens" position={riskPosition(risk)} title={riskLabel(risk, locale)} zIndexOffset={state === "selected" ? 1300 : 500} /></Fragment>;
   });
 }
 
@@ -185,7 +193,7 @@ export function FleetMap({ availableComparison, comparison, locale, recoveryExec
   return <div aria-label={copy.currentRoute} className="map-frame" onKeyDown={(event) => { if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "+", "-", "="].includes(event.key)) cancelManualFollow(); }} onPointerDown={cancelManualFollow} onWheel={cancelManualFollow}>
     <MapContainer center={[40.1, -3.55]} className="fleet-map" maxZoom={18} minZoom={5} zoom={6.5} zoomControl zoomSnap={0.5}>
       <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      <Pane name="risk-tokens" style={{ zIndex: 620 }} /><Pane name="fleet-trucks" style={{ zIndex: 640 }} /><Pane name="fleet-labels" style={{ zIndex: 660 }} /><Pane name="close-range-hazards" style={{ zIndex: 680 }} />
+      <Pane name="risk-tokens" style={{ zIndex: 620 }} /><Pane name="weather-effects" style={{ zIndex: 615 }} /><Pane name="fleet-trucks" style={{ zIndex: 640 }} /><Pane name="fleet-labels" style={{ zIndex: 660 }} /><Pane name="close-range-hazards" style={{ zIndex: 680 }} />
       <MapEvents coordinator={coordinator} /><MapFocus comparison={comparison} coordinator={coordinator} scenario={scenario} /><MapLayout coordinator={coordinator} signature={layoutSignature} />
       {layers.routes.filter((entry) => entry.route.id !== comparison?.current.id && entry.route.id !== comparison?.alternative.id).map((entry) => <Polyline key={`${entry.route.id}:${entry.state}`} {...routeStyle(entry)} noClip positions={routePositions(entry.route)} smoothFactor={0} />)}
       <RiskLayers entries={visibleRisks} locale={locale} />

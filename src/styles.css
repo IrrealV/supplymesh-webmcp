@@ -1077,3 +1077,79 @@ body { background: var(--chrome); }
   color: #8c6a4f;
   font-size: 14px;
 }
+
+/* --- LOCALIZED WEATHER EFFECTS --- */
+
+.weather-fx-container {
+  overflow: visible;
+  pointer-events: none;
+}
+
+.weather-fx-zone {
+  position: absolute;
+  top: -200px;
+  left: -200px;
+  width: 400px;
+  height: 400px;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 50%;
+  mask-image: radial-gradient(circle, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 70%);
+  -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 70%);
+}
+
+.weather-fx-heavy-rain {
+  background: repeating-linear-gradient(15deg, transparent, transparent 15px, rgba(150, 200, 255, 0.1) 16px, transparent 17px);
+  background-size: 100% 100%;
+  animation: rain-drop-anim 0.6s linear infinite;
+}
+
+@keyframes rain-drop-anim {
+  0% { background-position: 0 0; }
+  100% { background-position: -20px 200px; }
+}
+
+.weather-fx-severe-snow {
+  background-image: radial-gradient(2px 2px at 20px 30px, #ffffff, rgba(0,0,0,0)), radial-gradient(2px 2px at 40px 70px, #ffffff, rgba(0,0,0,0)), radial-gradient(2px 2px at 50px 160px, #ffffff, rgba(0,0,0,0)), radial-gradient(2px 2px at 90px 40px, #ffffff, rgba(0,0,0,0)), radial-gradient(2px 2px at 130px 80px, #ffffff, rgba(0,0,0,0)), radial-gradient(2px 2px at 160px 120px, #ffffff, rgba(0,0,0,0));
+  background-repeat: repeat;
+  background-size: 200px 200px;
+  animation: snow-flake-anim 4s linear infinite;
+  opacity: 0.8;
+}
+
+@keyframes snow-flake-anim {
+  0% { background-position: 0px 0px, 0px 0px, 0px 0px, 0px 0px, 0px 0px, 0px 0px; }
+  100% { background-position: 50px 200px, 30px 200px, 40px 200px, 60px 200px, 80px 200px, 70px 200px; }
+}
+
+.weather-fx-severe-storm {
+  background: repeating-linear-gradient(90deg, transparent, transparent 30px, rgba(200, 220, 255, 0.15) 35px, transparent 40px);
+  background-size: 200px 100%;
+  animation: storm-gust-anim 1s linear infinite;
+}
+
+@keyframes storm-gust-anim {
+  0% { background-position: 0 0; opacity: 0.3; }
+  50% { opacity: 0.8; }
+  100% { background-position: 400px 0; opacity: 0.3; }
+}
+
+.weather-fx-calima {
+  background: radial-gradient(circle, rgba(210, 150, 50, 0.4) 0%, rgba(210, 150, 50, 0.1) 60%, transparent 100%);
+  animation: calima-haze-anim 6s ease-in-out infinite alternate;
+  filter: blur(4px);
+}
+
+@keyframes calima-haze-anim {
+  0% { transform: scale(0.9) translate(-5px, 0); opacity: 0.7; }
+  100% { transform: scale(1.1) translate(5px, 0); opacity: 0.9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .weather-fx-heavy-rain,
+  .weather-fx-severe-snow,
+  .weather-fx-severe-storm,
+  .weather-fx-calima {
+    animation: none;
+  }
+}
