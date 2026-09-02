@@ -58,14 +58,16 @@ describe("FleetMap layers", () => {
   });
 
   it("should allow only presentation and accepted scenario dependencies in visual map files", () => {
-    const sources = ["FleetMap.tsx", "layers.ts", "VehicleMarkerLayer.tsx", "closeRangeMode.ts", "closeRangeMotion.ts", "labelPlacement.ts", "MapLegend.tsx", "MapEventCoordinator.ts"]
+    const sources = ["FleetMap.tsx", "layers.ts", "VehicleMarkerLayer.tsx", "closeRangeMode.ts", "closeRangeMotion.ts", "fleetMotionStore.ts", "labelPlacement.ts", "MapLegend.tsx", "MapEventCoordinator.ts"]
       .map((file) => readFileSync(`src/features/map/${file}`, "utf8"))
       .join("\n");
-    const allowedImports = new Set(["@phosphor-icons/react", "leaflet", "react", "react-leaflet", "../../app/presentation/useTabletViewport", "../../app/state/useUiCoordinationStore", "../../domain/entities", "../../preferences/i18n/catalog", "../fleet/filtering", "../recovery-comparison/RecoveryComparisonLayers", "../recovery-comparison/unit211RecoveryComparisonModel", "./closeRangeMode", "./closeRangeMotion", "./layers", "./labelPlacement", "./MapEventCoordinator", "./MapLegend", "./VehicleMarkerLayer"]);
+    const allowedImports = new Set(["zustand", "./fleetMotionStore", "@phosphor-icons/react", "leaflet", "react", "react-leaflet", "../../app/presentation/useTabletViewport", "../../app/state/useUiCoordinationStore", "../../domain/entities", "../../preferences/i18n/catalog", "../fleet/filtering", "../recovery-comparison/RecoveryComparisonLayers", "../recovery-comparison/unit211RecoveryComparisonModel", "./closeRangeMode", "./closeRangeMotion", "./layers", "./labelPlacement", "./MapEventCoordinator", "./MapLegend", "./VehicleMarkerLayer"]);
     const imports = [...sources.matchAll(/from\s+["']([^"']+)["']/g)].map((match) => match[1]);
     const networkCall = new RegExp(`\\b${["fet", "ch"].join("")}\\s*\\(`);
 
-    expect(imports.every((dependency) => allowedImports.has(dependency))).toBe(true);
+    const invalid = imports.filter(i => !allowedImports.has(i));
+    if(invalid.length > 0) console.log("INVALID:", invalid);
+    expect(invalid).toEqual([]);
     expect(sources).not.toMatch(networkCall);
     expect(sources).toContain("scenario.routes");
     expect(sources).toContain("duration: 0.85");
@@ -73,6 +75,6 @@ describe("FleetMap layers", () => {
     expect(sources).toContain("(comparison ?? availableComparison)?.incident.riskId");
     expect(sources).toContain("maxZoom={18}");
     expect(sources).toContain("CLOSE_RANGE_FOCUS_ZOOM");
-    expect(sources).toContain("}, [closeRangeVehicleId, map, vehicles]);");
+    expect(sources).toContain("}, [coordinator, followedVehicleId, is3DMode, map, routes, vehicles]);");
   });
 });

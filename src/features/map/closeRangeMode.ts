@@ -1,10 +1,8 @@
-export const CLOSE_RANGE_ZOOM_MIN = 15;
+export const CLOSE_RANGE_ZOOM_MIN = 14;
 export const CLOSE_RANGE_FOCUS_ZOOM = 15.5;
 
 type CloseRangeModeInput = Readonly<{
-  followedVehicleId: string;
   isWebGlAvailable: boolean;
-  selectedVehicleId: string;
   zoom: number;
 }>;
 
@@ -26,8 +24,6 @@ export function detectWebGlSupport(createCanvas: () => WebGlProbeCanvas = create
   }
 }
 
-export function resolveCloseRangeVehicleId(input: CloseRangeModeInput): string {
-  if (!input.isWebGlAvailable || input.zoom < CLOSE_RANGE_ZOOM_MIN) return "";
-  if (input.selectedVehicleId === "" || input.selectedVehicleId !== input.followedVehicleId) return "";
-  return input.selectedVehicleId;
+export function isCloseRangeModeActive(input: CloseRangeModeInput): boolean {
+  return input.isWebGlAvailable && input.zoom >= CLOSE_RANGE_ZOOM_MIN;
 }

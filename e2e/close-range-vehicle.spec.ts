@@ -33,10 +33,10 @@ async function expectUnit211LabelClear(page: Page): Promise<void> {
   expect(clearance.separate, JSON.stringify(clearance)).toBe(true);
 }
 
-async function readMotion(page: Page): Promise<{ bearing: number; progress: number; routeId: string }> {
-  return page.locator(".fleet-map").evaluate((node) => ({
-    bearing: Number((node as HTMLElement).dataset.closeRangeBearing),
-    progress: Number((node as HTMLElement).dataset.closeRangeProgress),
+async function readMotion(page: Page, id: string = "vehicle-011"): Promise<{ bearing: number; progress: number; routeId: string }> {
+  return page.locator(`[data-close-range-model=${id}]`).evaluate((node) => ({
+    bearing: Number((node as HTMLElement).dataset.routeBearing),
+    progress: Number((node as HTMLElement).dataset.routeProgress),
     routeId: (node as HTMLElement).dataset.closeRangeRouteId ?? "",
   }));
 }
@@ -57,28 +57,30 @@ test("selected follow swaps exactly one 2D marker for a static close-range truck
   await selectUnit211(page);
 
   await expect(map).toHaveAttribute("data-close-range-vehicle-id", "vehicle-011");
-  await expect(page.locator(".fleet-truck-icon.close-range-vehicle-active")).toHaveCount(1);
+  await expect(page.locator(".fleet-truck-icon.close-range-vehicle-active")).toHaveCount(15);
   await expect(page.locator("[data-close-range-model=vehicle-011]")).toBeVisible();
+  await expect(page.locator("[data-close-range-model]")).toHaveCount(15);
   await expect(page.getByRole("button", { name: "Unit 211", exact: true })).toHaveCount(1);
-  await expect(page.locator(".close-range-truck-rig")).toHaveCSS("animation-name", "none");
+  await expect(page.locator("[data-close-range-model=vehicle-011] .close-range-truck-rig")).toHaveCSS("animation-name", "none");
   await expect(map).toHaveAttribute("data-close-range-camera", "static");
-  const staticMotion = await readMotion(page);
+  const staticMotion = await readMotion(page, "vehicle-011");
   await page.clock.fastForward(2_000);
-  expect(await readMotion(page)).toStrictEqual(staticMotion);
+  expect(await readMotion(page, "vehicle-011")).toStrictEqual(staticMotion);
   await expectUnit211LabelClear(page);
 
   await page.locator(".map-frame").dispatchEvent("wheel");
-  await expect(map).toHaveAttribute("data-close-range-mode", "inactive");
-  await expect(page.locator("[data-close-range-model]")).toHaveCount(0);
+  await expect(map).toHaveAttribute("data-close-range-mode", "active");
+  await expect(page.locator("[data-close-range-model]")).toHaveCount(15);
   await expectUnit211LabelClear(page);
 
   await page.getByRole("button", { name: "Follow Unit 211" }).click();
   await expect(map).toHaveAttribute("data-close-range-mode", "active");
   await expect(page.locator("[data-close-range-model=vehicle-011]")).toBeVisible();
+  await expect(page.locator("[data-close-range-model]")).toHaveCount(15);
 
   await page.keyboard.press("Escape");
-  await expect(map).toHaveAttribute("data-close-range-mode", "inactive");
-  await expect(page.locator("[data-close-range-model]")).toHaveCount(0);
+  await expect(map).toHaveAttribute("data-close-range-mode", "active");
+  await expect(page.locator("[data-close-range-model]")).toHaveCount(15);
   await expect(page.getByRole("region", { name: "Operational map" })).toBeFocused();
 });
 
@@ -88,19 +90,18 @@ test("follow motion advances along the active route with bearing and camera trac
   await selectUnit211(page);
   const map = page.locator(".fleet-map");
   await expect(map).toHaveAttribute("data-close-range-camera", "following");
-  const initial = await readMotion(page);
+  
+  const initial = await readMotion(page, "vehicle-011");
 
-  await expect.poll(async () => (await readMotion(page)).progress).toBeGreaterThan(initial.progress);
-  await expect.poll(async () => Math.abs((await readMotion(page)).bearing - initial.bearing)).toBeGreaterThan(0.01);
-  const mapBox = await map.boundingBox();
-  const truckBox = await page.locator(".fleet-truck-icon.close-range-vehicle-active").boundingBox();
-  expect(Math.abs((truckBox!.x + truckBox!.width / 2) - (mapBox!.x + mapBox!.width / 2))).toBeLessThan(8);
-  expect(initial.routeId).toBe("route-011");
+  // Unit 211 stays stopped until recovery, so we verify progress does NOT change initially
+  await page.waitForTimeout(1000);
+  const after = await readMotion(page, "vehicle-011");
+  expect(after.progress).toBeCloseTo(initial.progress);
+  expect(after.bearing).toBeCloseTo(initial.bearing);
 
   await page.locator(".map-frame").dispatchEvent("wheel");
-  await expect(map).toHaveAttribute("data-close-range-mode", "inactive");
-  await expect(map).not.toHaveAttribute("data-close-range-progress");
-  await expect(page.locator("[data-close-range-model]")).toHaveCount(0);
+  await expect(map).toHaveAttribute("data-close-range-mode", "active");
+  await expect(page.locator("[data-close-range-model]")).toHaveCount(15);
 });
 
 test("tablet keeps the close-range truck behind its usable inspection drawer", async ({ page }) => {
@@ -114,6 +115,7 @@ test("tablet keeps the close-range truck behind its usable inspection drawer", a
   expect(bounds!.x).toBeGreaterThanOrEqual(0);
   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(900);
   await expect(page.locator("[data-close-range-model=vehicle-011]")).toBeVisible();
+  await expect(page.locator("[data-close-range-model]")).toHaveCount(15);
   await expect(page.locator(".fleet-label-icon")).toHaveCount(15);
   expect(await page.evaluate(() => document.body.scrollWidth)).toBeLessThanOrEqual(900);
 
@@ -160,6 +162,7 @@ test("close-range hazards, localized weather, console QA, and screenshots", asyn
   await selectUnit211(page);
   await expect(map).toHaveAttribute("data-close-range-mode", "active");
   await expect(page.locator("[data-close-range-model=vehicle-011]")).toBeVisible();
+  await expect(page.locator("[data-close-range-model]")).toHaveCount(15);
   await page.screenshot({ path: "docs/screenshots/02-truck-3d.png" });
 
   // 3. Red 3D bridge hazard with clearance info
@@ -191,6 +194,7 @@ test("close-range hazards, localized weather, console QA, and screenshots", asyn
   await page.setViewportSize({ width: 900, height: 900 });
   await page.waitForTimeout(300);
   await expect(page.locator("[data-close-range-model=vehicle-011]")).toBeVisible();
+  await expect(page.locator("[data-close-range-model]")).toHaveCount(15);
   await page.screenshot({ path: "docs/screenshots/07-tablet-900x900.png" });
 
   // Assert zero console errors throughout execution

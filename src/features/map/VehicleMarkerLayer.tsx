@@ -4,8 +4,9 @@ import { Marker, useMap } from "react-leaflet";
 import { useUiCoordinationStore } from "../../app/state/useUiCoordinationStore";
 import { getVehicleDisplayName, type Route } from "../../domain/entities";
 import { catalog, interpolate, type Locale } from "../../preferences/i18n/catalog";
-import { advanceRouteProgress, prepareRoutePath, resolveActiveRoute, sampleRoutePath, startFrameLoop } from "./closeRangeMotion";
-import { detectWebGlSupport, resolveCloseRangeVehicleId } from "./closeRangeMode";
+import { startFrameLoop } from "./closeRangeMotion";
+import { detectWebGlSupport, isCloseRangeModeActive } from "./closeRangeMode";
+import { useFleetMotionStore } from "./fleetMotionStore";
 import type { DerivedVehicle, LayerState } from "./layers";
 import { placeLabels, type ScreenRect } from "./labelPlacement";
 import type { MapEventCoordinator } from "./MapEventCoordinator";
@@ -45,17 +46,15 @@ export function VehicleMarkerLayer({ coordinator, locale, onSelect, routes, vehi
   const labelMarkers = useRef(new Map<string, LeafletMarker>());
   const truckMarkers = useRef(new Map<string, LeafletMarker>());
   const follow = useUiCoordinationStore((state) => state.follow);
-  const selection = useUiCoordinationStore((state) => state.selection);
   const [mapZoom, setMapZoom] = useState(() => map.getZoom());
   const [isWebGlAvailable] = useState(() => typeof window.WebGLRenderingContext !== "undefined" && detectWebGlSupport());
   const copy = catalog(locale);
   const suffix = locale === "es" ? { truck: "camion", label: "etiqueta" } : { truck: "truck", label: "label" };
-  const closeRangeVehicleId = resolveCloseRangeVehicleId({
-    followedVehicleId: follow.kind === "vehicle" ? follow.vehicleId : "",
-    isWebGlAvailable,
-    selectedVehicleId: selection.kind === "vehicle" ? selection.vehicleId : "",
-    zoom: mapZoom,
-  });
+  const is3DMode = isCloseRangeModeActive({ isWebGlAvailable, zoom: mapZoom });
+  const followedVehicleId = follow.kind === "vehicle" ? follow.vehicleId : "";
+  useEffect(() => {
+    useFleetMotionStore.getState().initialize(vehicles.map(v => v.vehicle), routes);
+  }, [vehicles, routes]);
   useEffect(() => {
     const container = map.getContainer();
     const syncZoom = (): void => {
@@ -69,16 +68,16 @@ export function VehicleMarkerLayer({ coordinator, locale, onSelect, routes, vehi
   }, [map]);
   useEffect(() => {
     const container = map.getContainer();
-    container.dataset.closeRangeMode = closeRangeVehicleId === "" ? "inactive" : "active";
+    container.dataset.closeRangeMode = is3DMode ? "active" : "inactive";
     container.dataset.closeRangeRenderer = isWebGlAvailable ? "css-3d" : "2d-fallback";
-    if (closeRangeVehicleId === "") delete container.dataset.closeRangeVehicleId;
-    else container.dataset.closeRangeVehicleId = closeRangeVehicleId;
+    if (!is3DMode) delete container.dataset.closeRangeVehicleId;
+    else if (followedVehicleId) container.dataset.closeRangeVehicleId = followedVehicleId;
     return () => {
       delete container.dataset.closeRangeMode;
       delete container.dataset.closeRangeRenderer;
       delete container.dataset.closeRangeVehicleId;
     };
-  }, [closeRangeVehicleId, isWebGlAvailable, map]);
+  }, [is3DMode, followedVehicleId, isWebGlAvailable, map]);
   useEffect(() => {
     let frame = 0;
     const place = (): void => {
@@ -97,55 +96,106 @@ export function VehicleMarkerLayer({ coordinator, locale, onSelect, routes, vehi
     };
     map.on("moveend zoomend resize", place); place();
     return () => { cancelAnimationFrame(frame); map.off("moveend zoomend resize", place); };
-  }, [closeRangeVehicleId, map, vehicles]);
+  }, [is3DMode, map, vehicles]);
   useEffect(() => {
-    if (closeRangeVehicleId === "") { return; }
-    const activeVehicle = vehicles.find(({ vehicle }) => vehicle.internalId === closeRangeVehicleId)?.vehicle;
-    const activeRoute = activeVehicle === undefined ? undefined : resolveActiveRoute(routes, activeVehicle.internalId, activeVehicle.routeId);
-    const truck = truckMarkers.current.get(closeRangeVehicleId); const label = labelMarkers.current.get(closeRangeVehicleId);
-    if (activeVehicle === undefined || activeRoute === undefined || truck === undefined || label === undefined) { return; }
-    const path = prepareRoutePath(activeRoute.geometry.geometry.coordinates);
-    const container = map.getContainer(); const model = container.querySelector<HTMLElement>("[data-close-range-model]");
-    const [authoritativeLongitude, authoritativeLatitude] = activeVehicle.position.geometry.coordinates;
-    let progress = activeVehicle.routeProgress; let previousTime = 0; let lastPanTime = Number.NEGATIVE_INFINITY;
+    let previousTime = 0; let lastPanTime = Number.NEGATIVE_INFINITY;
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
-    const renderFrame = (): [number, number] => {
-      const sample = sampleRoutePath(path, progress); const [longitude, latitude] = sample.coordinate;
-      truck.setLatLng([latitude, longitude]); label.setLatLng([latitude, longitude]);
-      const bearing = sample.bearing.toFixed(2); const renderedProgress = sample.progress.toFixed(6);
-      container.dataset.closeRangeBearing = bearing; container.dataset.closeRangeProgress = renderedProgress; container.dataset.closeRangeRouteId = activeRoute.id;
-      if (model !== null) { model.dataset.routeBearing = bearing; model.dataset.routeProgress = renderedProgress; model.style.setProperty("--close-range-bearing", `${sample.bearing - 63}deg`); }
-      return [latitude, longitude];
-    };
+    const container = map.getContainer();
+    
     const reset = (): void => {
-      truck.setLatLng([authoritativeLatitude, authoritativeLongitude]); label.setLatLng([authoritativeLatitude, authoritativeLongitude]);
-      delete container.dataset.closeRangeBearing; delete container.dataset.closeRangeProgress; delete container.dataset.closeRangeRouteId; delete container.dataset.closeRangeCamera;
-      if (model !== null) { delete model.dataset.routeBearing; delete model.dataset.routeProgress; model.style.removeProperty("--close-range-bearing"); }
+      vehicles.forEach(({ vehicle }) => {
+        const truck = truckMarkers.current.get(vehicle.internalId);
+        const label = labelMarkers.current.get(vehicle.internalId);
+        const [authoritativeLongitude, authoritativeLatitude] = vehicle.position.geometry.coordinates;
+        if (truck) truck.setLatLng([authoritativeLatitude, authoritativeLongitude]);
+        if (label) label.setLatLng([authoritativeLatitude, authoritativeLongitude]);
+        
+        const model = container.querySelector<HTMLElement>(`[data-close-range-model="${vehicle.internalId}"]`);
+        if (model) {
+          delete model.dataset.routeBearing;
+          delete model.dataset.routeProgress;
+          model.style.removeProperty("--close-range-bearing");
+        }
+      });
+      delete container.dataset.closeRangeCamera;
     };
-    renderFrame(); container.dataset.closeRangeCamera = reduceMotion ? "static" : "following";
-    if (reduceMotion) { return reset; }
-    const scheduler = { cancel: window.cancelAnimationFrame.bind(window), request: window.requestAnimationFrame.bind(window) };
+    
+    if (reduceMotion) {
+      container.dataset.closeRangeCamera = "static";
+      return reset;
+    }
+    
+    const scheduler = {
+      cancel: (id: number) => {
+        if (typeof window.cancelAnimationFrame === "function") {
+          window.cancelAnimationFrame(id);
+        } else {
+          clearTimeout(id);
+        }
+      },
+      request: (callback: FrameRequestCallback) => {
+        if (typeof window.requestAnimationFrame === "function") {
+          return window.requestAnimationFrame(callback);
+        }
+        return Number(setTimeout(() => callback(performance.now()), 16));
+      },
+    };
     const stop = startFrameLoop(scheduler, (time) => {
       if (document.hidden) { previousTime = 0; return; }
       const elapsed = previousTime === 0 ? 0 : Math.min(100, time - previousTime); previousTime = time;
-      progress = advanceRouteProgress(progress, elapsed, activeRoute.summary.distanceMeters, 24);
-      const position = renderFrame();
-      if (time - lastPanTime >= 120) {
-        coordinator.beginProgrammaticChange();
-        try { map.panTo(position, { animate: false }); } finally { coordinator.settleProgrammaticChange(); }
-        lastPanTime = time;
+      
+      const store = useFleetMotionStore.getState();
+      store.updateFrame(elapsed, routes, vehicles.map(v => v.vehicle));
+      const motions = store.motions;
+      
+      let followedPosition: [number, number] | null = null;
+      
+      vehicles.forEach(({ vehicle }) => {
+        const motion = motions[vehicle.internalId];
+        if (!motion) return;
+        const truck = truckMarkers.current.get(vehicle.internalId);
+        const label = labelMarkers.current.get(vehicle.internalId);
+        if (truck) truck.setLatLng([motion.latitude, motion.longitude]);
+        if (label) label.setLatLng([motion.latitude, motion.longitude]);
+        
+        const model = container.querySelector<HTMLElement>(`[data-close-range-model="${vehicle.internalId}"]`);
+        if (model && is3DMode) {
+          const bearing = motion.bearing.toFixed(2);
+          const renderedProgress = motion.progress.toFixed(6);
+          model.dataset.routeBearing = bearing;
+          model.dataset.routeProgress = renderedProgress;
+          model.dataset.routeId = motion.routeId;
+          model.style.setProperty("--close-range-bearing", `${motion.bearing - 63}deg`);
+          model.dataset.closeRangeRouteId = motion.routeId;
+        }
+        
+        if (followedVehicleId === vehicle.internalId) {
+          followedPosition = [motion.latitude, motion.longitude];
+        }
+      });
+      
+      if (followedPosition && followedVehicleId) {
+        container.dataset.closeRangeCamera = "following";
+        if (is3DMode && time - lastPanTime >= 120) {
+          coordinator.beginProgrammaticChange();
+          try { map.panTo(followedPosition, { animate: false }); } finally { coordinator.settleProgrammaticChange(); }
+          lastPanTime = time;
+        }
+      } else {
+        container.dataset.closeRangeCamera = "static";
       }
     });
-    const handleVisibility = (): void => { previousTime = 0; container.dataset.closeRangeCamera = document.hidden ? "paused" : "following"; };
+    
+    const handleVisibility = (): void => { previousTime = 0; if(document.hidden) container.dataset.closeRangeCamera = "paused"; };
     document.addEventListener("visibilitychange", handleVisibility);
-    return () => { stop(); document.removeEventListener("visibilitychange", handleVisibility); reset(); };
-  }, [closeRangeVehicleId, coordinator, locale, map, routes, vehicles]);
+    return () => { stop(); document.removeEventListener("visibilitychange", handleVisibility); };
+  }, [coordinator, followedVehicleId, is3DMode, map, routes, vehicles]);
 
   return vehicles.map(({ vehicle, state, zIndex }) => {
     const [longitude, latitude] = vehicle.position.geometry.coordinates;
     const displayName = getVehicleDisplayName(vehicle);
     const selectName = interpolate(copy.selectVehicle, { label: displayName });
-    const icons = createVehicleMarkerIcons(vehicle, state, vehicle.internalId === closeRangeVehicleId);
+    const icons = createVehicleMarkerIcons(vehicle, state, is3DMode);
     const eventHandlers = { click: () => onSelect(vehicle.internalId) };
     return <Fragment key={vehicle.internalId}>
       <Marker alt={displayName} eventHandlers={eventHandlers} icon={icons.truck} key={`truck:${vehicle.internalId}:${displayName}`} keyboard pane="fleet-trucks" position={[latitude, longitude]} ref={(marker) => { if (marker === null) truckMarkers.current.delete(vehicle.internalId); else truckMarkers.current.set(vehicle.internalId, marker); }} title={displayName} zIndexOffset={zIndex} />

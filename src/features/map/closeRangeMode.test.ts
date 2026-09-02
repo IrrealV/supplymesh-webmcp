@@ -1,24 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { CLOSE_RANGE_ZOOM_MIN, detectWebGlSupport, resolveCloseRangeVehicleId } from "./closeRangeMode";
+import { CLOSE_RANGE_ZOOM_MIN, detectWebGlSupport, isCloseRangeModeActive } from "./closeRangeMode";
 
-const activeVehicle = {
-  followedVehicleId: "vehicle-011",
+const activeInput = {
   isWebGlAvailable: true,
-  selectedVehicleId: "vehicle-011",
   zoom: CLOSE_RANGE_ZOOM_MIN,
 };
 
 describe("close range mode", () => {
-  it("should activate only for the same selected and followed vehicle at close zoom", () => {
-    expect(resolveCloseRangeVehicleId(activeVehicle)).toBe("vehicle-011");
+  it("should activate at close zoom with webgl", () => {
+    expect(isCloseRangeModeActive(activeInput)).toBe(true);
   });
 
   it.each([
     ["zoom is too far", { zoom: CLOSE_RANGE_ZOOM_MIN - 0.5 }],
-    ["another vehicle is followed", { followedVehicleId: "vehicle-004" }],
     ["WebGL is unavailable", { isWebGlAvailable: false }],
   ])("should remain 2D when %s", (_reason, overrides) => {
-    expect(resolveCloseRangeVehicleId({ ...activeVehicle, ...overrides })).toBe("");
+    expect(isCloseRangeModeActive({ ...activeInput, ...overrides })).toBe(false);
   });
 
   it("should probe WebGL without retaining or attaching the probe canvas", () => {
