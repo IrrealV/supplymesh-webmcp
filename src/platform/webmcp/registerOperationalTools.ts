@@ -1,4 +1,4 @@
-import type { DomainResult, OperatingRegion, VehicleAssignRouteCommand, VehicleCreateCommand, VehicleUpdateCommand } from "../../domain/entities";
+import type { Cargo, Dimensions, DomainResult, OperatingRegion, VehicleAssignRouteCommand, VehicleCreateCommand, VehicleUpdateCommand } from "../../domain/entities";
 import type { OperationsApi } from "../../domain/operations/createOperationsApi";
 import type { JsonSchema, WebMcpTool, WebMcpToolResponse } from "./webMcpTypes";
 
@@ -8,6 +8,29 @@ const emptyInputSchema: JsonSchema = { type: "object", properties: {}, additiona
 const vehicleGetInputSchema: JsonSchema = { type: "object", properties: { vehicleId: { type: "string", minLength: 1 } }, required: ["vehicleId"], additionalProperties: false };
 const vehicleRenameInputSchema: JsonSchema = { type: "object", properties: { vehicleId: { type: "string", minLength: 1 }, label: { type: "string", minLength: 1 } }, required: ["vehicleId", "label"], additionalProperties: false };
 
+const cargoInputSchema: JsonSchema = {
+  type: "object",
+  properties: {
+    description: { type: "string", minLength: 1 },
+    refrigeration: { type: "string", enum: ["ambient", "chilled", "frozen"] },
+    priority: { type: "string", enum: ["standard", "priority", "critical"] },
+  },
+  required: ["description", "refrigeration", "priority"],
+  additionalProperties: false,
+};
+
+const dimensionsInputSchema: JsonSchema = {
+  type: "object",
+  properties: {
+    vehicleType: { type: "string", minLength: 1 },
+    lengthMeters: { type: "number", minimum: 0 },
+    heightMeters: { type: "number", minimum: 0 },
+    weightTonnes: { type: "number", minimum: 0 },
+  },
+  required: ["vehicleType", "lengthMeters", "heightMeters", "weightTonnes"],
+  additionalProperties: false,
+};
+
 const vehicleCreateInputSchema: JsonSchema = {
   type: "object",
   properties: {
@@ -15,24 +38,10 @@ const vehicleCreateInputSchema: JsonSchema = {
     plate: { type: "string", minLength: 1 },
     label: { type: "string" },
     routeId: { type: "string" },
-    cargo: {
-      type: "object",
-      properties: {
-        description: { type: "string" },
-        weightKg: { type: "number" },
-        type: { type: "string", enum: ["ambient", "chilled", "frozen"] },
-      },
-    },
-    dimensions: {
-      type: "object",
-      properties: {
-        heightMeters: { type: "number" },
-        widthMeters: { type: "number" },
-        lengthMeters: { type: "number" },
-      },
-    },
+    dimensions: dimensionsInputSchema,
+    cargo: cargoInputSchema,
   },
-  required: ["fleetNumber", "plate"],
+  required: ["fleetNumber", "plate", "dimensions", "cargo"],
   additionalProperties: false,
 };
 
@@ -40,24 +49,10 @@ const vehicleUpdateInputSchema: JsonSchema = {
   type: "object",
   properties: {
     vehicleId: { type: "string", minLength: 1 },
-    plate: { type: "string" },
+    plate: { type: "string", minLength: 1 },
     label: { type: "string" },
-    cargo: {
-      type: "object",
-      properties: {
-        description: { type: "string" },
-        weightKg: { type: "number" },
-        type: { type: "string", enum: ["ambient", "chilled", "frozen"] },
-      },
-    },
-    dimensions: {
-      type: "object",
-      properties: {
-        heightMeters: { type: "number" },
-        widthMeters: { type: "number" },
-        lengthMeters: { type: "number" },
-      },
-    },
+    dimensions: dimensionsInputSchema,
+    cargo: cargoInputSchema,
   },
   required: ["vehicleId"],
   additionalProperties: false,
@@ -89,6 +84,37 @@ function hasExactKeys(value: Record<string, unknown>, keys: string[]): boolean {
   return Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 }
 
+function hasOnlyAllowedKeys(value: Record<string, unknown>, allowedKeys: string[]): boolean {
+  const allowed = new Set(allowedKeys);
+  return Object.keys(value).every((key) => allowed.has(key));
+}
+
+const REFRIGERATION_VALUES = new Set(["ambient", "chilled", "frozen"]);
+const PRIORITY_VALUES = new Set(["standard", "priority", "critical"]);
+
+function isFinitePositive(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+function isCargoInput(input: unknown): input is Omit<Cargo, "id"> {
+  if (!isRecord(input)) return false;
+  if (!hasOnlyAllowedKeys(input, ["description", "refrigeration", "priority"])) return false;
+  if (typeof input.description !== "string" || input.description.trim().length === 0) return false;
+  if (typeof input.refrigeration !== "string" || !REFRIGERATION_VALUES.has(input.refrigeration)) return false;
+  if (typeof input.priority !== "string" || !PRIORITY_VALUES.has(input.priority)) return false;
+  return true;
+}
+
+function isDimensionsInput(input: unknown): input is Dimensions {
+  if (!isRecord(input)) return false;
+  if (!hasOnlyAllowedKeys(input, ["vehicleType", "lengthMeters", "heightMeters", "weightTonnes"])) return false;
+  if (typeof input.vehicleType !== "string" || input.vehicleType.trim().length === 0) return false;
+  if (!isFinitePositive(input.lengthMeters) || input.lengthMeters > 50) return false;
+  if (!isFinitePositive(input.heightMeters) || input.heightMeters > 10) return false;
+  if (!isFinitePositive(input.weightTonnes) || input.weightTonnes > 200) return false;
+  return true;
+}
+
 function isEmptyInput(input: unknown): boolean {
   return isRecord(input) && hasExactKeys(input, []);
 }
@@ -103,27 +129,30 @@ function isVehicleRenameInput(input: unknown): input is { vehicleId: string; lab
 
 function isVehicleCreateInput(input: unknown): input is VehicleCreateCommand {
   if (!isRecord(input)) return false;
+  if (!hasOnlyAllowedKeys(input, ["fleetNumber", "plate", "label", "routeId", "dimensions", "cargo"])) return false;
   if (typeof input.fleetNumber !== "string" || input.fleetNumber.trim().length === 0) return false;
   if (typeof input.plate !== "string" || input.plate.trim().length === 0) return false;
-  if (input.label !== undefined && typeof input.label !== "string") return false;
+  if (input.label !== undefined && (typeof input.label !== "string" || input.label.trim().length === 0)) return false;
   if (input.routeId !== undefined && typeof input.routeId !== "string") return false;
-  if (input.dimensions !== undefined && !isRecord(input.dimensions)) return false;
-  if (input.cargo !== undefined && !isRecord(input.cargo)) return false;
+  if (!isDimensionsInput(input.dimensions)) return false;
+  if (!isCargoInput(input.cargo)) return false;
   return true;
 }
 
 function isVehicleUpdateInput(input: unknown): input is VehicleUpdateCommand {
   if (!isRecord(input)) return false;
+  if (!hasOnlyAllowedKeys(input, ["vehicleId", "plate", "label", "dimensions", "cargo"])) return false;
   if (typeof input.vehicleId !== "string" || input.vehicleId.trim().length === 0) return false;
-  if (input.plate !== undefined && typeof input.plate !== "string") return false;
-  if (input.label !== undefined && typeof input.label !== "string") return false;
-  if (input.dimensions !== undefined && !isRecord(input.dimensions)) return false;
-  if (input.cargo !== undefined && !isRecord(input.cargo)) return false;
+  if (input.plate !== undefined && (typeof input.plate !== "string" || input.plate.trim().length === 0)) return false;
+  if (input.label !== undefined && (typeof input.label !== "string" || input.label.trim().length === 0)) return false;
+  if (input.dimensions !== undefined && !isDimensionsInput(input.dimensions)) return false;
+  if (input.cargo !== undefined && !isCargoInput(input.cargo)) return false;
   return true;
 }
 
 function isVehicleAssignRouteInput(input: unknown): input is VehicleAssignRouteCommand {
   if (!isRecord(input)) return false;
+  if (!hasOnlyAllowedKeys(input, ["vehicleId", "routeId"])) return false;
   if (typeof input.vehicleId !== "string" || input.vehicleId.trim().length === 0) return false;
   if (input.routeId !== undefined && typeof input.routeId !== "string") return false;
   return true;

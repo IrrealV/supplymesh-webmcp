@@ -1,36 +1,101 @@
 # SupplyMesh
 
-SupplyMesh is a provisional name for a deterministic, map-first fleet operations console for the OpenAI WebMCP Challenge. Phase 1 is implemented, independently verified, and archived. Phase 1.1 is an active chained redesign and is not merged to `main`.
+SupplyMesh is a deterministic, map-first fleet operations console built with React 19, Leaflet, and the W3C/OpenAI WebMCP standard. It combines client-side authoritative fleet coordination, recovery planning, 3D close-range inspection, and native browser tool execution.
 
-Final verification verdict: **PASS WITH WARNINGS** — 18/18 requirements, 37/37 scenarios, and 17/17 tasks, with zero blockers or CRITICAL findings. The local WebMCP seam, production capability gate, 32 Vitest tests, 4 Playwright tests, lint, typecheck, and builds passed.
+---
 
-Phase 1.1 release evidence on `test/phase1-1-release-evidence` is **PASS**: all 58 scenarios, 82 Vitest tests, eight Playwright checks, six reviewed screenshots, and genuine native WebMCP validation passed. The active change is 19/19 tasks complete, but remains an unmerged chained candidate; no merge or release is claimed. See [the visual evidence verdict](docs/evidence/phase1-1/visual-comparison.md).
+## Core Capabilities
 
-## Run locally
+### 1. Authoritative Recovery Workflow
+- **Pre-Dispatch Context**: Detects vertical clearance violations (e.g. Unit 211 / FM-211 clearance incident: 3.90 m restriction vs 4.00 m required clearance).
+- **Alternative Route Comparison**: Deterministic geometric and temporal evaluation between the current blocked corridor and the clearance alternative.
+- **Exclusively Human Approval**: Agents can compare and stage candidate plans (`recovery_plan_stage`), but plan approval (`recoveryHuman.approvePlan`) and mutation execution (`recoveryExecution.executePlan`) are strictly reserved for human operators. Agent-asserted execution facts are rejected.
+- **Audited Execution & Receipt Lineage**: Cryptographic digest checks, singleton route-vehicle bindings, and CAS revision verification emit an immutable receipt upon successful recovery.
+
+### 2. Fleet Edit & Operational Tools
+- **11 Native WebMCP Tools**:
+  - **Operational**: `scenario_current`, `fleet_status`, `vehicle_get`, `vehicle_rename`, `fleet_vehicle_create`, `fleet_vehicle_update`, `fleet_vehicle_assign_route`, `fleet_vehicle_delete`.
+  - **Recovery**: `recovery_operations_context`, `recovery_options_compare`, `recovery_plan_stage`.
+- **Strict Domain Validation**: Full runtime validation for `cargo` (`description`, `refrigeration` enum, `priority` enum) and `dimensions` (`vehicleType`, finite positive `lengthMeters`, `heightMeters`, `weightTonnes`), with `additionalProperties: false`.
+- **Deterministic Time & Geometry**: Avoids `Date.now()`; derives timing from the scenario clock (`2026-08-28T09:00:00.000Z`). Destination position defaults to the route's terminal coordinate.
+- **Route Ownership Persistence**: Reassigning or unassigning a route synchronizes `Route.vehicleId` across the scenario and persists in browser `localStorage`. Selecting any newly created or reassigned vehicle immediately highlights its active corridor.
+
+### 3. Close Range Operational Mode
+- **Zoom-Driven 2D/3D Transition**: At overview zoom levels (`zoom < 14.5`), vehicles render as high-contrast 2D pins. At close range (`zoom >= 14.5`), vehicles transition into 3D volumetric truck models with accurate heading bearing along the route tangent.
+- **Follow Camera Decoupling**: Selection focuses and tracks the vehicle, but user map interaction (drag, pan, zoom) gracefully pauses camera follow without dropping 3D rendering.
+- **Physical Hazards in 3D**:
+  - **Authoritative Red Bridge Hazard**: Rendered at coordinate `[-3.897481, 40.149232]` on `route-011`, displaying clearance comparison (`4.00 m required · 3.90 m available`).
+  - **Road Closure**: Striped barricade visual on blocked segments (AP-68).
+  - **Landslide**: Lightweight rock/debris scatter in mountain corridors.
+
+### 4. Localized Weather Hazards
+- Geographically bound weather overlays strictly confined to risk polygon boundaries (never covering the whole viewport, and hidden at `zoom < 8`):
+  - **Heavy Rain**: Galicia corridor.
+  - **Severe Snow**: León mountain pass.
+  - **Severe Wind & Storm**: Valle del Ebro corridor.
+  - **Calima / Dust Haze**: Andalusian corridor.
+- Deterministic synthetic demo data with zero live external meteorological dependencies.
+- Full `prefers-reduced-motion` compliance.
+
+### 5. DEV Mode vs. Production Capability Gate
+- **DEV Mode (`import.meta.env.DEV`)**: When running in development without a WebMCP-enabled browser, SupplyMesh enters simulation mode with a warning banner, registering tools to `window.__recoveryTools` for local evaluation in any standard browser.
+- **Production Gate (`import.meta.env.PROD`)**: Production builds strictly enforce the WebMCP capability gate (`document.modelContext`). Unauthenticated or non-WebMCP environments are blocked.
+
+---
+
+## Verification & Test Metrics
+
+SupplyMesh enforces strict verification gates across all tiers:
+
+| Suite | Scope | Status |
+| :--- | :--- | :--- |
+| **ESLint** | Source & test linting | **0 errors, 0 warnings** |
+| **TypeScript** | Strict compiler typecheck (`tsc -b`) | **0 errors** |
+| **Vitest** | Unit & domain capabilities | **35 / 35 test files passed (364 / 364 tests)** |
+| **Playwright** | End-to-end user workflows | **19 / 19 passed** |
+| **WebMCP Native** | Real browser tool execution | **11 registered tools, clean 11→0 unload, signal isolation verified** |
+| **Route Verifier** | Offline ORS routes | **15 routes verified (45,577 coordinates, revision `16e9952c...`)** |
+| **Clearance Verifier**| Authoritative alternative route | **1 alternative verified (743 coordinates, revision `688161cb...`)** |
+
+---
+
+## Commands
 
 ```sh
+# Install dependencies
 bun install
+
+# Start development server
 bun run dev
-```
 
-## Quality commands
-
-```sh
-bun run lint
-bun run typecheck
-bun run test
-bun run build
+# Run quality checks (lint + typecheck + vitest + build)
 bun run check
+
+# Run end-to-end browser tests
+bun run test:e2e
+
+# Run genuine native WebMCP verification (requires preview server on port 4173)
+bun run webmcp:verify-native
+
+# Verify offline route catalogs
+bun run routes:verify
+bun run routes:clearance:verify
+
+# Build production bundle
+bun run build
 ```
 
-## Development environment
+---
 
-Copy `.env.example` to `.env.local` only for local development. Set `VITE_WEBMCP_LOCAL_BYPASS=true` when the local browser does not provide WebMCP and you need to exercise the console UI. The application accepts this bypass only when `import.meta.env.DEV` is true; a production build always requires the WebMCP capability gate. No secrets belong in this repository.
+## Limitations & Boundaries
 
-## Product boundary
+- **Operating Region**: Focused strictly on the Iberian corridor (`spain-v1`). Fictional straight-line regional routes (France/Germany) have been eliminated to uphold operational data truth until real ORS road networks are computed.
+- **Authoritative Recovery**: Automated agents can explore context, compare alternatives, and stage plans, but execution requires human authorization.
+- **Persistence**: Operational state changes are persisted locally in browser `localStorage`.
+- **WebMCP Native Support**: Requires a browser supporting the WebMCP specification (e.g. Chromium with `--enable-features=WebMCP`), or the DEV simulation mode during local development.
 
-The console uses deterministic offline fixtures, React, and a minimal WebMCP bridge backed by the same application operations. Phase 1 exposes exactly four WebMCP tools: `scenario_current`, `fleet_status`, `vehicle_get`, and `vehicle_rename`.
+---
 
-Fleet Edit Mode, vehicle creation, route assignment, `create_vehicle`, and `assign_route` remain unavailable Phase 2 work. [Genuine native WebMCP validation](docs/webmcp-native-validation.md) succeeded in system Chromium 151.0.7922.169 with the official `--enable-features=WebMCP` flag and no polyfill, mock, local seam, route interception, init script, or bypass. This validates the native integration under the feature flag; it does not claim that ordinary Chromium enables WebMCP by default.
+## License
 
-See [the product contract](docs/product-spec.md), [UI contract](docs/ui-spec.md), and [architecture](docs/architecture.md). Licensed under [MIT](LICENSE).
+MIT

@@ -77,4 +77,18 @@ describe("FleetMap layers", () => {
     expect(sources).toContain("CLOSE_RANGE_FOCUS_ZOOM");
     expect(sources).toContain("}, [coordinator, followedVehicleId, is3DMode, map, routes, vehicles]);");
   });
+
+  it("should bind 3D bridge hazard strictly to route-011 authoritative snap and prevent routeSnaps[0] regression", () => {
+    const scenario = createSpainScenario();
+    const heightRisk = scenario.risks.find((r) => r.id === "restriction-height-3.9");
+    expect(heightRisk).toBeDefined();
+
+    const route011Snap = heightRisk?.routeSnaps?.find((snap) => snap.routeId === "route-011");
+    expect(route011Snap).toBeDefined();
+    expect(route011Snap?.startCoordinate).toStrictEqual([-3.897481, 40.149232]);
+
+    const mapSource = readFileSync("src/features/map/FleetMap.tsx", "utf8");
+    expect(mapSource).toContain('heightRisk?.routeSnaps?.find((snap) => snap.routeId === "route-011")');
+    expect(mapSource).not.toContain("heightRisk?.routeSnaps?.[0]");
+  });
 });

@@ -172,7 +172,7 @@ function routeStyle({ state }: DerivedRoute) {
 function CloseRangeBridgeHazard({ scenario }: { scenario: OperatingRegion }) {
   const map = useMap();
   const heightRisk = scenario.risks.find((r) => r.id === "restriction-height-3.9");
-  const routeSnap = heightRisk?.routeSnaps?.[0];
+  const routeSnap = heightRisk?.routeSnaps?.find((snap) => snap.routeId === "route-011");
   const [isModeActive, setIsModeActive] = useState(() => map.getContainer().dataset.closeRangeMode === "active");
 
   useEffect(() => {

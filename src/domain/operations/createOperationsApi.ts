@@ -78,9 +78,10 @@ export function createOperationsApi(repository: ScenarioRepository, options?: Op
       }
 
       const scenario = repository.scenarioCurrent();
-      let startCoords: Coordinates = [-3.7038, 40.4168]; // Hub Central Madrid
-      let originName = "Madrid Logistics Hub";
-      let destName = "Madrid Logistics Hub";
+      let startCoords: Coordinates = [-3.7038, 40.4168];
+      let endCoords: Coordinates = [-3.7038, 40.4168];
+      let originName = "Madrid Reserve";
+      let destName = "Madrid Reserve";
       let status: Vehicle["status"] = "resting";
       let assignedRouteId = "";
 
@@ -94,12 +95,14 @@ export function createOperationsApi(repository: ScenarioRepository, options?: Op
           return failure("route-already-assigned", `Route '${command.routeId}' is already assigned to vehicle ${existingWithRoute.fleetNumber || existingWithRoute.internalId}.`);
         }
         startCoords = route.geometry.geometry.coordinates[0] as Coordinates;
+        endCoords = (route.geometry.geometry.coordinates[route.geometry.geometry.coordinates.length - 1] ?? startCoords) as Coordinates;
         originName = route.name.split("→")[0]?.trim() || "Origin";
         destName = route.name.split("→")[1]?.trim() || "Destination";
         status = "driving";
         assignedRouteId = command.routeId;
       }
 
+      const DEMO_CLOCK_EPOCH_MS = Date.parse("2026-08-28T09:00:00.000Z");
       const internalId = `vehicle-${crypto.randomUUID().slice(0, 8)}`;
       const newVehicle: Vehicle = {
         internalId,
@@ -122,12 +125,12 @@ export function createOperationsApi(repository: ScenarioRepository, options?: Op
         },
         timing: {
           remainingDriveMinutes: status === "driving" ? 240 : 0,
-          restDeadline: new Date(Date.now() + 4.5 * 3600 * 1000).toISOString(),
-          eta: new Date(Date.now() + 3.5 * 3600 * 1000).toISOString(),
+          restDeadline: new Date(DEMO_CLOCK_EPOCH_MS + 4.5 * 3600 * 1000).toISOString(),
+          eta: new Date(DEMO_CLOCK_EPOCH_MS + 3.5 * 3600 * 1000).toISOString(),
           delayMinutes: 0,
         },
         origin: { id: `origin-${internalId}`, name: originName, position: geoPoint(startCoords) },
-        destination: { id: `dest-${internalId}`, name: destName, position: geoPoint(startCoords) },
+        destination: { id: `dest-${internalId}`, name: destName, position: geoPoint(endCoords) },
         currentRoute: assignedRouteId,
         routeId: assignedRouteId,
         routeProgress: 0,
@@ -178,12 +181,17 @@ export function createOperationsApi(repository: ScenarioRepository, options?: Op
           return failure("route-already-assigned", `Route '${command.routeId}' is already assigned to vehicle ${existingWithRoute.fleetNumber || existingWithRoute.internalId}.`);
         }
         const startCoords = route.geometry.geometry.coordinates[0] as Coordinates;
+        const endCoords = (route.geometry.geometry.coordinates[route.geometry.geometry.coordinates.length - 1] ?? startCoords) as Coordinates;
+        const originName = route.name.split("→")[0]?.trim() || existing.origin.name;
+        const destName = route.name.split("→")[1]?.trim() || existing.destination.name;
         const updates: Partial<Vehicle> = {
           routeId: command.routeId,
           currentRoute: command.routeId,
           routeProgress: 0,
           status: "driving",
           position: geoPoint(startCoords),
+          origin: { id: `origin-${command.vehicleId}`, name: originName, position: geoPoint(startCoords) },
+          destination: { id: `dest-${command.vehicleId}`, name: destName, position: geoPoint(endCoords) },
           speedKmH: 78,
         };
         repository.vehicleUpdate(command.vehicleId, updates);

@@ -82,10 +82,10 @@ export type VehicleCreateCommand = {
 };
 export type VehicleUpdateCommand = {
   vehicleId: string;
-  plate: string;
-  label: string;
-  dimensions: Dimensions;
-  cargo: Omit<Cargo, "id">;
+  plate?: string;
+  label?: string;
+  dimensions?: Dimensions;
+  cargo?: Omit<Cargo, "id">;
 };
 export type VehicleAssignRouteCommand = {
   vehicleId: string;

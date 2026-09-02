@@ -84,8 +84,8 @@ describe("createOperationalTools", () => {
       fleetNumber: "Unit 999",
       plate: "9999-XYZ",
       label: "Support Unit",
-      dimensions: { heightMeters: 3.8, widthMeters: 2.5, lengthMeters: 16.0 },
-      cargo: { description: "Spare parts", weightKg: 5000, type: "ambient" },
+      dimensions: { vehicleType: "Articulated curtain-sider", heightMeters: 3.8, lengthMeters: 16.0, weightTonnes: 24 },
+      cargo: { description: "Spare parts", refrigeration: "ambient", priority: "standard" },
     });
     expect(createResult.ok).toBe(true);
     if (!createResult.ok) return;
@@ -102,7 +102,7 @@ describe("createOperationalTools", () => {
     const updateResult = await toolResult<Vehicle>(updateTool, {
       vehicleId: createdVehicle.internalId,
       label: "Updated Support Unit",
-      dimensions: { heightMeters: 4.0, widthMeters: 2.55, lengthMeters: 16.5 },
+      dimensions: { vehicleType: "Articulated curtain-sider", heightMeters: 4.0, lengthMeters: 16.5, weightTonnes: 26 },
     });
     expect(updateResult.ok).toBe(true);
     if (!updateResult.ok) return;
@@ -131,16 +131,51 @@ describe("createOperationalTools", () => {
     const tools = createOperationalTools(failingOperations());
     const vehicleGet = tools.find((tool) => tool.name === "vehicle_get")!;
     const createTool = tools.find((tool) => tool.name === "fleet_vehicle_create")!;
+    const updateTool = tools.find((tool) => tool.name === "fleet_vehicle_update")!;
     const scenarioCurrent = tools.find((tool) => tool.name === "scenario_current")!;
 
+    // Rejects empty vehicleId
     expect(await toolResult(vehicleGet, { vehicleId: "", unexpected: true })).toStrictEqual({
       ok: false,
       error: { code: "invalid-input", message: "The tool input is invalid." },
     });
 
+    // Rejects missing required fields
     expect(await toolResult(createTool, { fleetNumber: "" })).toStrictEqual({
       ok: false,
       error: { code: "invalid-input", message: "The tool input is invalid. Provide valid fleetNumber and plate." },
+    });
+
+    // Rejects additional properties
+    expect(await toolResult(createTool, {
+      fleetNumber: "Unit 123",
+      plate: "1234-ABC",
+      dimensions: { vehicleType: "Semi", heightMeters: 4, lengthMeters: 16, weightTonnes: 20 },
+      cargo: { description: "Goods", refrigeration: "ambient", priority: "standard" },
+      unexpectedProp: "leak",
+    })).toStrictEqual({
+      ok: false,
+      error: { code: "invalid-input", message: "The tool input is invalid. Provide valid fleetNumber and plate." },
+    });
+
+    // Rejects invalid enums
+    expect(await toolResult(createTool, {
+      fleetNumber: "Unit 123",
+      plate: "1234-ABC",
+      dimensions: { vehicleType: "Semi", heightMeters: 4, lengthMeters: 16, weightTonnes: 20 },
+      cargo: { description: "Goods", refrigeration: "solar-powered", priority: "standard" },
+    })).toStrictEqual({
+      ok: false,
+      error: { code: "invalid-input", message: "The tool input is invalid. Provide valid fleetNumber and plate." },
+    });
+
+    // Rejects negative numbers
+    expect(await toolResult(updateTool, {
+      vehicleId: "vehicle-001",
+      dimensions: { vehicleType: "Semi", heightMeters: -1, lengthMeters: 16, weightTonnes: 20 },
+    })).toStrictEqual({
+      ok: false,
+      error: { code: "invalid-input", message: "The tool input is invalid. Provide valid vehicleId." },
     });
 
     const result = await toolResult(scenarioCurrent, {});

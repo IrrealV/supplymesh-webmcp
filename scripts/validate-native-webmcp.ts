@@ -98,6 +98,92 @@ try {
   assert(isDeepStrictEqual(schemas.recovery_operations_context, { type: "object", properties: {}, additionalProperties: false }), `recovery_operations_context schema changed: ${JSON.stringify(schemas.recovery_operations_context)}`);
   assert(isDeepStrictEqual(schemas.recovery_options_compare, { type: "object", properties: {}, additionalProperties: false }), `recovery_options_compare schema changed: ${JSON.stringify(schemas.recovery_options_compare)}`);
   assert(isDeepStrictEqual(schemas.recovery_plan_stage, { type: "object", properties: { selectedOptionId: { type: "string", minLength: 1 } }, required: ["selectedOptionId"], additionalProperties: false }), `recovery_plan_stage schema changed: ${JSON.stringify(schemas.recovery_plan_stage)}`);
+
+  // Verify the 4 CRUD schemas
+  assert(isDeepStrictEqual(schemas.fleet_vehicle_create, {
+    type: "object",
+    properties: {
+      fleetNumber: { type: "string", minLength: 1 },
+      plate: { type: "string", minLength: 1 },
+      label: { type: "string" },
+      routeId: { type: "string" },
+      dimensions: {
+        type: "object",
+        properties: {
+          vehicleType: { type: "string", minLength: 1 },
+          lengthMeters: { type: "number", minimum: 0 },
+          heightMeters: { type: "number", minimum: 0 },
+          weightTonnes: { type: "number", minimum: 0 },
+        },
+        required: ["vehicleType", "lengthMeters", "heightMeters", "weightTonnes"],
+        additionalProperties: false,
+      },
+      cargo: {
+        type: "object",
+        properties: {
+          description: { type: "string", minLength: 1 },
+          refrigeration: { type: "string", enum: ["ambient", "chilled", "frozen"] },
+          priority: { type: "string", enum: ["standard", "priority", "critical"] },
+        },
+        required: ["description", "refrigeration", "priority"],
+        additionalProperties: false,
+      },
+    },
+    required: ["fleetNumber", "plate", "dimensions", "cargo"],
+    additionalProperties: false,
+  }), `fleet_vehicle_create schema changed: ${JSON.stringify(schemas.fleet_vehicle_create)}`);
+
+  assert(isDeepStrictEqual(schemas.fleet_vehicle_update, {
+    type: "object",
+    properties: {
+      vehicleId: { type: "string", minLength: 1 },
+      plate: { type: "string", minLength: 1 },
+      label: { type: "string" },
+      dimensions: {
+        type: "object",
+        properties: {
+          vehicleType: { type: "string", minLength: 1 },
+          lengthMeters: { type: "number", minimum: 0 },
+          heightMeters: { type: "number", minimum: 0 },
+          weightTonnes: { type: "number", minimum: 0 },
+        },
+        required: ["vehicleType", "lengthMeters", "heightMeters", "weightTonnes"],
+        additionalProperties: false,
+      },
+      cargo: {
+        type: "object",
+        properties: {
+          description: { type: "string", minLength: 1 },
+          refrigeration: { type: "string", enum: ["ambient", "chilled", "frozen"] },
+          priority: { type: "string", enum: ["standard", "priority", "critical"] },
+        },
+        required: ["description", "refrigeration", "priority"],
+        additionalProperties: false,
+      },
+    },
+    required: ["vehicleId"],
+    additionalProperties: false,
+  }), `fleet_vehicle_update schema changed: ${JSON.stringify(schemas.fleet_vehicle_update)}`);
+
+  assert(isDeepStrictEqual(schemas.fleet_vehicle_assign_route, {
+    type: "object",
+    properties: {
+      vehicleId: { type: "string", minLength: 1 },
+      routeId: { type: "string" },
+    },
+    required: ["vehicleId"],
+    additionalProperties: false,
+  }), `fleet_vehicle_assign_route schema changed: ${JSON.stringify(schemas.fleet_vehicle_assign_route)}`);
+
+  assert(isDeepStrictEqual(schemas.fleet_vehicle_delete, {
+    type: "object",
+    properties: {
+      vehicleId: { type: "string", minLength: 1 },
+    },
+    required: ["vehicleId"],
+    additionalProperties: false,
+  }), `fleet_vehicle_delete schema changed: ${JSON.stringify(schemas.fleet_vehicle_delete)}`);
+
   const signalIsolation = await verifySignalIsolation(page);
   assert(signalIsolation.leftRetired && signalIsolation.rightSurvived && signalIsolation.rightRetired, `Native AbortSignal isolation failed: ${JSON.stringify(signalIsolation)}`);
   console.log(JSON.stringify({ nativeSignalIsolation: signalIsolation }));
@@ -115,6 +201,58 @@ try {
   assert(JSON.stringify(invalid).includes('"code":"invalid-label"'), "Native invalid-label result was not structured.");
   await execute(page, "vehicle_rename", { vehicleId: "vehicle-002", label: original.data.label });
   await page.getByRole("button", { exact: true, name: original.data.label }).waitFor();
+
+  // Native CRUD Lifecycle with UI & State parity
+  const createResult = await execute(page, "fleet_vehicle_create", {
+    fleetNumber: "FM-900",
+    plate: "9000-NVT",
+    label: "Native Vehicle Unit",
+    dimensions: { vehicleType: "Semi-trailer", heightMeters: 4.0, lengthMeters: 16.5, weightTonnes: 32 },
+    cargo: { description: "High-value electronics", refrigeration: "ambient", priority: "priority" },
+  }) as { data?: { internalId: string; label: string; status: string }; ok?: boolean };
+  assert(createResult.ok === true && typeof createResult.data?.internalId === "string", "Native vehicle creation failed.");
+  const createdId = createResult.data.internalId;
+
+  await page.getByRole("button", { exact: true, name: "Native Vehicle Unit" }).waitFor();
+  const getCreated = await execute(page, "vehicle_get", { vehicleId: createdId }) as { data?: { status: string; label: string }; ok?: boolean };
+  assert(getCreated.ok === true && getCreated.data?.status === "resting", "Native created vehicle not resting.");
+
+  const updateResult = await execute(page, "fleet_vehicle_update", {
+    vehicleId: createdId,
+    label: "Updated Native Vehicle",
+    dimensions: { vehicleType: "Rigid box truck", heightMeters: 3.5, lengthMeters: 12.0, weightTonnes: 18 },
+  }) as { data?: { label: string }; ok?: boolean };
+  assert(updateResult.ok === true && updateResult.data?.label === "Updated Native Vehicle", "Native vehicle update failed.");
+  await page.getByRole("button", { exact: true, name: "Updated Native Vehicle" }).waitFor();
+
+  // Unassign route-012 from vehicle-012
+  const unassignResult = await execute(page, "fleet_vehicle_assign_route", {
+    vehicleId: "vehicle-012",
+    routeId: "",
+  }) as { data?: { status: string; routeId: string }; ok?: boolean };
+  assert(unassignResult.ok === true && unassignResult.data?.status === "resting", "Native route unassign failed.");
+
+  // Assign route-012 to the new vehicle
+  const assignResult = await execute(page, "fleet_vehicle_assign_route", {
+    vehicleId: createdId,
+    routeId: "route-012",
+  }) as { data?: { status: string; routeId: string }; ok?: boolean };
+  assert(assignResult.ok === true && assignResult.data?.status === "driving" && assignResult.data?.routeId === "route-012", `Native route assignment to new vehicle failed: ${JSON.stringify(assignResult)}`);
+
+  // State parity: scenario_current verifies Route.vehicleId is updated
+  const scenarioCheck = await execute(page, "scenario_current", {}) as { data?: { routes: Array<{ id: string; vehicleId: string }> }; ok?: boolean };
+  assert(scenarioCheck.ok === true, "Native scenario_current query failed.");
+  const assignedRouteObj = scenarioCheck.data?.routes.find((r) => r.id === "route-012");
+  assert(assignedRouteObj?.vehicleId === createdId, `Route.vehicleId was not updated to ${createdId}, got ${assignedRouteObj?.vehicleId}`);
+
+  // Delete the vehicle
+  const deleteResult = await execute(page, "fleet_vehicle_delete", { vehicleId: createdId }) as { ok?: boolean };
+  assert(deleteResult.ok === true, "Native vehicle deletion failed.");
+  const afterDelete = await execute(page, "vehicle_get", { vehicleId: createdId }) as { ok?: boolean };
+  assert(afterDelete.ok === false, "Deleted vehicle still returned by vehicle_get.");
+
+  // Re-assign route-012 back to vehicle-012 for parity
+  await execute(page, "fleet_vehicle_assign_route", { vehicleId: "vehicle-012", routeId: "route-012" });
 
   const cleanup = await page.evaluate(async () => {
     type Context = { getTools(): Promise<NativeTool[]> };

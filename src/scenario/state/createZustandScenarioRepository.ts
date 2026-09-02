@@ -125,28 +125,44 @@ function applyRecoveryRoute(scenario: OperatingRegion, route: AdmittedRecoveryRo
 function applyOverrides(overrides: ScenarioOverrides, route?: AdmittedRecoveryRoute): OperatingRegion {
   const fixture = createSpainScenario();
   const deleted = new Set(overrides.deletedVehicleIds);
+  const mapVehicleOverrides = (vehicle: Vehicle) => {
+    const updated = overrides.updatedVehicles?.[vehicle.internalId] || {};
+    const assignedRoute = overrides.assignedRoutes?.[vehicle.internalId];
+    const routeId = assignedRoute !== undefined ? (assignedRoute || "") : vehicle.routeId;
+    const status = assignedRoute === null || (assignedRoute === undefined && !vehicle.routeId)
+      ? "resting"
+      : (assignedRoute ? "driving" : (updated.status || vehicle.status));
+    return {
+      ...vehicle,
+      ...updated,
+      label: overrides.labels[vehicle.internalId] ?? updated.label ?? vehicle.label,
+      routeId,
+      status: status as Vehicle["status"],
+    };
+  };
+
   const baseVehicles = fixture.vehicles
     .filter((vehicle) => !deleted.has(vehicle.internalId))
-    .map((vehicle) => {
-      const updated = overrides.updatedVehicles?.[vehicle.internalId] || {};
-      const assignedRoute = overrides.assignedRoutes?.[vehicle.internalId];
-      const routeId = assignedRoute !== undefined ? (assignedRoute || "") : vehicle.routeId;
-      const status = assignedRoute === null || (assignedRoute === undefined && !vehicle.routeId) ? "resting" : vehicle.status;
-      return { 
-        ...vehicle, 
-        ...updated, 
-        label: overrides.labels[vehicle.internalId] ?? updated.label ?? vehicle.label,
-        routeId,
-        status: status as Vehicle["status"]
-      };
-    });
+    .map(mapVehicleOverrides);
 
-  const createdVehicles = (overrides.createdVehicles || []).filter((v) => !deleted.has(v.internalId));
+  const createdVehicles = (overrides.createdVehicles || [])
+    .filter((v) => !deleted.has(v.internalId))
+    .map(mapVehicleOverrides);
+
+  const allVehicles = [...baseVehicles, ...createdVehicles];
   
   const scenario = {
     ...fixture,
-    vehicles: [...baseVehicles, ...createdVehicles],
-    routes: fixture.routes.filter((route) => !deleted.has(route.vehicleId)),
+    vehicles: allVehicles,
+    routes: fixture.routes
+      .filter((candidate) => !deleted.has(candidate.vehicleId))
+      .map((candidate) => {
+        const owningVehicle = allVehicles.find((v) => v.routeId === candidate.id);
+        return {
+          ...candidate,
+          vehicleId: owningVehicle ? owningVehicle.internalId : "",
+        };
+      }),
   };
   return overrides.recoveryRouteApplied === true && route !== undefined ? applyRecoveryRoute(scenario, route) : scenario;
 }
@@ -309,8 +325,9 @@ export function createZustandScenarioRepository(storage: StorageLike = browserSt
         const operational = invalidatedAfterMutation(state.operational);
         const nextOverrides: ScenarioOverrides = state.overrides.recoveryRouteApplied === true ? { ...baseOverrides, operationalSnapshot: operational, recoveryRouteApplied: true } : baseOverrides;
         if (!saveScenarioOverrides(storage, nextOverrides)) return state;
-        updatedVehicle = { ...vehicle, ...updates };
-        return { overrides: nextOverrides, scenario: applyOverrides(nextOverrides, admittedRoute ?? undefined), operational };
+        const nextScenario = applyOverrides(nextOverrides, admittedRoute ?? undefined);
+        updatedVehicle = findVehicle(nextScenario, vehicleId);
+        return { overrides: nextOverrides, scenario: nextScenario, operational };
       });
       return updatedVehicle === undefined ? undefined : detached(updatedVehicle);
     },
@@ -325,8 +342,9 @@ export function createZustandScenarioRepository(storage: StorageLike = browserSt
         const operational = invalidatedAfterMutation(state.operational);
         const nextOverrides: ScenarioOverrides = state.overrides.recoveryRouteApplied === true ? { ...baseOverrides, operationalSnapshot: operational, recoveryRouteApplied: true } : baseOverrides;
         if (!saveScenarioOverrides(storage, nextOverrides)) return state;
-        updatedVehicle = { ...vehicle, routeId: routeId ?? "", status: routeId ? vehicle.status : "resting" };
-        return { overrides: nextOverrides, scenario: applyOverrides(nextOverrides, admittedRoute ?? undefined), operational };
+        const nextScenario = applyOverrides(nextOverrides, admittedRoute ?? undefined);
+        updatedVehicle = findVehicle(nextScenario, vehicleId);
+        return { overrides: nextOverrides, scenario: nextScenario, operational };
       });
       return updatedVehicle === undefined ? undefined : detached(updatedVehicle);
     },

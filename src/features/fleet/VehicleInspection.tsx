@@ -31,7 +31,7 @@ function DetailList({ locale, tab, vehicle, onOpenHud }: { locale: Locale; tab: 
         <h4 id="privacy-facts-heading" style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem' }}>Verifiable Architecture Facts</h4>
         <ul style={{ margin: '0 0 0.75rem 0', paddingLeft: '1.2rem', fontSize: '0.8rem', color: '#334e68', lineHeight: 1.4 }}>
           <li>Client-side deterministic routing & clearance assessment</li>
-          <li>Local-only state persistence via browser sessionStorage</li>
+          <li>Local-only state persistence via browser localStorage</li>
           <li>Zero external telemetry tracking or third-party ad beacons</li>
           <li>Explicit human approval gates for recovery execution</li>
         </ul>
