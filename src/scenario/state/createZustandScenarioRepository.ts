@@ -1,6 +1,7 @@
 import { createStore } from "zustand/vanilla";
 import type { OperatingRegion, Route, Vehicle } from "../../domain/entities";
 import { deepDetachAndFreeze } from "../../domain/deepDetach";
+import { getScenarioForRegion } from "../fixtures/regionalScenarios";
 import type { OperationalRecoveryRepository, SemanticScenarioMutation } from "../../domain/ports/OperationalRecoveryRepository";
 import type { ScenarioRepository } from "../../domain/ports/ScenarioRepository";
 import { browserSha256Crypto, canonicalJson, sha256Fingerprint, type Sha256Crypto } from "../../domain/recovery/canonicalJson";
@@ -123,7 +124,8 @@ function applyRecoveryRoute(scenario: OperatingRegion, route: AdmittedRecoveryRo
 }
 
 function applyOverrides(overrides: ScenarioOverrides, route?: AdmittedRecoveryRoute): OperatingRegion {
-  const fixture = createSpainScenario();
+  const regionId = overrides.regionId || "spain-v1";
+  const fixture = getScenarioForRegion(regionId) || createSpainScenario();
   const deleted = new Set(overrides.deletedVehicleIds);
   const baseVehicles = fixture.vehicles
     .filter((vehicle) => !deleted.has(vehicle.internalId))
@@ -247,6 +249,11 @@ export function createZustandScenarioRepository(storage: StorageLike = browserSt
 
   return {
     scenarioCurrent: () => detached(store.getState().scenario),
+    scenarioRegionSelect: (regionId: string) => {
+      const nextOverrides = { ...store.getState().overrides, regionId };
+      const success = persist(nextOverrides);
+      return success ? detached(store.getState().scenario) : undefined;
+    },
     vehicleGet: (vehicleId) => {
       const vehicle = findVehicle(store.getState().scenario, vehicleId);
       return vehicle === undefined ? undefined : detached(vehicle);

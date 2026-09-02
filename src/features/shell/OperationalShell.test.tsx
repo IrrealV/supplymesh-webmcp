@@ -42,7 +42,7 @@ describe("OperationalShell", () => {
 
     const banner = screen.getByRole("banner");
     expect(screen.getByText("SupplyMesh")).not.toBeNull();
-    expect(banner.querySelectorAll("button")).toHaveLength(3);
+    expect(banner.querySelectorAll("button")).toHaveLength(5);
     expect(screen.getByRole("button", { name: "Help" })).not.toBeNull();
     expect(screen.getByRole("button", { name: "Account" })).not.toBeNull();
     expect(screen.getByRole("main")).not.toBeNull();
@@ -128,7 +128,7 @@ describe("OperationalShell", () => {
 
   it("should switch the visible language immediately", async () => {
     const user = userEvent.setup();
-    function LocalizedTopbar() { const [locale, setLocale] = useState<"en" | "es">("en"); return <Topbar locale={locale} onLocaleChange={setLocale} />; }
+    function LocalizedTopbar() { const [locale, setLocale] = useState<"en" | "es">("en"); const mockOperations = {} as any; return <Topbar locale={locale} onLocaleChange={setLocale} scenario={{ id: 'spain-v1', name: 'Spain' } as any} operations={mockOperations} onScenarioChange={() => {}} />; }
     render(<LocalizedTopbar />);
 
     const language = screen.getByRole("button", { name: "Language" });

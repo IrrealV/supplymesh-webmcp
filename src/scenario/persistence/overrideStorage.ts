@@ -5,7 +5,7 @@ import { isOperationalRecoverySnapshot } from "../../domain/recovery/recoveryVal
 export const SCENARIO_OVERRIDES_STORAGE_KEY = "scenario-overrides:v1";
 const SCENARIO_OVERRIDES_VERSION = 1;
 
-export type ScenarioOverrides = { version: 1; labels: Record<string, string>; deletedVehicleIds: string[]; operationalSnapshot?: OperationalRecoverySnapshot; recoveryRouteApplied?: true; createdVehicles?: Vehicle[]; updatedVehicles?: Record<string, Partial<Vehicle>>; assignedRoutes?: Record<string, string | null> };
+export type ScenarioOverrides = { version: 1; regionId?: string; labels: Record<string, string>; deletedVehicleIds: string[]; operationalSnapshot?: OperationalRecoverySnapshot; recoveryRouteApplied?: true; createdVehicles?: Vehicle[]; updatedVehicles?: Record<string, Partial<Vehicle>>; assignedRoutes?: Record<string, string | null> };
 export type StorageLike = Pick<Storage, "getItem" | "setItem">;
 
 const emptyOverrides = (): ScenarioOverrides => ({ version: SCENARIO_OVERRIDES_VERSION, labels: {}, deletedVehicleIds: [], createdVehicles: [], updatedVehicles: {}, assignedRoutes: {} });

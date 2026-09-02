@@ -1,6 +1,6 @@
 import { divIcon, latLngBounds, type LatLngExpression, type Map as LeafletMap } from "leaflet";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { MapContainer, Marker, Pane, Polygon, Polyline, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, Marker, Pane, Polygon, Polyline, TileLayer, Circle, useMap, useMapEvents } from "react-leaflet";
 import { useUiCoordinationStore } from "../../app/state/useUiCoordinationStore";
 import type { OperatingRegion, OperationalRisk, RiskSeverity } from "../../domain/entities";
 import { catalog, operationalCopy, type Locale } from "../../preferences/i18n/catalog";
@@ -15,6 +15,26 @@ import { CLOSE_RANGE_FOCUS_ZOOM } from "./closeRangeMode";
 
 const severityColors: Record<RiskSeverity, string> = { low: "#657985", medium: "#a66a18", high: "#c4512d", critical: "#b4232d" };
 const WEATHER_RISK_COLOR = "#1268e8";
+
+function RegionFramer({ regionId }: { regionId: string }) {
+  const map = useMap();
+  useEffect(() => {
+    if (regionId === "france-v1") map.setView([45.75, 3.5], 6.5);
+    else if (regionId === "germany-v1") map.setView([51.16, 10.45], 6.5);
+    else map.setView([40.1, -3.55], 6.5);
+  }, [regionId, map]);
+  return null;
+}
+
+function AvoidanceAreaLayer() {
+  const area = useUiCoordinationStore(state => state.avoidanceArea);
+  if (!area) return null;
+  return (
+    <Pane name="avoidance-area" style={{ zIndex: 610 }}>
+      <Circle center={[area.coordinates[1], area.coordinates[0]]} radius={area.radiusMeters} pathOptions={{ color: 'red', fillColor: '#ff0000', fillOpacity: 0.2 }} />
+    </Pane>
+  );
+}
 
 function toPosition([longitude, latitude]: readonly number[]): [number, number] { return [latitude, longitude]; }
 function routePositions(route: DerivedRoute["route"]): LatLngExpression[] { return route.geometry.geometry.coordinates.map(toPosition); }
@@ -181,6 +201,8 @@ export function FleetMap({ availableComparison, comparison, locale, recoveryExec
       <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       <Pane name="risk-tokens" style={{ zIndex: 620 }} /><Pane name="weather-effects" style={{ zIndex: 615 }} /><Pane name="fleet-trucks" style={{ zIndex: 640 }} /><Pane name="fleet-labels" style={{ zIndex: 660 }} /><Pane name="close-range-hazards" style={{ zIndex: 680 }} />
       <MapEvents coordinator={coordinator} /><MapFocus comparison={comparison} coordinator={coordinator} scenario={scenario} /><MapLayout coordinator={coordinator} signature={layoutSignature} />
+      <RegionFramer regionId={scenario.id} />
+      <AvoidanceAreaLayer />
       {layers.routes.filter((entry) => entry.route.id !== comparison?.current.id && entry.route.id !== comparison?.alternative.id).map((entry) => <Polyline key={`${entry.route.id}:${entry.state}`} {...routeStyle(entry)} noClip positions={routePositions(entry.route)} smoothFactor={0} />)}
       <RiskLayers entries={visibleRisks} locale={locale} />
       <CloseRangeBridgeHazard scenario={scenario} />

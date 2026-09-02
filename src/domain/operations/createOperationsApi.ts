@@ -8,6 +8,7 @@ type OperationsApiOptions = { readAlternativeCatalog(): unknown; admittedAlterna
 
 export type OperationsApi = {
   scenarioCurrent(): DomainResult<OperatingRegion>;
+  scenarioRegionSelect(regionId: string): DomainResult<OperatingRegion>;
   assessAuthoritativeVerticalClearance: AssessAuthoritativeVerticalClearance;
   unit211PreDispatchContext(): Unit211PreDispatchContextResult;
   fleetStatus(): DomainResult<FleetStatus>;
@@ -34,6 +35,16 @@ export function createOperationsApi(repository: ScenarioRepository, options?: Op
     scenarioCurrent: () => {
       try {
         const detached = deepDetachAndFreeze(repository.scenarioCurrent());
+        return detached.ok ? { ok: true, data: detached.data } : failure("repository-data-invalid", "The scenario repository returned malformed data.");
+      } catch {
+        return failure("repository-data-invalid", "The scenario repository returned malformed data.");
+      }
+    },
+    scenarioRegionSelect: (regionId) => {
+      try {
+        const selected = repository.scenarioRegionSelect(regionId);
+        if (!selected) return failure("region-not-found", `Region ${regionId} was not found.`);
+        const detached = deepDetachAndFreeze(selected);
         return detached.ok ? { ok: true, data: detached.data } : failure("repository-data-invalid", "The scenario repository returned malformed data.");
       } catch {
         return failure("repository-data-invalid", "The scenario repository returned malformed data.");

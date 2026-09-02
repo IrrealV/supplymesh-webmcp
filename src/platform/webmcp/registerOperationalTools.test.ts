@@ -50,6 +50,8 @@ describe("createOperationalTools", () => {
 
     expect(tools.map((tool) => ({ name: tool.name, inputSchema: tool.inputSchema }))).toStrictEqual([
       { name: "scenario_current", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+      { name: "scenario_region_select", inputSchema: { type: "object", properties: { regionId: { type: "string" } }, required: ["regionId"], additionalProperties: false } },
+      { name: "avoidance_area_set", inputSchema: { type: "object", properties: { radiusMeters: { type: "number" }, coordinates: { type: "array", items: { type: "number" }, minItems: 2, maxItems: 2 }, enabled: { type: "boolean" } }, required: ["enabled"], additionalProperties: false } },
       { name: "fleet_status", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
       { name: "vehicle_get", inputSchema: { type: "object", properties: { vehicleId: { type: "string", minLength: 1 } }, required: ["vehicleId"], additionalProperties: false } },
       { name: "vehicle_rename", inputSchema: { type: "object", properties: { vehicleId: { type: "string", minLength: 1 }, label: { type: "string", minLength: 1 } }, required: ["vehicleId", "label"], additionalProperties: false } },

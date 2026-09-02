@@ -9,6 +9,8 @@ export type Follow = { kind: "none" } | { kind: "vehicle"; vehicleId: string };
 export type MapFocusTarget = { kind: "none" } | { kind: "vehicle" | "route" | "comparison"; requestId: number; vehicleId: string };
 export type RailState = "compact" | "expanded";
 
+export type AvoidanceArea = { radiusMeters: number; coordinates: [number, number] };
+
 type UiCoordinationState = {
   activeFilters: ReadonlySet<FleetFilter>;
   focusRequestId: number;
@@ -17,6 +19,7 @@ type UiCoordinationState = {
   panelContext: PanelContext;
   railState: RailState;
   selection: Selection;
+  avoidanceArea: AvoidanceArea | null;
   acknowledgeMapFocus(requestId: number): void;
   cancelFollow(): void;
   clearFilters(returnFocusId: string): void;
@@ -27,6 +30,7 @@ type UiCoordinationState = {
   selectVehicle(vehicleId: string, returnFocusId?: string): void;
   setRailState(railState: RailState): void;
   toggleFilter(filter: FleetFilter, returnFocusId: string): void;
+  setAvoidanceArea(area: AvoidanceArea | null): void;
 };
 
 const noFollow: Follow = { kind: "none" };
@@ -41,6 +45,7 @@ export const useUiCoordinationStore = create<UiCoordinationState>()((set, get) =
   panelContext: { mode: "overview", returnFocusId: "operational-map" },
   railState: "compact",
   selection: noSelection,
+  avoidanceArea: null,
   acknowledgeMapFocus: (requestId) => set((state) => state.mapFocusTarget.kind !== "none" && state.mapFocusTarget.requestId === requestId ? { mapFocusTarget: noFocus } : {}),
   cancelFollow: () => set({ follow: noFollow }),
   clearFilters: (returnFocusId) => set({ activeFilters: new Set<FleetFilter>(), panelContext: { mode: "overview", returnFocusId } }),
@@ -87,4 +92,5 @@ export const useUiCoordinationStore = create<UiCoordinationState>()((set, get) =
       railState: "expanded",
     };
   }),
+  setAvoidanceArea: (area) => set({ avoidanceArea: area }),
 }));

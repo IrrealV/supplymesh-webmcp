@@ -3,7 +3,7 @@ import type { OperationalRecoverySnapshot, RecoveryWorkflowStatus } from "../../
 import { RecoveryWorkflowStatuses } from "../../domain/recovery/recoveryContracts";
 import { recoveryWorkflowCopy, type Locale } from "../../preferences/i18n/catalog";
 
-export type RecoveryWorkflowAction = "approve" | "reject" | "reset";
+export type RecoveryWorkflowAction = "approve" | "reject" | "reset" | "escalate";
 type Failure = Readonly<{ code: string; message: string }>;
 export type RecoveryWorkflowPanelProps = { actionFailure?: Failure; locale: Locale; onAction(action: RecoveryWorkflowAction): void; pending?: RecoveryWorkflowAction; refreshFailure?: Failure; snapshot?: OperationalRecoverySnapshot; snapshotFailure?: Failure };
 
@@ -27,6 +27,6 @@ export function RecoveryWorkflowPanel({ actionFailure, locale, onAction, pending
     {receipt && <section className="workflow-block workflow-receipt"><h2>{copy.receipt}</h2><p><code>{receipt.receiptId}</code></p><dl className="workflow-facts"><div><dt>{copy.previousAppliedRoute}</dt><dd>{receipt.previousRouteId} → {receipt.appliedRouteId}</dd></div><div><dt>{copy.beforeAfterRevision}</dt><dd>{receipt.beforeRevision} → {receipt.afterRevision}</dd></div><div><dt>{copy.humanApproval}</dt><dd><code>{receipt.approvalSource}</code></dd></div><div><dt>{copy.executionOnce}</dt><dd>{snapshot.executionEffects.length}</dd></div><div><dt>{copy.verificationResult}</dt><dd><b data-status={receipt.verificationReport.status}>{receipt.verificationReport.status}</b></dd></div></dl></section>}
     {timeline.length > 0 && <section className="workflow-block"><h2>{copy.activity}</h2><ol className="workflow-activity">{timeline.map(([date, label], index) => <li key={label + ":" + index}><span>{label}</span><time dateTime={date}>{date}</time></li>)}</ol></section>}
     {(status === RecoveryWorkflowStatuses.rejected || status === RecoveryWorkflowStatuses.invalidated) && <p className="workflow-audit-note">{copy.noAudit}</p>}{failure && <div className="workflow-error" role="alert"><strong>{copy.actionFailed}</strong><code>{failure.code}</code><p>{failure.message}</p></div>}
-    <div aria-busy={busy} className="workflow-actions">{status === RecoveryWorkflowStatuses.reviewRequested && <>{action("approve", copy.approve, "workflow-primary")}{action("reject", copy.reject, "workflow-danger")}</>}{status !== RecoveryWorkflowStatuses.idle && action("reset", copy.resetDemo)}</div>
+    <div aria-busy={busy} className="workflow-actions">{status === RecoveryWorkflowStatuses.reviewRequested && <>{action("approve", copy.approve, "workflow-primary")}{action("reject", copy.reject, "workflow-danger")}{action("escalate", "Hold & Escalate", "workflow-danger")}</>}{status !== RecoveryWorkflowStatuses.idle && action("reset", copy.resetDemo)}</div>
   </section>;
 }

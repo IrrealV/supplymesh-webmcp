@@ -80,6 +80,39 @@ export function createOperationalTools(operations: OperationsApi, onScenarioChan
       execute: (input) => isEmptyInput(input) ? execute(operations.scenarioCurrent) : toolResponse(failure("invalid-input", "The tool input is invalid.")),
     },
     {
+      name: "scenario_region_select",
+      description: "Switches the operational region for the scenario.",
+      inputSchema: { type: "object", properties: { regionId: { type: "string" } }, required: ["regionId"], additionalProperties: false },
+      execute: (input: any) => {
+        try {
+          if (typeof input?.regionId !== "string") return toolResponse(failure("invalid-input", "Invalid regionId"));
+          const result = operations.scenarioRegionSelect(input.regionId);
+          if (result.ok) publishScenario(operations, onScenarioChange);
+          return toolResponse(result);
+        } catch {
+          return toolResponse(failure("operation-failed", "The operation could not be completed."));
+        }
+      },
+    },
+    {
+      name: "avoidance_area_set",
+      description: "Sets an active avoidance zone constraint.",
+      inputSchema: { type: "object", properties: { radiusMeters: { type: "number" }, coordinates: { type: "array", items: { type: "number" }, minItems: 2, maxItems: 2 }, enabled: { type: "boolean" } }, required: ["enabled"], additionalProperties: false },
+      execute: (input: any) => {
+        try {
+          const store = (globalThis as any).__UI_COORDINATION_STORE__ || require("../../app/state/useUiCoordinationStore").useUiCoordinationStore;
+          if (input.enabled && input.coordinates && input.radiusMeters) {
+            store.getState().setAvoidanceArea({ radiusMeters: input.radiusMeters, coordinates: input.coordinates });
+          } else {
+            store.getState().setAvoidanceArea(null);
+          }
+          return toolResponse({ ok: true, data: { success: true } });
+        } catch (e) {
+          return toolResponse(failure("operation-failed", "Could not set avoidance area."));
+        }
+      },
+    },
+    {
       name: "fleet_status",
       description: "Gets the current fleet status summary.",
       inputSchema: emptyInputSchema,

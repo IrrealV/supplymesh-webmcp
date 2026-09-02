@@ -65,6 +65,7 @@ export function OperationalShell({ locale, onLocaleChange, onScenarioChange, ope
     try {
       if (action === "approve" && recoveryHuman && planId) result = recoveryHuman.approvePlan({ planId });
       else if (action === "reject" && recoveryHuman && planId) result = recoveryHuman.rejectPlan({ planId });
+      else if (action === "escalate" && recoveryHuman && planId) { result = recoveryHuman.rejectPlan({ planId }); console.log(`Escalated plan ${planId} at ${new Date().toISOString()} with reason: Hold & Escalate`); }
       else if (action === "reset" && recoveryExecution) result = recoveryExecution.reset({});
       if (result && !result.ok) setActionFailure(result.error); setRecoveryState(operational.read());
     } finally { actionLock.current = false; setPending(undefined); }
@@ -85,7 +86,7 @@ export function OperationalShell({ locale, onLocaleChange, onScenarioChange, ope
   return (
     <div className="console-shell">
       <a className="skip-link" href="#operational-map" onClick={focusMap}>{copy.operationalMap}</a>
-      <Topbar locale={locale} onLocaleChange={onLocaleChange} />
+      <Topbar locale={locale} onLocaleChange={onLocaleChange} scenario={scenario} operations={operations} onScenarioChange={onScenarioChange} />
       <main className={`console-workspace ${railState === "expanded" ? "rail-is-expanded" : ""}`}>
         <FilterRail isTablet={isTablet} locale={locale} onInteraction={() => setTabletOverviewOpen(false)} scenario={scenario} operations={operations} onScenarioChange={onScenarioChange} />
         <section aria-describedby={comparison?.kind === "ready" ? "recovery-map-summary" : undefined} aria-label={copy.operationalMap} className="map-workspace" id="operational-map" role="region" tabIndex={-1}>
