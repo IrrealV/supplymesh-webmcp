@@ -80,6 +80,7 @@ export type VehicleCreateCommand = {
   dimensions: Dimensions;
   cargo: Omit<Cargo, "id">;
   routeId?: string;
+  initialPosition?: [number, number] | { longitude: number; latitude: number };
 };
 export type VehicleUpdateCommand = {
   vehicleId: string;

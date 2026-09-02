@@ -5,14 +5,14 @@ import type { OperatingRegion } from "../../domain/entities";
 import type { OperationsApi } from "../../domain/operations/createOperationsApi";
 import { catalog, filterLabel, type Locale } from "../../preferences/i18n/catalog";
 import { filterCount } from "./filtering";
-import { CreateVehicleDialog } from "./CreateVehicleDialog";
+import { AddVehicleButton } from "./CreateVehicleDialog";
 
 const icons = {
   all: Truck, resting: Bed, "needs-attention": Warning, critical: WarningOctagon,
   "weather-affected": Snowflake, "driving-rest-risk": SteeringWheel, "road-restriction-issues": RoadHorizon,
 } satisfies Record<FilterCategory, typeof Truck>;
 
-export function FilterRail({ isTablet = false, locale, onInteraction, scenario, operations, onScenarioChange }: { isTablet?: boolean; locale: Locale; onInteraction?(): void; scenario: OperatingRegion; operations?: OperationsApi; onScenarioChange?: (scenario: OperatingRegion) => void }) {
+export function FilterRail({ isTablet = false, locale, onInteraction, scenario }: { isTablet?: boolean; locale: Locale; onInteraction?(): void; scenario: OperatingRegion; operations?: OperationsApi; onScenarioChange?: (scenario: OperatingRegion) => void }) {
   const activeFilters = useUiCoordinationStore((state) => state.activeFilters);
   const railState = useUiCoordinationStore((state) => state.railState);
   const clearFilters = useUiCoordinationStore((state) => state.clearFilters);
@@ -26,9 +26,9 @@ export function FilterRail({ isTablet = false, locale, onInteraction, scenario, 
       <aside aria-label={copy.fleetFilters} className={`filter-rail ${isRailExpanded ? "filter-rail-expanded" : ""}`}>
         {isRailExpanded
           ? <div className="rail-heading">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
                 <h2>{copy.fleetFilters}</h2>
-                {operations && onScenarioChange && <CreateVehicleDialog locale={locale} operations={operations} scenario={scenario} onScenarioChange={onScenarioChange} />}
+                <AddVehicleButton isExpanded={true} locale={locale} />
               </div>
               <button aria-label={copy.collapseRail} className="rail-collapse" onClick={() => setRailState("compact")} type="button"><CaretDoubleLeft aria-hidden="true" size={22} /></button>
             </div>

@@ -78,8 +78,13 @@ export function createOperationsApi(repository: ScenarioRepository, options?: Op
       }
 
       const scenario = repository.scenarioCurrent();
-      let startCoords: Coordinates = [-3.7038, 40.4168];
-      let endCoords: Coordinates = [-3.7038, 40.4168];
+      const coords: Coordinates = command.initialPosition
+        ? Array.isArray(command.initialPosition)
+          ? [command.initialPosition[0], command.initialPosition[1]]
+          : [command.initialPosition.longitude, command.initialPosition.latitude]
+        : [-3.7038, 40.4168];
+      let startCoords: Coordinates = coords;
+      let endCoords: Coordinates = coords;
       let originName = "Madrid Reserve";
       let destName = "Madrid Reserve";
       let status: Vehicle["status"] = "resting";

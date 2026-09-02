@@ -11,6 +11,7 @@ import { VehicleInspection } from "../fleet/VehicleInspection";
 import { FleetMap } from "../map/FleetMap";
 import { ContextPanel } from "./ContextPanel";
 import { Topbar } from "./Topbar";
+import { VehiclePlacementDrawer } from "../fleet/CreateVehicleDialog";
 import { useTabletViewport } from "../../app/presentation/useTabletViewport";
 import type { Unit211PreDispatchContextResult } from "../../domain/operations/unit211PreDispatchContext";
 import { createUnit211RecoveryComparisonModel } from "../recovery-comparison/unit211RecoveryComparisonModel";
@@ -82,6 +83,9 @@ export function OperationalShell({ locale, onLocaleChange, onScenarioChange, ope
     setTabletOverviewOpen(true);
   }
 
+  const placementCoordinates = useUiCoordinationStore((state) => state.placementCoordinates);
+  const cancelPlacement = useUiCoordinationStore((state) => state.cancelPlacement);
+
   return (
     <div className="console-shell">
       <a className="skip-link" href="#operational-map" onClick={focusMap}>{copy.operationalMap}</a>
@@ -93,9 +97,19 @@ export function OperationalShell({ locale, onLocaleChange, onScenarioChange, ope
         </section>
         {isTablet && inspectionVehicle === undefined && panelContext.mode === "overview" && !tabletOverviewOpen && <button aria-label={panelCopy.openOverview} className="tablet-overview-trigger" onClick={openTabletOverview} type="button"><ChartPieSlice aria-hidden="true" size={19} /><span>{panelCopy.operationalOverview}</span></button>}
         {inspectionVehicle === undefined ? (
-          <ContextPanel closeLabel={panelContext.mode === "overview" ? panelCopy.closeOverview : copy.closeResults} label={panelContext.mode === "overview" ? panelCopy.operationalOverview : copy.fleetFilters} mode={panelContext.mode} onClose={panelContext.mode === "overview" ? () => setTabletOverviewOpen(false) : closeResults} tabletOpen={panelContext.mode === "results" || tabletOverviewOpen}>
-            {panelContext.mode === "overview" ? <OperationalOverview locale={locale} scenario={scenario} /> : <FilterResults locale={locale} scenario={scenario} />}
-          </ContextPanel>
+          placementCoordinates ? (
+            <VehiclePlacementDrawer
+              coordinates={placementCoordinates}
+              locale={locale}
+              onClose={cancelPlacement}
+              onScenarioChange={onScenarioChange}
+              operations={operations}
+            />
+          ) : (
+            <ContextPanel closeLabel={panelContext.mode === "overview" ? panelCopy.closeOverview : copy.closeResults} label={panelContext.mode === "overview" ? panelCopy.operationalOverview : copy.fleetFilters} mode={panelContext.mode} onClose={panelContext.mode === "overview" ? () => setTabletOverviewOpen(false) : closeResults} tabletOpen={panelContext.mode === "results" || tabletOverviewOpen}>
+              {panelContext.mode === "overview" ? <OperationalOverview locale={locale} scenario={scenario} /> : <FilterResults locale={locale} scenario={scenario} />}
+            </ContextPanel>
+          )
         ) : (
           <VehicleInspection comparison={comparison} isFollowing={follow.kind === "vehicle" && follow.vehicleId === inspectionVehicle.internalId} key={inspectionVehicle.internalId} locale={locale} onBackFromRecovery={backFromRecovery} onClose={closeInspection} onDeleted={() => comparisonRequest ? setRecoveryOpen(true) : closeInspection()} onRestoreFollow={() => useUiCoordinationStore.getState().restoreFollow()} onReviewRecovery={inspectionVehicle.internalId === "vehicle-011" && (availableComparison.kind === "ready" || snapshot?.plan != null) ? reviewRecovery : undefined} onScenarioChange={onScenarioChange} onViewRoute={() => useUiCoordinationStore.getState().focusRoute(inspectionVehicle.internalId)} operations={operations} recovery={comparison === undefined || !operational || !recoveryExecution || !recoveryHuman ? undefined : { actionFailure, onAction: (action) => { void runRecoveryAction(action); }, pending, refreshFailure, snapshot, snapshotFailure: recoveryState && !recoveryState.ok ? recoveryState.error : undefined }} recoveryUnavailableReason={availableComparison.kind === "operation-failure" && inspectionVehicle.internalId === "vehicle-011" ? availableComparison.reasonCode : undefined} scenario={scenario} vehicle={inspectionVehicle} />
         )}

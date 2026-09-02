@@ -42,9 +42,9 @@ describe("OperationalShell", () => {
 
     const banner = screen.getByRole("banner");
     expect(screen.getByText("SupplyMesh")).not.toBeNull();
-    expect(banner.querySelectorAll("button")).toHaveLength(3);
+    expect(banner.querySelectorAll("button")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Help" })).not.toBeNull();
-    expect(screen.getByRole("button", { name: "Account" })).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Account" })).toBeNull();
     expect(screen.getByRole("main")).not.toBeNull();
     expect(screen.getByRole("complementary", { name: "Fleet filters" })).not.toBeNull();
     expect(screen.getByRole("complementary", { name: "Operational overview" }).getAttribute("data-context-mode")).toBe("overview");

@@ -40,6 +40,15 @@ const vehicleCreateInputSchema: JsonSchema = {
     routeId: { type: "string" },
     dimensions: dimensionsInputSchema,
     cargo: cargoInputSchema,
+    initialPosition: {
+      type: "object",
+      properties: {
+        longitude: { type: "number", minimum: -180, maximum: 180 },
+        latitude: { type: "number", minimum: -90, maximum: 90 },
+      },
+      required: ["longitude", "latitude"],
+      additionalProperties: false,
+    },
   },
   required: ["fleetNumber", "plate", "dimensions", "cargo"],
   additionalProperties: false,
@@ -127,15 +136,33 @@ function isVehicleRenameInput(input: unknown): input is { vehicleId: string; lab
   return isRecord(input) && hasExactKeys(input, ["vehicleId", "label"]) && typeof input.vehicleId === "string" && input.vehicleId.trim().length > 0 && typeof input.label === "string" && input.label.trim().length > 0;
 }
 
+function isInitialPositionInput(input: unknown): input is [number, number] | { longitude: number; latitude: number } {
+  if (Array.isArray(input)) {
+    if (input.length !== 2) return false;
+    const [lon, lat] = input;
+    if (typeof lon !== "number" || !Number.isFinite(lon) || lon < -180 || lon > 180) return false;
+    if (typeof lat !== "number" || !Number.isFinite(lat) || lat < -90 || lat > 90) return false;
+    return true;
+  }
+  if (!isRecord(input)) return false;
+  if (!hasExactKeys(input, ["longitude", "latitude"])) return false;
+  if (typeof input.longitude !== "number" || !Number.isFinite(input.longitude)) return false;
+  if (typeof input.latitude !== "number" || !Number.isFinite(input.latitude)) return false;
+  if (input.longitude < -180 || input.longitude > 180) return false;
+  if (input.latitude < -90 || input.latitude > 90) return false;
+  return true;
+}
+
 function isVehicleCreateInput(input: unknown): input is VehicleCreateCommand {
   if (!isRecord(input)) return false;
-  if (!hasOnlyAllowedKeys(input, ["fleetNumber", "plate", "label", "routeId", "dimensions", "cargo"])) return false;
+  if (!hasOnlyAllowedKeys(input, ["fleetNumber", "plate", "label", "routeId", "dimensions", "cargo", "initialPosition"])) return false;
   if (typeof input.fleetNumber !== "string" || input.fleetNumber.trim().length === 0) return false;
   if (typeof input.plate !== "string" || input.plate.trim().length === 0) return false;
   if (input.label !== undefined && (typeof input.label !== "string" || input.label.trim().length === 0)) return false;
   if (input.routeId !== undefined && typeof input.routeId !== "string") return false;
   if (!isDimensionsInput(input.dimensions)) return false;
   if (!isCargoInput(input.cargo)) return false;
+  if (input.initialPosition !== undefined && !isInitialPositionInput(input.initialPosition)) return false;
   return true;
 }
 
