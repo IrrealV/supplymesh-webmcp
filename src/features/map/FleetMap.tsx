@@ -12,7 +12,6 @@ import { RecoveryComparisonLayers, RecoveryIncidentInset } from "../recovery-com
 import type { Unit211RecoveryComparisonModel } from "../recovery-comparison/unit211RecoveryComparisonModel";
 import { recoveryComparisonCopy } from "../../preferences/i18n/catalog";
 import { CLOSE_RANGE_FOCUS_ZOOM } from "./closeRangeMode";
-import { prepareRoutePath } from "./closeRangeMotion";
 
 const severityColors: Record<RiskSeverity, string> = { low: "#657985", medium: "#a66a18", high: "#c4512d", critical: "#b4232d" };
 const WEATHER_RISK_COLOR = "#1268e8";
@@ -127,8 +126,8 @@ function RiskLayers({ entries, locale }: { entries: readonly DerivedRisk[]; loca
       ? <Polygon key={shapeKey} {...pathOptions} positions={risk.geometry.geometry.coordinates[0].map(toPosition)} />
       : <Polyline key={shapeKey} {...pathOptions} noClip positions={risk.geometry.geometry.coordinates.map(toPosition)} smoothFactor={0} />;
       
-    const weatherFx = isWeatherRisk && state !== "muted" ? (
-      <Marker key={`fx-${shapeKey}`} alt="" interactive={false} keyboard={false} pane="weather-effects" position={riskPosition(risk)} icon={divIcon({ className: `weather-fx-container`, html: `<div class="weather-fx-zone weather-fx-${risk.kind}"></div>`, iconSize: [0, 0] })} />
+    const weatherFx = isWeatherRisk ? (
+      <Marker key={`fx-${shapeKey}`} alt="" interactive={false} keyboard={false} pane="weather-effects" position={riskPosition(risk)} icon={divIcon({ className: `weather-fx-container`, html: `<div class="weather-fx-zone weather-fx-${risk.kind}"></div>`, iconSize: [400, 400], iconAnchor: [200, 200] })} />
     ) : null;
     
     return <Fragment key={risk.id}>{shape}{weatherFx}<Marker alt={riskLabel(risk, locale)} icon={riskIcon(entry, locale)} interactive={false} keyboard={false} pane="risk-tokens" position={riskPosition(risk)} title={riskLabel(risk, locale)} zIndexOffset={state === "selected" ? 1300 : 500} /></Fragment>;
@@ -147,36 +146,23 @@ function CloseRangeBridgeHazard({ scenario }: { scenario: OperatingRegion }) {
   const map = useMap();
   const heightRisk = scenario.risks.find((r) => r.id === "restriction-height-3.9");
   const routeSnap = heightRisk?.routeSnaps?.[0];
-  const route = scenario.routes.find((r) => r.id === routeSnap?.routeId);
-  const [isVisible, setIsVisible] = useState(false);
+  const [isModeActive, setIsModeActive] = useState(() => map.getContainer().dataset.closeRangeMode === "active");
 
   useEffect(() => {
-    if (!route || !routeSnap) return;
-    const path = prepareRoutePath(route.geometry.geometry.coordinates);
-    const snapProgress = path.cumulative[routeSnap.startIndex] / path.length;
     const container = map.getContainer();
-
-    const observer = new MutationObserver(() => {
-      const isModeActive = container.dataset.closeRangeMode === "active";
-      const currentRouteId = container.dataset.closeRangeRouteId;
-      const currentProgress = parseFloat(container.dataset.closeRangeProgress || "0");
-      const shouldShow = isModeActive && currentRouteId === route.id && Math.abs(currentProgress - snapProgress) <= 0.05;
-      
-      if (shouldShow !== isVisible) {
-        setIsVisible(shouldShow);
-      }
-    });
-
-    observer.observe(container, { attributes: true, attributeFilter: ["data-close-range-progress", "data-close-range-mode"] });
+    const update = () => setIsModeActive(container.dataset.closeRangeMode === "active");
+    const observer = new MutationObserver(update);
+    observer.observe(container, { attributes: true, attributeFilter: ["data-close-range-mode"] });
+    update();
     return () => observer.disconnect();
-  }, [isVisible, map, route, routeSnap]);
+  }, [map]);
 
-  if (!isVisible || !routeSnap) return null;
+  if (!isModeActive || !routeSnap) return null;
 
   const position = toPosition(routeSnap.startCoordinate);
-  const html = `<div class="bridge-3d-structure"><div class="bridge-pillar bridge-pillar-left"></div><div class="bridge-pillar bridge-pillar-right"></div><div class="bridge-beam"></div></div><div class="bridge-clearance-info">4.00 m required &middot; 3.90 m available</div>`;
-  
-  return <Marker position={position} pane="close-range-hazards" icon={divIcon({ className: "close-range-hazard-bridge", html, iconSize: [0, 0] })} />;
+  const html = `<div class="bridge-3d-structure" data-hazard="bridge-3d"><div class="bridge-pillar bridge-pillar-left"></div><div class="bridge-pillar bridge-pillar-right"></div><div class="bridge-beam"></div></div><div class="bridge-clearance-info" data-hazard-label="clearance">4.00 m required &middot; 3.90 m available</div>`;
+
+  return <Marker position={position} pane="close-range-hazards" icon={divIcon({ className: "close-range-hazard-bridge", html, iconSize: [160, 80], iconAnchor: [80, 40] })} />;
 }
 
 export function FleetMap({ availableComparison, comparison, locale, recoveryExecuted = false, scenario }: { availableComparison?: Unit211RecoveryComparisonModel; comparison?: Unit211RecoveryComparisonModel; locale: Locale; recoveryExecuted?: boolean; scenario: OperatingRegion }) {

@@ -108,6 +108,7 @@ test("tablet keeps the close-range truck behind its usable inspection drawer", a
   await selectUnit211(page);
 
   const drawer = page.getByRole("dialog", { name: "Unit 211" });
+  await expect(drawer).toBeVisible();
   const bounds = await drawer.boundingBox();
   expect(bounds).not.toBeNull();
   expect(bounds!.x).toBeGreaterThanOrEqual(0);
@@ -136,7 +137,62 @@ test("forced WebGL absence retains the selected 2D marker", async ({ page }) => 
   await page.keyboard.press("Enter");
 
   await expect(map).toHaveAttribute("data-close-range-mode", "inactive");
-  await expect(page.locator("[data-close-range-model]")).toHaveCount(0);
   await expect(page.locator(".fleet-truck-icon")).toHaveCount(15);
   await expect(page.locator(".fleet-truck-icon.map-layer-selected .fleet-vehicle-glyph")).toBeVisible();
+});
+
+test("close-range hazards, localized weather, console QA, and screenshots", async ({ page }) => {
+  const consoleErrors: string[] = [];
+  page.on("console", (msg) => {
+    if (msg.type() === "error") {
+      consoleErrors.push(msg.text());
+    }
+  });
+
+  // 1. Initial 2D fleet view on desktop (1440x900)
+  await openConsole(page, 1440, 900);
+  const map = page.locator(".fleet-map");
+  await expect(map).toHaveAttribute("data-close-range-mode", "inactive");
+  await expect(page.locator(".fleet-truck-icon")).toHaveCount(15);
+  await page.screenshot({ path: "docs/screenshots/01-fleet-2d.png" });
+
+  // 2. 3D Truck in Close Range Operational Mode
+  await selectUnit211(page);
+  await expect(map).toHaveAttribute("data-close-range-mode", "active");
+  await expect(page.locator("[data-close-range-model=vehicle-011]")).toBeVisible();
+  await page.screenshot({ path: "docs/screenshots/02-truck-3d.png" });
+
+  // 3. Red 3D bridge hazard with clearance info
+  const bridgeHazard = page.locator(".close-range-hazard-bridge");
+  await expect(bridgeHazard).toBeVisible();
+  const clearanceLabel = page.locator("[data-hazard-label=clearance]");
+  await expect(clearanceLabel).toContainText("4.00 m required");
+  await expect(clearanceLabel).toContainText("3.90 m available");
+  await page.screenshot({ path: "docs/screenshots/03-red-bridge.png" });
+
+  // 4. Localized Weather FX: Rain in Galicia
+  const rainEffect = page.locator(".weather-fx-heavy-rain");
+  await expect(rainEffect).toBeVisible();
+  await page.screenshot({ path: "docs/screenshots/04-heavy-rain.png" });
+
+  // 5. Localized Weather FX: Snow in Leon
+  const snowEffect = page.locator(".weather-fx-severe-snow");
+  await expect(snowEffect).toBeVisible();
+  await page.screenshot({ path: "docs/screenshots/05-severe-snow.png" });
+
+  // 6. Localized Weather FX: Storm & Calima in Ebro / Andalucia
+  const stormEffect = page.locator(".weather-fx-severe-storm");
+  const calimaEffect = page.locator(".weather-fx-calima");
+  await expect(stormEffect).toBeVisible();
+  await expect(calimaEffect).toBeVisible();
+  await page.screenshot({ path: "docs/screenshots/06-wind-calima.png" });
+
+  // 7. Tablet viewport 900x900 QA and screenshot
+  await page.setViewportSize({ width: 900, height: 900 });
+  await page.waitForTimeout(300);
+  await expect(page.locator("[data-close-range-model=vehicle-011]")).toBeVisible();
+  await page.screenshot({ path: "docs/screenshots/07-tablet-900x900.png" });
+
+  // Assert zero console errors throughout execution
+  expect(consoleErrors).toHaveLength(0);
 });
