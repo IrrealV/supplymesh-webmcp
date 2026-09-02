@@ -23,9 +23,9 @@ const dimensionsInputSchema: JsonSchema = {
   type: "object",
   properties: {
     vehicleType: { type: "string", minLength: 1 },
-    lengthMeters: { type: "number", minimum: 0 },
-    heightMeters: { type: "number", minimum: 0 },
-    weightTonnes: { type: "number", minimum: 0 },
+    lengthMeters: { type: "number", exclusiveMinimum: 0 },
+    heightMeters: { type: "number", exclusiveMinimum: 0 },
+    weightTonnes: { type: "number", exclusiveMinimum: 0 },
   },
   required: ["vehicleType", "lengthMeters", "heightMeters", "weightTonnes"],
   additionalProperties: false,

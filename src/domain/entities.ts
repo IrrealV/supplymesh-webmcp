@@ -75,7 +75,7 @@ export type VehicleRenameCommand = { vehicleId: string; label: string };
 export type VehicleCreateCommand = {
   fleetNumber: string;
   plate: string;
-  label: string;
+  label?: string;
   dimensions: Dimensions;
   cargo: Omit<Cargo, "id">;
   routeId?: string;
