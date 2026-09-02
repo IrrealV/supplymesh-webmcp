@@ -43,71 +43,137 @@ async function expectUnit211LabelClear(page: Page): Promise<void> {
   expect(clearance.separate, JSON.stringify(clearance)).toBe(true);
 }
 
-async function readMotion(page: Page, id: string = "vehicle-011"): Promise<{ bearing: number; progress: number; routeId: string }> {
-  return page.locator(`[data-close-range-model=${id}]`).evaluate((node) => ({
-    bearing: Number((node as HTMLElement).dataset.routeBearing),
-    progress: Number((node as HTMLElement).dataset.routeProgress),
-    routeId: (node as HTMLElement).dataset.closeRangeRouteId ?? "",
-  }));
+async function readMotion(page: Page, id: string = "vehicle-011"): Promise<{ bearing: number; progress: number; routeId: string; speed: number; isMoving: boolean }> {
+  return page.evaluate((vehicleId) => {
+    const store = (window as unknown as { __fleetMotionStore?: { getState(): { motions: Record<string, { bearing: number; progress: number; routeId: string; speed: number; isMoving: boolean }> } } }).__fleetMotionStore?.getState();
+    if (store && store.motions[vehicleId]) {
+      const m = store.motions[vehicleId];
+      return { bearing: m.bearing, progress: m.progress, routeId: m.routeId, speed: m.speed, isMoving: m.isMoving };
+    }
+    return { bearing: 0, progress: 0, routeId: "", speed: 0, isMoving: false };
+  }, id);
 }
 
 test.beforeEach(async ({ page }) => page.emulateMedia({ reducedMotion: "reduce" }));
 
-test("selected follow swaps exactly one 2D marker for a static close-range truck", async ({ page }) => {
+test("selected follow swaps 2D markers for a shared Three.js WebGL canvas and removes old CSS truck", async ({ page }) => {
   await page.clock.install({ time: new Date("2026-08-28T10:00:00Z") });
   await openConsole(page, 1440, 900);
   const map = page.locator(".fleet-map");
 
-  await expect(map).toHaveAttribute("data-close-range-renderer", "css-3d");
+  await expect(map).toHaveAttribute("data-close-range-renderer", "three-webgl");
   await expect(map).toHaveAttribute("data-close-range-mode", "inactive");
   await expect(page.locator(".fleet-truck-icon")).toHaveCount(15);
   await expect(page.locator("[data-close-range-model]")).toHaveCount(0);
-  await expect(page.locator(".map-frame canvas")).toHaveCount(0);
+  await expect(page.locator(".close-range-truck-rig")).toHaveCount(0);
+  await expect(page.locator("[data-three-canvas=shared]")).toHaveCount(0);
 
   await selectUnit211(page);
 
   await expect(map).toHaveAttribute("data-close-range-vehicle-id", "vehicle-011");
   await expect(page.locator(".fleet-truck-icon.close-range-vehicle-active")).toHaveCount(15);
-  await expect(page.locator("[data-close-range-model=vehicle-011]")).toBeVisible();
-  await expect(page.locator("[data-close-range-model]")).toHaveCount(15);
+  // Shared Three.js canvas exists with exactly 1 renderer
+  const threeCanvas = page.locator("[data-three-canvas=shared]");
+  await expect(threeCanvas).toHaveCount(1);
+  await expect(threeCanvas).toBeVisible();
+
+  // Old CSS markup is completely gone
+  await expect(page.locator("[data-close-range-model]")).toHaveCount(0);
+  await expect(page.locator(".close-range-truck-rig")).toHaveCount(0);
+
   await expect(page.getByRole("button", { name: "Unit 211", exact: true })).toHaveCount(1);
-  await expect(page.locator("[data-close-range-model=vehicle-011] .close-range-truck-rig")).toHaveCSS("animation-name", "none");
   await expect(map).toHaveAttribute("data-close-range-camera", "static");
   const staticMotion = await readMotion(page, "vehicle-011");
+  expect(staticMotion.isMoving).toBe(false);
   await page.clock.fastForward(2_000);
   expect(await readMotion(page, "vehicle-011")).toStrictEqual(staticMotion);
   await expectUnit211LabelClear(page);
 
   await page.locator(".map-frame").dispatchEvent("wheel");
   await expect(map).toHaveAttribute("data-close-range-mode", "active");
-  await expect(page.locator("[data-close-range-model]")).toHaveCount(15);
+  await expect(page.locator("[data-three-canvas=shared]")).toHaveCount(1);
   await expectUnit211LabelClear(page);
 
   await page.getByRole("button", { name: "Follow Unit 211" }).click();
   await expect(map).toHaveAttribute("data-close-range-mode", "active");
-  await expect(page.locator("[data-close-range-model=vehicle-011]")).toBeVisible();
-  await expect(page.locator("[data-close-range-model]")).toHaveCount(15);
+  await expect(page.locator("[data-three-canvas=shared]")).toHaveCount(1);
 
   await page.keyboard.press("Escape");
   await expect(map).toHaveAttribute("data-close-range-mode", "active");
-  await expect(page.locator("[data-close-range-model]")).toHaveCount(15);
+  await expect(page.locator("[data-three-canvas=shared]")).toHaveCount(1);
   await expect(page.getByRole("region", { name: "Operational map" })).toBeFocused();
 });
 
-test("follow motion advances along the active route with bearing and camera tracking", async ({ page }) => {
+test("movement policy: needs-attention and critical vehicles move, stopped vehicles show reason", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
+  await openConsole(page, 1440, 900);
+
+  // Unit 211 (pre-dispatch hold)
+  const motion211 = await readMotion(page, "vehicle-011");
+  expect(motion211.isMoving).toBe(false);
+  const stoppedBadge211 = page.locator('[data-stopped-indicator="vehicle-011"]');
+  await expect(stoppedBadge211).toBeVisible();
+  await expect(stoppedBadge211).toHaveAttribute("title", "Pre-dispatch safety hold");
+
+  // Needs-attention vehicle with route moves (e.g. vehicle-003)
+  const motion003 = await readMotion(page, "vehicle-003");
+  expect(motion003.isMoving).toBe(true);
+  expect(motion003.speed).toBeGreaterThan(20);
+
+  // Critical vehicle with route moves (e.g. vehicle-004)
+  const motion004 = await readMotion(page, "vehicle-004");
+  expect(motion004.isMoving).toBe(true);
+  expect(motion004.speed).toBeGreaterThan(20);
+
+  // Select Unit 211 to inspect stopped reason in operational summary
+  await selectUnit211(page);
+  const motionStatus = page.locator('[data-vehicle-motion-status="stopped"]');
+  await expect(motionStatus).toBeVisible();
+  await expect(motionStatus).toContainText("Pre-dispatch safety hold");
+});
+
+test("2D/3D position continuity: zooming out restores 2D icon at exact coordinates", async ({ page }) => {
   await openConsole(page, 1440, 900);
   await selectUnit211(page);
   const map = page.locator(".fleet-map");
-  await expect(map).toHaveAttribute("data-close-range-camera", "following");
-  
-  const initial = await readMotion(page, "vehicle-011");
+  await expect(map).toHaveAttribute("data-close-range-mode", "active");
+  await expect(page.locator("[data-three-canvas=shared]")).toHaveCount(1);
 
-  // Unit 211 stays stopped until recovery, so we verify progress does NOT change initially
-  await page.waitForTimeout(1000);
-  const after = await readMotion(page, "vehicle-011");
-  expect(after.progress).toBeCloseTo(initial.progress);
-  expect(after.bearing).toBeCloseTo(initial.bearing);
+  // Get Unit 211 position in 3D mode
+  const motion3D = await readMotion(page, "vehicle-011");
+
+  // Zoom out to zoom 13
+  await page.evaluate(() => {
+    const leafletMap = (window as unknown as { __leafletMap?: { setZoom(z: number): void } }).__leafletMap || (document.querySelector(".fleet-map") as unknown as { _leaflet_map?: { setZoom(z: number): void } })?._leaflet_map;
+    if (leafletMap) leafletMap.setZoom(13);
+  });
+  await page.waitForTimeout(300);
+
+  // In zoom 13, close range mode is inactive, 2D pins are restored
+  await expect(map).toHaveAttribute("data-close-range-mode", "inactive");
+  await expect(page.locator("[data-three-canvas=shared]")).toHaveCount(0);
+
+  // Motion state coordinates are identical
+  const motion2D = await readMotion(page, "vehicle-011");
+  expect(motion2D.progress).toBeCloseTo(motion3D.progress);
+});
+
+test("weather effects: visible independently of vehicle selection and clickable to focus", async ({ page }) => {
+  await openConsole(page, 1440, 900);
+
+  // Weather effects are visible at overview without selecting any vehicle
+  await expect(page.locator(".weather-fx-heavy-rain")).toBeVisible();
+  await expect(page.locator(".weather-fx-severe-snow")).toBeVisible();
+  await expect(page.locator(".weather-fx-severe-storm")).toBeVisible();
+  await expect(page.locator(".weather-fx-calima")).toBeVisible();
+
+  // Clicking weather token zooms into that risk zone
+  const snowToken = page.locator(".risk-severe-snow").first();
+  await snowToken.click();
+  await page.waitForTimeout(500);
+
+  // Camera focused on León snow area
+  await expect(page.locator(".weather-fx-severe-snow")).toBeVisible();
 });
 
 test("tablet keeps the close-range truck behind its usable inspection drawer", async ({ page }) => {
@@ -170,8 +236,8 @@ test("close-range hazards, localized weather, console QA, and screenshots", asyn
   // 2. 3D Truck in Close Range Operational Mode (focused on Unit 211)
   await selectUnit211(page);
   await expect(map).toHaveAttribute("data-close-range-mode", "active");
-  await expect(page.locator("[data-close-range-model=vehicle-011]")).toBeVisible();
-  await expect(page.locator("[data-close-range-model]")).toHaveCount(15);
+  await expect(page.locator("[data-three-canvas=shared]")).toBeVisible();
+  await expect(page.locator("[data-three-canvas=shared]")).toHaveCount(1);
   await page.screenshot({ path: "docs/screenshots/02-truck-3d.png" });
 
   // 3. Red 3D bridge hazard with clearance info (focused on height restriction)

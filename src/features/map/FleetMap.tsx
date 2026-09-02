@@ -123,22 +123,17 @@ function riskIcon(entry: DerivedRisk, locale: Locale) {
 
 function RiskLayers({ entries, locale }: { entries: readonly DerivedRisk[]; locale: Locale }) {
   const map = useMap();
-  const [zoom, setZoom] = useState(() => map.getZoom());
-
-  useEffect(() => {
-    const onZoom = () => setZoom(map.getZoom());
-    map.on("zoomend", onZoom);
-    return () => { map.off("zoomend", onZoom); };
-  }, [map]);
-
-  const showWeatherFx = zoom >= 8.0;
+  const showWeatherFx = true;
 
   return entries.map((entry) => {
     const { risk, state } = entry;
     const isWeatherRisk = ["severe-snow", "heavy-rain", "severe-storm", "calima"].includes(risk.kind);
     const color = isWeatherRisk ? WEATHER_RISK_COLOR : severityColors[risk.severity];
     const opacity = state === "muted" ? 0.18 : state === "selected" ? 1 : 0.72;
-    const fillOpacity = isWeatherRisk ? state === "muted" ? 0.06 : state === "selected" ? 0.26 : state === "matched" ? 0.22 : 0.18 : 0;
+    const fillOpacity = isWeatherRisk ? state === "muted" ? 0.12 : state === "selected" ? 0.35 : state === "matched" ? 0.30 : 0.25 : 0;
+    const onRiskClick = () => {
+      map.flyTo(riskPosition(risk), 9, { duration: 0.8 });
+    };
     const pathOptions = {
       className: `risk-overlay risk-overlay-${risk.kind} risk-overlay-${risk.severity} map-path-${state}`,
       color,
@@ -150,14 +145,30 @@ function RiskLayers({ entries, locale }: { entries: readonly DerivedRisk[]; loca
     };
     const shapeKey = `${risk.id}:${state}`;
     const shape = risk.geometry.geometry.type === "Polygon"
-      ? <Polygon key={shapeKey} {...pathOptions} positions={risk.geometry.geometry.coordinates[0].map(toPosition)} />
-      : <Polyline key={shapeKey} {...pathOptions} noClip positions={risk.geometry.geometry.coordinates.map(toPosition)} smoothFactor={0} />;
+      ? <Polygon key={shapeKey} {...pathOptions} eventHandlers={{ click: onRiskClick }} positions={risk.geometry.geometry.coordinates[0].map(toPosition)} />
+      : <Polyline key={shapeKey} {...pathOptions} eventHandlers={{ click: onRiskClick }} noClip positions={risk.geometry.geometry.coordinates.map(toPosition)} smoothFactor={0} />;
       
     const weatherFx = isWeatherRisk && showWeatherFx ? (
-      <Marker key={`fx-${shapeKey}`} alt="" interactive={false} keyboard={false} pane="weather-effects" position={riskPosition(risk)} icon={divIcon({ className: `weather-fx-container`, html: `<div class="weather-fx-zone weather-fx-${risk.kind}"></div>`, iconSize: [260, 260], iconAnchor: [130, 130] })} />
+      <Marker key={`fx-${shapeKey}`} alt="" interactive={false} keyboard={false} pane="weather-effects" position={riskPosition(risk)} icon={divIcon({ className: `weather-fx-container`, html: `<div class="weather-fx-zone weather-fx-${risk.kind}"></div>`, iconSize: [360, 360], iconAnchor: [180, 180] })} />
     ) : null;
     
-    return <Fragment key={risk.id}>{shape}{weatherFx}<Marker alt={riskLabel(risk, locale)} icon={riskIcon(entry, locale)} interactive={false} keyboard={false} pane="risk-tokens" position={riskPosition(risk)} title={riskLabel(risk, locale)} zIndexOffset={state === "selected" ? 1300 : 500} /></Fragment>;
+    return (
+      <Fragment key={risk.id}>
+        {shape}
+        {weatherFx}
+        <Marker
+          alt={riskLabel(risk, locale)}
+          eventHandlers={{ click: onRiskClick }}
+          icon={riskIcon(entry, locale)}
+          interactive={true}
+          keyboard={false}
+          pane="risk-tokens"
+          position={riskPosition(risk)}
+          title={riskLabel(risk, locale)}
+          zIndexOffset={state === "selected" ? 1300 : 500}
+        />
+      </Fragment>
+    );
   });
 }
 

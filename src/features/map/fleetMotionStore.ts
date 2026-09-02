@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { RoutePath, advanceRouteProgress, sampleRoutePath, prepareRoutePath } from "./closeRangeMotion";
 import type { Vehicle, Route } from "../../domain/entities";
+import { evaluateVehicleMotion } from "./vehicleMotion";
 
 export type VehicleMotionState = {
   progress: number;
@@ -9,6 +10,8 @@ export type VehicleMotionState = {
   bearing: number;
   speed: number;
   routeId: string;
+  isMoving: boolean;
+  stoppedReason?: { en: string; es: string };
 };
 
 type FleetMotionStore = {
@@ -30,16 +33,27 @@ export const useFleetMotionStore = create<FleetMotionStore>((set) => ({
       const motions: Record<string, VehicleMotionState> = {};
       for (const v of vehicles) {
         const existing = state.motions[v.internalId];
+        const motionEval = evaluateVehicleMotion(v);
+        const speedKmH = v.speedKmH && v.speedKmH > 0 ? v.speedKmH : 82;
+        const speed = motionEval.isMoving ? speedKmH / 3.6 : 0;
+
         if (existing && existing.routeId === v.routeId) {
-          motions[v.internalId] = existing;
+          motions[v.internalId] = {
+            ...existing,
+            isMoving: motionEval.isMoving,
+            stoppedReason: motionEval.isMoving ? undefined : motionEval.reasonText,
+            speed,
+          };
         } else {
           motions[v.internalId] = {
             progress: v.routeProgress,
             latitude: v.position.geometry.coordinates[1],
             longitude: v.position.geometry.coordinates[0],
             bearing: 0,
-            speed: 0,
-            routeId: v.routeId
+            speed,
+            routeId: v.routeId,
+            isMoving: motionEval.isMoving,
+            stoppedReason: motionEval.isMoving ? undefined : motionEval.reasonText,
           };
         }
       }
@@ -50,13 +64,19 @@ export const useFleetMotionStore = create<FleetMotionStore>((set) => ({
     set((state) => {
       const newMotions = { ...state.motions };
       for (const v of vehicles) {
+        const motionEval = evaluateVehicleMotion(v);
+        const speedKmH = v.speedKmH && v.speedKmH > 0 ? v.speedKmH : 82;
+        const speed = motionEval.isMoving ? speedKmH / 3.6 : 0;
+
         const motion = newMotions[v.internalId] || {
           progress: v.routeProgress,
           latitude: v.position.geometry.coordinates[1],
           longitude: v.position.geometry.coordinates[0],
           bearing: 0,
-          speed: 0,
-          routeId: v.routeId
+          speed,
+          routeId: v.routeId,
+          isMoving: motionEval.isMoving,
+          stoppedReason: motionEval.isMoving ? undefined : motionEval.reasonText,
         };
         // Reset if route changed mid-frame
         if (motion.routeId !== v.routeId) {
@@ -64,8 +84,9 @@ export const useFleetMotionStore = create<FleetMotionStore>((set) => ({
           motion.routeId = v.routeId;
         }
 
-        const isMoving = v.status === "driving" && !(v.internalId === "vehicle-011" && v.routeId === "route-011");
-        const speed = isMoving ? 24 : 0;
+        motion.isMoving = motionEval.isMoving;
+        motion.stoppedReason = motionEval.isMoving ? undefined : motionEval.reasonText;
+        motion.speed = speed;
         
         const route = routes.find(r => r.id === v.routeId);
         if (route) {
@@ -79,12 +100,20 @@ export const useFleetMotionStore = create<FleetMotionStore>((set) => ({
               longitude: sample.coordinate[0],
               bearing: sample.bearing,
               speed,
-              routeId: v.routeId
+              routeId: v.routeId,
+              isMoving: motionEval.isMoving,
+              stoppedReason: motionEval.isMoving ? undefined : motionEval.reasonText,
             };
           }
+        } else {
+          newMotions[v.internalId] = motion;
         }
       }
       return { motions: newMotions };
     });
   }
 }));
+
+if (typeof window !== "undefined") {
+  (window as unknown as { __fleetMotionStore?: typeof useFleetMotionStore }).__fleetMotionStore = useFleetMotionStore;
+}

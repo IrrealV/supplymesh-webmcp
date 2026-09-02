@@ -53,6 +53,7 @@ export type Vehicle = {
   routeProgress: number;
   riskIds: string[];
   speedKmH?: number;
+  stoppedReason?: string;
 };
 export type Route = { id: string; vehicleId: string; name: string; geometry: GeoLine; summary: RouteSummary; riskSnaps: RiskRouteSnap[] };
 export type OperationalRisk = {

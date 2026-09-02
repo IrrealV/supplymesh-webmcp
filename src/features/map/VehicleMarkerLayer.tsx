@@ -10,6 +10,8 @@ import { useFleetMotionStore } from "./fleetMotionStore";
 import type { DerivedVehicle, LayerState } from "./layers";
 import { placeLabels, type ScreenRect } from "./labelPlacement";
 import type { MapEventCoordinator } from "./MapEventCoordinator";
+import { evaluateVehicleMotion } from "./vehicleMotion";
+import { ThreeFleetOverlay } from "./three/ThreeFleetOverlay";
 
 const LABEL_ZOOM_THRESHOLD = 7.5;
 
@@ -17,26 +19,32 @@ function escapeHtml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 
-function closeRangeTruckMarkup(vehicleId: string): string {
-  return `<span aria-hidden="true" class="close-range-truck-model" data-close-range-model="${escapeHtml(vehicleId)}"><span class="close-range-truck-shadow"></span><span class="close-range-truck-rig"><span class="close-range-truck-trailer"></span><span class="close-range-truck-cab"></span><span class="close-range-truck-chassis"></span><span class="close-range-truck-wheel wheel-rear"></span><span class="close-range-truck-wheel wheel-front"></span></span></span>`;
-}
-
-function createVehicleMarkerIcons(vehicle: DerivedVehicle["vehicle"], state: LayerState, isCloseRangeActive: boolean): { truck: DivIcon; label: DivIcon } {
+function createVehicleMarkerIcons(
+  vehicle: DerivedVehicle["vehicle"],
+  state: LayerState,
+  isCloseRangeActive: boolean,
+  locale: Locale
+): { truck: DivIcon; label: DivIcon } {
   const label = escapeHtml(getVehicleDisplayName(vehicle));
   const status = escapeHtml(vehicle.status);
   const closeRangeClass = isCloseRangeActive ? " close-range-vehicle-active" : "";
-  const closeRangeModel = isCloseRangeActive ? closeRangeTruckMarkup(vehicle.internalId) : "";
+  const motionEval = evaluateVehicleMotion(vehicle);
+  const stoppedBadge = !motionEval.isMoving
+    ? `<span class="fleet-stopped-badge" data-stopped-indicator="${vehicle.internalId}" title="${escapeHtml(motionEval.reasonText[locale])}">🛑</span>`
+    : "";
+
   return {
     truck: divIcon({
       className: `fleet-truck-icon map-layer-${state}${closeRangeClass}`,
-      html: `<span data-vehicle-truck="${vehicle.internalId}" class="fleet-status-pin fleet-vehicle-pin status-${status}" aria-hidden="true"><span class="fleet-selection-aura"></span><svg class="fleet-vehicle-glyph" viewBox="0 0 28 28"><path d="M4.5 7.5h12.3v9.4H4.5z"/><path d="M16.8 10.2h4.1l2.6 3.2v3.5h-6.7z"/><circle cx="8" cy="19.2" r="2.1"/><circle cx="20.2" cy="19.2" r="2.1"/></svg>${closeRangeModel}</span>`,
-      iconAnchor: isCloseRangeActive ? [56, 54] : [20, 20],
-      iconSize: isCloseRangeActive ? [112, 92] : [40, 40],
+      html: `<span data-vehicle-truck="${vehicle.internalId}" data-motion-status="${motionEval.isMoving ? "moving" : "stopped"}" ${!motionEval.isMoving ? `data-stopped-reason="${escapeHtml(motionEval.reasonText[locale])}"` : ""} class="fleet-status-pin fleet-vehicle-pin status-${status}" aria-hidden="true" title="${!motionEval.isMoving ? escapeHtml(motionEval.reasonText[locale]) : ""}"><span class="fleet-selection-aura"></span><svg class="fleet-vehicle-glyph" viewBox="0 0 28 28"><path d="M4.5 7.5h12.3v9.4H4.5z"/><path d="M16.8 10.2h4.1l2.6 3.2v3.5h-6.7z"/><circle cx="8" cy="19.2" r="2.1"/><circle cx="20.2" cy="19.2" r="2.1"/></svg>${stoppedBadge}</span>`,
+      iconAnchor: [20, 20],
+      iconSize: [40, 40],
     }),
     label: divIcon({
       className: `fleet-label-icon map-layer-${state}`,
       html: `<span data-vehicle-label="${vehicle.internalId}" class="fleet-marker-label" aria-hidden="true">${label}</span>`,
-      iconAnchor: [52, 50], iconSize: [112, 30],
+      iconAnchor: [52, 50],
+      iconSize: [112, 30],
     }),
   };
 }
@@ -69,7 +77,7 @@ export function VehicleMarkerLayer({ coordinator, locale, onSelect, routes, vehi
   useEffect(() => {
     const container = map.getContainer();
     container.dataset.closeRangeMode = is3DMode ? "active" : "inactive";
-    container.dataset.closeRangeRenderer = isWebGlAvailable ? "css-3d" : "2d-fallback";
+    container.dataset.closeRangeRenderer = isWebGlAvailable ? "three-webgl" : "2d-fallback";
     if (!is3DMode) delete container.dataset.closeRangeVehicleId;
     else if (followedVehicleId) container.dataset.closeRangeVehicleId = followedVehicleId;
     return () => {
@@ -109,13 +117,6 @@ export function VehicleMarkerLayer({ coordinator, locale, onSelect, routes, vehi
         const [authoritativeLongitude, authoritativeLatitude] = vehicle.position.geometry.coordinates;
         if (truck) truck.setLatLng([authoritativeLatitude, authoritativeLongitude]);
         if (label) label.setLatLng([authoritativeLatitude, authoritativeLongitude]);
-        
-        const model = container.querySelector<HTMLElement>(`[data-close-range-model="${vehicle.internalId}"]`);
-        if (model) {
-          delete model.dataset.routeBearing;
-          delete model.dataset.routeProgress;
-          model.style.removeProperty("--close-range-bearing");
-        }
       });
       delete container.dataset.closeRangeCamera;
     };
@@ -158,17 +159,6 @@ export function VehicleMarkerLayer({ coordinator, locale, onSelect, routes, vehi
         if (truck) truck.setLatLng([motion.latitude, motion.longitude]);
         if (label) label.setLatLng([motion.latitude, motion.longitude]);
         
-        const model = container.querySelector<HTMLElement>(`[data-close-range-model="${vehicle.internalId}"]`);
-        if (model && is3DMode) {
-          const bearing = motion.bearing.toFixed(2);
-          const renderedProgress = motion.progress.toFixed(6);
-          model.dataset.routeBearing = bearing;
-          model.dataset.routeProgress = renderedProgress;
-          model.dataset.routeId = motion.routeId;
-          model.style.setProperty("--close-range-bearing", `${motion.bearing - 63}deg`);
-          model.dataset.closeRangeRouteId = motion.routeId;
-        }
-        
         if (followedVehicleId === vehicle.internalId) {
           followedPosition = [motion.latitude, motion.longitude];
         }
@@ -191,15 +181,57 @@ export function VehicleMarkerLayer({ coordinator, locale, onSelect, routes, vehi
     return () => { stop(); document.removeEventListener("visibilitychange", handleVisibility); };
   }, [coordinator, followedVehicleId, is3DMode, map, routes, vehicles]);
 
-  return vehicles.map(({ vehicle, state, zIndex }) => {
-    const [longitude, latitude] = vehicle.position.geometry.coordinates;
-    const displayName = getVehicleDisplayName(vehicle);
-    const selectName = interpolate(copy.selectVehicle, { label: displayName });
-    const icons = createVehicleMarkerIcons(vehicle, state, is3DMode);
-    const eventHandlers = { click: () => onSelect(vehicle.internalId) };
-    return <Fragment key={vehicle.internalId}>
-      <Marker alt={displayName} eventHandlers={eventHandlers} icon={icons.truck} key={`truck:${vehicle.internalId}:${displayName}`} keyboard pane="fleet-trucks" position={[latitude, longitude]} ref={(marker) => { if (marker === null) truckMarkers.current.delete(vehicle.internalId); else truckMarkers.current.set(vehicle.internalId, marker); }} title={displayName} zIndexOffset={zIndex} />
-      <Marker alt={`${selectName} ${suffix.label}`} eventHandlers={eventHandlers} icon={icons.label} key={`label:${vehicle.internalId}:${displayName}`} keyboard pane="fleet-labels" position={[latitude, longitude]} ref={(marker) => { if (marker === null) labelMarkers.current.delete(vehicle.internalId); else labelMarkers.current.set(vehicle.internalId, marker); }} title={`${selectName} ${suffix.label}`} zIndexOffset={zIndex + 1} />
-    </Fragment>;
-  });
+  const selection = useUiCoordinationStore((state) => state.selection);
+  const selectedVehicleId = selection.kind === "vehicle" ? selection.vehicleId : "";
+
+  return (
+    <>
+      <ThreeFleetOverlay
+        active={is3DMode}
+        vehicles={vehicles}
+        selectedVehicleId={selectedVehicleId}
+      />
+      {vehicles.map(({ vehicle, state, zIndex }) => {
+        const [longitude, latitude] = vehicle.position.geometry.coordinates;
+        const displayName = getVehicleDisplayName(vehicle);
+        const selectName = interpolate(copy.selectVehicle, { label: displayName });
+        const icons = createVehicleMarkerIcons(vehicle, state, is3DMode, locale);
+        const eventHandlers = { click: () => onSelect(vehicle.internalId) };
+        return (
+          <Fragment key={vehicle.internalId}>
+            <Marker
+              alt={displayName}
+              eventHandlers={eventHandlers}
+              icon={icons.truck}
+              key={`truck:${vehicle.internalId}:${displayName}`}
+              keyboard
+              pane="fleet-trucks"
+              position={[latitude, longitude]}
+              ref={(marker) => {
+                if (marker === null) truckMarkers.current.delete(vehicle.internalId);
+                else truckMarkers.current.set(vehicle.internalId, marker);
+              }}
+              title={displayName}
+              zIndexOffset={zIndex}
+            />
+            <Marker
+              alt={`${selectName} ${suffix.label}`}
+              eventHandlers={eventHandlers}
+              icon={icons.label}
+              key={`label:${vehicle.internalId}:${displayName}`}
+              keyboard
+              pane="fleet-labels"
+              position={[latitude, longitude]}
+              ref={(marker) => {
+                if (marker === null) labelMarkers.current.delete(vehicle.internalId);
+                else labelMarkers.current.set(vehicle.internalId, marker);
+              }}
+              title={`${selectName} ${suffix.label}`}
+              zIndexOffset={zIndex + 1}
+            />
+          </Fragment>
+        );
+      })}
+    </>
+  );
 }
