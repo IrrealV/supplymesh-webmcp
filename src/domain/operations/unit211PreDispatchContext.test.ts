@@ -29,7 +29,16 @@ function routeFrom(scenario: OperatingRegion): Route { return required(scenario.
 function riskFrom(scenario: OperatingRegion): OperationalRisk { return required(scenario.risks.find(({ id }) => id === RISK_ID), "Clearance risk is missing."); }
 function unexpectedMutation(): never { throw new Error("The pre-dispatch operation must be read-only."); }
 function repositoryFor(scenario: OperatingRegion, calls: Calls): ScenarioRepository {
-  return { scenarioCurrent: () => { calls.scenario += 1; return scenario; }, vehicleGet: unexpectedMutation, vehicleRename: unexpectedMutation, vehicleDelete: unexpectedMutation };
+  return {
+    scenarioCurrent: () => { calls.scenario += 1; return scenario; },
+    scenarioRegionSelect: unexpectedMutation,
+    vehicleGet: unexpectedMutation,
+    vehicleRename: unexpectedMutation,
+    vehicleDelete: unexpectedMutation,
+    vehicleCreate: unexpectedMutation,
+    vehicleUpdate: unexpectedMutation,
+    vehicleAssignRoute: unexpectedMutation,
+  };
 }
 function apiFor(scenario: OperatingRegion, read: () => unknown = () => clearanceAlternativeCatalog, admittedAlternativeCatalog: unknown = clearanceAlternativeCatalog): { api: ReturnType<typeof createOperationsApi>; calls: Calls } {
   const calls = { scenario: 0, catalog: 0 };

@@ -1,5 +1,5 @@
-import { type OperatingRegion, type Vehicle, type Route, type Coordinates, type Place, type Cargo, type Dimensions, type OperationalRisk, type RiskRouteSnap } from "../../domain/entities";
-import { geoPoint, geoLine, geoPolygon } from "../geometry";
+import { type OperatingRegion, type Vehicle, type Route, type Place, type Cargo, type Dimensions } from "../../domain/entities";
+import { geoPoint, geoLine, type Coordinates } from "../geometry";
 
 type VehicleSeed = [internalId: string, fleetNumber: string, plate: string, status: Vehicle["status"], originCoordinates: Coordinates, originName: string, destinationCoordinates: Coordinates, destinationName: string, cargoId: string, cargoDescription: string];
 

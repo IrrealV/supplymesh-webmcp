@@ -1,7 +1,7 @@
 export type JsonSchema = {
   type: "object";
-  properties: Record<string, { type: "string"; minLength: number }>;
-  required?: string[];
+  properties: Record<string, unknown>;
+  required?: readonly string[];
   additionalProperties: false;
 };
 

@@ -2,7 +2,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { useState } from "react";
 import type { VehicleUpdateCommand, OperatingRegion, Vehicle, VehicleAssignRouteCommand } from "../../domain/entities";
 import type { OperationsApi } from "../../domain/operations/createOperationsApi";
-import { catalog, type Locale } from "../../preferences/i18n/catalog";
+import type { Locale } from "../../preferences/i18n/catalog";
 import { Pencil } from "@phosphor-icons/react";
 
 type EditVehicleDialogProps = {
@@ -13,9 +13,8 @@ type EditVehicleDialogProps = {
   onScenarioChange(scenario: OperatingRegion): void;
 };
 
-export function EditVehicleDialog({ locale, operations, scenario, vehicle, onScenarioChange }: EditVehicleDialogProps) {
+export function EditVehicleDialog({ operations, scenario, vehicle, onScenarioChange }: EditVehicleDialogProps) {
   const [open, setOpen] = useState(false);
-  const copy = catalog(locale);
 
   const [plate, setPlate] = useState(vehicle.plate);
   const [label, setLabel] = useState(vehicle.label);
@@ -74,14 +73,14 @@ export function EditVehicleDialog({ locale, operations, scenario, vehicle, onSce
             <label>Weight (t): <input type="number" step="0.1" required value={weightTonnes} onChange={e => setWeightTonnes(parseFloat(e.target.value))} /></label>
             <label>Cargo Description: <input required value={cargoDesc} onChange={e => setCargoDesc(e.target.value)} /></label>
             <label>Refrigeration: 
-              <select value={refrigeration} onChange={e => setRefrigeration(e.target.value as any)}>
+              <select value={refrigeration} onChange={e => setRefrigeration(e.target.value as "ambient" | "chilled" | "frozen")}>
                 <option value="ambient">Ambient</option>
                 <option value="chilled">Chilled</option>
                 <option value="frozen">Frozen</option>
               </select>
             </label>
             <label>Priority:
-              <select value={priority} onChange={e => setPriority(e.target.value as any)}>
+              <select value={priority} onChange={e => setPriority(e.target.value as "standard" | "priority" | "critical")}>
                 <option value="standard">Standard</option>
                 <option value="priority">Priority</option>
                 <option value="critical">Critical</option>

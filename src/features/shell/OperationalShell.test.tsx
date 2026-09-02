@@ -8,6 +8,7 @@ import { createSpainScenario } from "../../scenario/fixtures/spain-v1";
 import { clearanceAlternativeCatalog } from "../../scenario/fixtures/clearanceAlternativeCatalog";
 import { createOperationsApi } from "../../domain/operations/createOperationsApi";
 import type { OperationsApi } from "../../domain/operations/createOperationsApi";
+import type { OperatingRegion } from "../../domain/entities";
 import { createApplication, createRecoveryApplication } from "../../app/createApplication";
 import type { RecoveryApplication } from "../../app/createApplication";
 import { createZustandScenarioRepository } from "../../scenario/state/createZustandScenarioRepository";
@@ -128,7 +129,7 @@ describe("OperationalShell", () => {
 
   it("should switch the visible language immediately", async () => {
     const user = userEvent.setup();
-    function LocalizedTopbar() { const [locale, setLocale] = useState<"en" | "es">("en"); const mockOperations = {} as any; return <Topbar locale={locale} onLocaleChange={setLocale} scenario={{ id: 'spain-v1', name: 'Spain' } as any} operations={mockOperations} onScenarioChange={() => {}} />; }
+    function LocalizedTopbar() { const [locale, setLocale] = useState<"en" | "es">("en"); const mockOperations = {} as unknown as OperationsApi; return <Topbar locale={locale} onLocaleChange={setLocale} scenario={{ id: "spain-v1", name: "Spain" } as unknown as OperatingRegion} operations={mockOperations} onScenarioChange={() => {}} />; }
     render(<LocalizedTopbar />);
 
     const language = screen.getByRole("button", { name: "Language" });

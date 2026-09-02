@@ -1,6 +1,7 @@
-import type { DomainResult, OperatingRegion } from "../../domain/entities";
+import type { DomainResult, OperatingRegion, VehicleAssignRouteCommand, VehicleCreateCommand, VehicleUpdateCommand } from "../../domain/entities";
 import type { OperationsApi } from "../../domain/operations/createOperationsApi";
 import type { JsonSchema, WebMcpTool, WebMcpToolResponse } from "./webMcpTypes";
+import { useUiCoordinationStore } from "../../app/state/useUiCoordinationStore";
 
 type ScenarioChangeHandler = (scenario: OperatingRegion) => void;
 
@@ -83,9 +84,9 @@ export function createOperationalTools(operations: OperationsApi, onScenarioChan
       name: "scenario_region_select",
       description: "Switches the operational region for the scenario.",
       inputSchema: { type: "object", properties: { regionId: { type: "string" } }, required: ["regionId"], additionalProperties: false },
-      execute: (input: any) => {
+      execute: (input: unknown) => {
         try {
-          if (typeof input?.regionId !== "string") return toolResponse(failure("invalid-input", "Invalid regionId"));
+          if (!isRecord(input) || typeof input.regionId !== "string") return toolResponse(failure("invalid-input", "Invalid regionId"));
           const result = operations.scenarioRegionSelect(input.regionId);
           if (result.ok) publishScenario(operations, onScenarioChange);
           return toolResponse(result);
@@ -98,16 +99,17 @@ export function createOperationalTools(operations: OperationsApi, onScenarioChan
       name: "avoidance_area_set",
       description: "Sets an active avoidance zone constraint.",
       inputSchema: { type: "object", properties: { radiusMeters: { type: "number" }, coordinates: { type: "array", items: { type: "number" }, minItems: 2, maxItems: 2 }, enabled: { type: "boolean" } }, required: ["enabled"], additionalProperties: false },
-      execute: (input: any) => {
+      execute: (input: unknown) => {
         try {
-          const store = (globalThis as any).__UI_COORDINATION_STORE__ || require("../../app/state/useUiCoordinationStore").useUiCoordinationStore;
-          if (input.enabled && input.coordinates && input.radiusMeters) {
-            store.getState().setAvoidanceArea({ radiusMeters: input.radiusMeters, coordinates: input.coordinates });
+          if (!isRecord(input) || typeof input.enabled !== "boolean") return toolResponse(failure("invalid-input", "Invalid input for avoidance area."));
+          if (input.enabled && Array.isArray(input.coordinates) && typeof input.radiusMeters === "number") {
+            const coords = input.coordinates as [number, number];
+            useUiCoordinationStore.getState().setAvoidanceArea({ radiusMeters: input.radiusMeters, coordinates: coords });
           } else {
-            store.getState().setAvoidanceArea(null);
+            useUiCoordinationStore.getState().setAvoidanceArea(null);
           }
           return toolResponse({ ok: true, data: { success: true } });
-        } catch (e) {
+        } catch {
           return toolResponse(failure("operation-failed", "Could not set avoidance area."));
         }
       },
@@ -140,9 +142,9 @@ export function createOperationalTools(operations: OperationsApi, onScenarioChan
       name: "fleet_vehicle_create",
       description: "Creates a new vehicle.",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
-      execute: (input: any) => {
+      execute: (input: unknown) => {
         try {
-          const result = operations.vehicleCreate(input);
+          const result = operations.vehicleCreate(input as VehicleCreateCommand);
           if (result.ok) publishScenario(operations, onScenarioChange);
           return toolResponse(result);
         } catch {
@@ -154,9 +156,9 @@ export function createOperationalTools(operations: OperationsApi, onScenarioChan
       name: "fleet_vehicle_update",
       description: "Updates an existing vehicle.",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
-      execute: (input: any) => {
+      execute: (input: unknown) => {
         try {
-          const result = operations.vehicleUpdate(input);
+          const result = operations.vehicleUpdate(input as VehicleUpdateCommand);
           if (result.ok) publishScenario(operations, onScenarioChange);
           return toolResponse(result);
         } catch {
@@ -168,9 +170,9 @@ export function createOperationalTools(operations: OperationsApi, onScenarioChan
       name: "fleet_vehicle_assign_route",
       description: "Assigns a route to a vehicle.",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
-      execute: (input: any) => {
+      execute: (input: unknown) => {
         try {
-          const result = operations.vehicleAssignRoute(input);
+          const result = operations.vehicleAssignRoute(input as VehicleAssignRouteCommand);
           if (result.ok) publishScenario(operations, onScenarioChange);
           return toolResponse(result);
         } catch {
@@ -182,8 +184,9 @@ export function createOperationalTools(operations: OperationsApi, onScenarioChan
       name: "fleet_vehicle_delete",
       description: "Deletes a vehicle.",
       inputSchema: vehicleGetInputSchema,
-      execute: (input: any) => {
+      execute: (input: unknown) => {
         try {
+          if (!isVehicleInput(input)) return toolResponse(failure("invalid-input", "The tool input is invalid."));
           const result = operations.vehicleDelete(input.vehicleId);
           if (result.ok) publishScenario(operations, onScenarioChange);
           return toolResponse(result);

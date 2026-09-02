@@ -19,7 +19,16 @@ type SnapCase = { label: string; mutate(targets: SnapTargets): void };
 function callsEmpty(): RepositoryCalls { return { scenarioCurrent: 0 }; }
 function unexpectedRepositoryCall(): never { throw new Error("The clearance assessment must only read scenarioCurrent."); }
 function repositoryFor(scenario: OperatingRegion, calls: RepositoryCalls): ScenarioRepository {
-  return { scenarioCurrent: () => { calls.scenarioCurrent += 1; return scenario; }, vehicleGet: unexpectedRepositoryCall, vehicleRename: unexpectedRepositoryCall, vehicleDelete: unexpectedRepositoryCall };
+  return {
+    scenarioCurrent: () => { calls.scenarioCurrent += 1; return scenario; },
+    scenarioRegionSelect: unexpectedRepositoryCall,
+    vehicleGet: unexpectedRepositoryCall,
+    vehicleRename: unexpectedRepositoryCall,
+    vehicleDelete: unexpectedRepositoryCall,
+    vehicleCreate: unexpectedRepositoryCall,
+    vehicleUpdate: unexpectedRepositoryCall,
+    vehicleAssignRoute: unexpectedRepositoryCall,
+  };
 }
 function assess(scenario: OperatingRegion, clearanceBufferMeters: number): AuthoritativeVerticalClearanceAssessmentResult {
   return createOperationsApi(repositoryFor(scenario, callsEmpty())).assessAuthoritativeVerticalClearance({ ...INPUT, clearanceBufferMeters });

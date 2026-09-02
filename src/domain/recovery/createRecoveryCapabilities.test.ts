@@ -550,7 +550,7 @@ describe("recovery fail-closed boundaries", () => {
     const tools = createOperationalTools(operations);
 
     expect(uiKeys.some((key) => /recovery|revision|approval|plan|incident/i.test(key))).toBe(false);
-    expect(tools.map(({ name }) => name)).toStrictEqual(["scenario_current", "fleet_status", "vehicle_get", "vehicle_rename", "fleet_vehicle_create", "fleet_vehicle_update", "fleet_vehicle_assign_route", "fleet_vehicle_delete"]);
+    expect(tools.map(({ name }) => name)).toStrictEqual(["scenario_current", "scenario_region_select", "avoidance_area_set", "fleet_status", "vehicle_get", "vehicle_rename", "fleet_vehicle_create", "fleet_vehicle_update", "fleet_vehicle_assign_route", "fleet_vehicle_delete"]);
     expect(tools.some(({ name }) => /approve|reject|reset|execute|recovery/i.test(name))).toBe(false);
   });
 

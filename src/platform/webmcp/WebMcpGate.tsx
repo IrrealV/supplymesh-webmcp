@@ -54,12 +54,12 @@ export function WebMcpGate({ children, explicitFlag, locale, onScenarioChange, o
 
       const modelContext = document.modelContext;
       if (modelContext === undefined) {
-        if (import.meta.env.DEV) {
+        if (import.meta.env.DEV && explicitFlag !== "false") {
           const opsTools = createOperationalTools(operations, onScenarioChange);
           let recTools: WebMcpTool[] = [];
 
           const updateWindowTools = () => {
-            (window as any).__recoveryTools = [...opsTools, ...recTools];
+            (window as unknown as { __recoveryTools: WebMcpTool[] }).__recoveryTools = [...opsTools, ...recTools];
           };
 
           const schedule = (snapshot: OperationalRecoverySnapshot): void => {

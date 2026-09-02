@@ -64,7 +64,7 @@ export function Topbar({ locale, onLocaleChange, scenario, operations, onScenari
         
         <Dialog.Root>
           <Dialog.Trigger asChild>
-            <button className="topbar-control" type="button"><Question aria-hidden="true" size={21} /><span>WebMCP vs REST</span></button>
+            <button className="topbar-control" type="button" aria-label="Architecture comparison"><Question aria-hidden="true" size={21} /><span>Architecture</span></button>
           </Dialog.Trigger>
           <Dialog.Portal>
             <Dialog.Overlay className="dialog-overlay" style={{ background: 'rgba(0,0,0,0.5)', position: 'fixed', inset: 0, zIndex: 999 }} />

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { createOperationsApi } from "./createOperationsApi";
 import type { ScenarioRepository } from "../ports/ScenarioRepository";
-import type { Vehicle, VehicleCreateCommand, VehicleUpdateCommand, VehicleAssignRouteCommand, OperatingRegion, FleetStatus, VehicleRenameCommand } from "../entities";
+import type { Vehicle, VehicleCreateCommand, VehicleUpdateCommand, VehicleAssignRouteCommand, OperatingRegion } from "../entities";
 
 const mockRepository = (): ScenarioRepository => ({
-  scenarioCurrent: () => ({} as OperatingRegion),
-  fleetStatus: () => ({} as FleetStatus),
-  vehicleGet: (id) => ({ cargo: { id: "cargo-1" } } as Vehicle),
+  scenarioCurrent: () => ({ vehicles: [] } as unknown as OperatingRegion),
+  scenarioRegionSelect: () => undefined,
+  vehicleGet: () => ({ cargo: { id: "cargo-1" } } as Vehicle),
   vehicleRename: () => ({} as Vehicle),
   vehicleDelete: () => ({} as Vehicle),
   vehicleCreate: (v) => v,

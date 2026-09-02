@@ -1,7 +1,7 @@
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import path from "node:path";
 
-const expectedToolNames = ["fleet_status", "fleet_vehicle_assign_route", "fleet_vehicle_create", "fleet_vehicle_delete", "fleet_vehicle_update", "recovery_operations_context", "recovery_options_compare", "recovery_plan_stage", "scenario_current", "vehicle_get", "vehicle_rename"];
+const expectedToolNames = ["avoidance_area_set", "fleet_status", "fleet_vehicle_assign_route", "fleet_vehicle_create", "fleet_vehicle_delete", "fleet_vehicle_update", "recovery_operations_context", "recovery_options_compare", "recovery_plan_stage", "scenario_current", "scenario_region_select", "vehicle_get", "vehicle_rename"];
 const scenarioTrace = [
   "Render operational desktop", "Exclude unsupported chrome", "Respect reduced motion", "Navigate shell semantics",
   "Change locale", "Switch back to English", "Use the menu by keyboard", "Toggle multiple filters",

@@ -16,7 +16,7 @@ function isLabelRecord(value: unknown): value is Record<string, string> {
 
 function isScenarioOverrides(value: unknown): value is ScenarioOverrides {
   if (typeof value !== "object" || value === null) return false;
-  const candidate = value as { version?: unknown; labels?: unknown; deletedVehicleIds?: unknown; operationalSnapshot?: unknown; recoveryRouteApplied?: unknown };
+  const candidate = value as ScenarioOverrides;
   const hasRecovery = candidate.operationalSnapshot !== undefined || candidate.recoveryRouteApplied !== undefined;
   return candidate.version === SCENARIO_OVERRIDES_VERSION
     && isLabelRecord(candidate.labels)
@@ -35,9 +35,9 @@ export function loadScenarioOverrides(storage: StorageLike): ScenarioOverrides {
       version: SCENARIO_OVERRIDES_VERSION, 
       labels: Object.fromEntries(Object.entries(parsed.labels).map(([id, label]) => [id, label.trim()])), 
       deletedVehicleIds: [...new Set(parsed.deletedVehicleIds)],
-      createdVehicles: Array.isArray((parsed as any).createdVehicles) ? (parsed as any).createdVehicles : [],
-      updatedVehicles: (parsed as any).updatedVehicles || {},
-      assignedRoutes: (parsed as any).assignedRoutes || {}
+      createdVehicles: Array.isArray(parsed.createdVehicles) ? parsed.createdVehicles : [],
+      updatedVehicles: parsed.updatedVehicles ?? {},
+      assignedRoutes: parsed.assignedRoutes ?? {}
     };
     return parsed.recoveryRouteApplied === true && parsed.operationalSnapshot !== undefined
       ? { ...normalized, recoveryRouteApplied: true, operationalSnapshot: structuredClone(parsed.operationalSnapshot) }
