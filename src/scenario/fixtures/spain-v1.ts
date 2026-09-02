@@ -60,6 +60,7 @@ function createRisks(routes: Route[]): OperationalRisk[] {
     shared("restriction-weight-26", { kind: "weight-restriction", severity: "medium", title: "26 t weight restriction", limitTonnes: 26 }),
     shared("closure-ap-68", { kind: "road-closure", severity: "critical", title: "AP-68 closure segment" }),
     (() => { const routeSnaps = snaps(routes, "severe-snow-leon"); return { id: "severe-snow-leon", kind: "severe-snow" as const, severity: "high" as const, title: "Severe snow advisory", geometry: geoPolygon([[-5.75, 42.62], [-5.42, 42.62], [-5.42, 42.83], [-5.75, 42.83]]), affectedVehicleIds: affected(routes, routeSnaps), routeSnaps }; })(),
+    { id: "landslide-santander", kind: "landslide" as const, severity: "high" as const, title: "Landslide", geometry: geoPolygon([[-3.88, 43.24], [-3.82, 43.24], [-3.82, 43.28], [-3.88, 43.28]]), affectedVehicleIds: [] },
     ...vehicleSeeds.map(([internalId], index) => { const id = `rest-deadline-${internalId}`; const routeSnaps = snaps(routes, id); return { id, kind: "rest-deadline" as const, severity: index % 4 === 3 ? "critical" as const : "high" as const, title: "Driving and rest deadline", geometry: snappedLine(routeSnaps), affectedVehicleIds: [internalId], routeSnaps, vehicleId: internalId, deadline: `2026-08-28T${String(6 + (index % 12)).padStart(2, "0")}:00:00Z` }; }),
   ];
 }

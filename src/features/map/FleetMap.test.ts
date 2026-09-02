@@ -11,7 +11,7 @@ describe("FleetMap layers", () => {
 
     expect(layers.vehicles).toHaveLength(15);
     expect(layers.routes).toHaveLength(15);
-    expect(layers.risks).toHaveLength(19);
+    expect(layers.risks).toHaveLength(20);
     expect(getVehicleDisplayName(scenario.vehicles[0])).toBe("FM-201");
     expect(layers.routes.every((entry, index) => entry.route.geometry.geometry.coordinates === scenario.routes[index].geometry.geometry.coordinates)).toBe(true);
     expect(layers.vehicles.every((entry) => entry.state === "normal")).toBe(true);

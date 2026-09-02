@@ -176,7 +176,7 @@ test("should complete the desktop filters, map, inspection, locale, and restorat
   await assertOverviewLabelsHidden(page);
   await revealVehicleLabels(page);
   await assertCollisionFreeLabels(page);
-  await expect(page.locator(".risk-marker-symbol")).toHaveCount(3);
+  await expect(page.locator(".risk-marker-symbol")).toHaveCount(4);
   await expect(page.getByRole("button", { name: "Select Unit 211 clearance incident", exact: true })).toHaveCount(1);
   await expect(page.locator(".risk-marker-label:visible")).toHaveCount(0);
   const panes = await page.evaluate(() => ["risk-tokens", "fleet-trucks", "fleet-labels"].map((name) => Number(getComputedStyle(document.querySelector<HTMLElement>(`.leaflet-${name}-pane`)!).zIndex)));

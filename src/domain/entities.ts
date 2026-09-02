@@ -26,7 +26,8 @@ export type RiskKind =
   | "weight-restriction"
   | "road-closure"
   | "severe-snow"
-  | "rest-deadline";
+  | "rest-deadline"
+  | "landslide";
 
 export type Place = { id: string; name: string; position: GeoPoint };
 export type Cargo = { id: string; description: string; refrigeration: "ambient" | "chilled" | "frozen"; priority: "standard" | "priority" | "critical" };

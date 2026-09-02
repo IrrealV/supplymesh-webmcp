@@ -1,5 +1,5 @@
 import { divIcon, latLngBounds, type LatLngExpression, type Map as LeafletMap } from "leaflet";
-import { Fragment, useEffect, useMemo } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { MapContainer, Marker, Pane, Polygon, Polyline, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import { useUiCoordinationStore } from "../../app/state/useUiCoordinationStore";
 import type { OperatingRegion, OperationalRisk, RiskSeverity } from "../../domain/entities";
@@ -12,6 +12,7 @@ import { RecoveryComparisonLayers, RecoveryIncidentInset } from "../recovery-com
 import type { Unit211RecoveryComparisonModel } from "../recovery-comparison/unit211RecoveryComparisonModel";
 import { recoveryComparisonCopy } from "../../preferences/i18n/catalog";
 import { CLOSE_RANGE_FOCUS_ZOOM } from "./closeRangeMode";
+import { prepareRoutePath } from "./closeRangeMotion";
 
 const severityColors: Record<RiskSeverity, string> = { low: "#657985", medium: "#a66a18", high: "#c4512d", critical: "#b4232d" };
 const WEATHER_RISK_COLOR = "#1268e8";
@@ -134,6 +135,42 @@ function routeStyle({ state }: DerivedRoute) {
   return { className, color: "#4c9a6a", opacity: 0.66, weight: 2.5 };
 }
 
+function CloseRangeBridgeHazard({ scenario }: { scenario: OperatingRegion }) {
+  const map = useMap();
+  const heightRisk = scenario.risks.find((r) => r.id === "restriction-height-3.9");
+  const routeSnap = heightRisk?.routeSnaps?.[0];
+  const route = scenario.routes.find((r) => r.id === routeSnap?.routeId);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (!route || !routeSnap) return;
+    const path = prepareRoutePath(route.geometry.geometry.coordinates);
+    const snapProgress = path.cumulative[routeSnap.startIndex] / path.length;
+    const container = map.getContainer();
+
+    const observer = new MutationObserver(() => {
+      const isModeActive = container.dataset.closeRangeMode === "active";
+      const currentRouteId = container.dataset.closeRangeRouteId;
+      const currentProgress = parseFloat(container.dataset.closeRangeProgress || "0");
+      const shouldShow = isModeActive && currentRouteId === route.id && Math.abs(currentProgress - snapProgress) <= 0.05;
+      
+      if (shouldShow !== isVisible) {
+        setIsVisible(shouldShow);
+      }
+    });
+
+    observer.observe(container, { attributes: true, attributeFilter: ["data-close-range-progress", "data-close-range-mode"] });
+    return () => observer.disconnect();
+  }, [isVisible, map, route, routeSnap]);
+
+  if (!isVisible || !routeSnap) return null;
+
+  const position = toPosition(routeSnap.startCoordinate);
+  const html = `<div class="bridge-3d-structure"><div class="bridge-pillar bridge-pillar-left"></div><div class="bridge-pillar bridge-pillar-right"></div><div class="bridge-beam"></div></div><div class="bridge-clearance-info">4.00 m required &middot; 3.90 m available</div>`;
+  
+  return <Marker position={position} pane="close-range-hazards" icon={divIcon({ className: "close-range-hazard-bridge", html, iconSize: [0, 0] })} />;
+}
+
 export function FleetMap({ availableComparison, comparison, locale, recoveryExecuted = false, scenario }: { availableComparison?: Unit211RecoveryComparisonModel; comparison?: Unit211RecoveryComparisonModel; locale: Locale; recoveryExecuted?: boolean; scenario: OperatingRegion }) {
   const activeFilters = useUiCoordinationStore((state) => state.activeFilters);
   const panelContext = useUiCoordinationStore((state) => state.panelContext);
@@ -148,10 +185,11 @@ export function FleetMap({ availableComparison, comparison, locale, recoveryExec
   return <div aria-label={copy.currentRoute} className="map-frame" onKeyDown={(event) => { if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "+", "-", "="].includes(event.key)) cancelManualFollow(); }} onPointerDown={cancelManualFollow} onWheel={cancelManualFollow}>
     <MapContainer center={[40.1, -3.55]} className="fleet-map" maxZoom={18} minZoom={5} zoom={6.5} zoomControl zoomSnap={0.5}>
       <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      <Pane name="risk-tokens" style={{ zIndex: 620 }} /><Pane name="fleet-trucks" style={{ zIndex: 640 }} /><Pane name="fleet-labels" style={{ zIndex: 660 }} />
+      <Pane name="risk-tokens" style={{ zIndex: 620 }} /><Pane name="fleet-trucks" style={{ zIndex: 640 }} /><Pane name="fleet-labels" style={{ zIndex: 660 }} /><Pane name="close-range-hazards" style={{ zIndex: 680 }} />
       <MapEvents coordinator={coordinator} /><MapFocus comparison={comparison} coordinator={coordinator} scenario={scenario} /><MapLayout coordinator={coordinator} signature={layoutSignature} />
       {layers.routes.filter((entry) => entry.route.id !== comparison?.current.id && entry.route.id !== comparison?.alternative.id).map((entry) => <Polyline key={`${entry.route.id}:${entry.state}`} {...routeStyle(entry)} noClip positions={routePositions(entry.route)} smoothFactor={0} />)}
       <RiskLayers entries={visibleRisks} locale={locale} />
+      <CloseRangeBridgeHazard scenario={scenario} />
       {(comparison ?? availableComparison) && <RecoveryComparisonLayers comparison={comparison !== undefined} executed={hasExecuted} locale={locale} model={(comparison ?? availableComparison)!} onIncidentSelect={comparison ? undefined : (vehicleId) => useUiCoordinationStore.getState().selectVehicle(vehicleId, "operational-map")} />}
       <VehicleMarkerLayer coordinator={coordinator} locale={locale} onSelect={(vehicleId) => useUiCoordinationStore.getState().selectVehicle(vehicleId)} routes={scenario.routes} vehicles={layers.vehicles} />
     </MapContainer>
