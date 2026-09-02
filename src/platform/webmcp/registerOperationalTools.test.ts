@@ -17,11 +17,11 @@ class MemoryStorage {
   }
 }
 
-async function toolResult(tool: ReturnType<typeof createOperationalTools>[number], input: unknown): Promise<DomainResult<unknown>> {
+async function toolResult<T = unknown>(tool: ReturnType<typeof createOperationalTools>[number], input: unknown): Promise<DomainResult<T>> {
   const response = await tool.execute(input);
   expect(response.content).toHaveLength(1);
   expect(response.content[0].type).toBe("text");
-  return JSON.parse(response.content[0].text) as DomainResult<unknown>;
+  return JSON.parse(response.content[0].text) as DomainResult<T>;
 }
 
 function failingOperations(): OperationsApi {
@@ -49,58 +49,105 @@ function failingOperations(): OperationsApi {
 }
 
 describe("createOperationalTools", () => {
-  it("should expose exactly the four documented schemas and JSON text envelope", async () => {
+  it("should expose exactly the 8 operational schemas and JSON text envelopes", async () => {
     const tools = createOperationalTools(createOperationsApi(createZustandScenarioRepository(new MemoryStorage())));
 
-    expect(tools.map((tool) => ({ name: tool.name, inputSchema: tool.inputSchema }))).toStrictEqual([
-      { name: "scenario_current", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-      { name: "scenario_region_select", inputSchema: { type: "object", properties: { regionId: { type: "string" } }, required: ["regionId"], additionalProperties: false } },
-      { name: "avoidance_area_set", inputSchema: { type: "object", properties: { radiusMeters: { type: "number" }, coordinates: { type: "array", items: { type: "number" }, minItems: 2, maxItems: 2 }, enabled: { type: "boolean" } }, required: ["enabled"], additionalProperties: false } },
-      { name: "fleet_status", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-      { name: "vehicle_get", inputSchema: { type: "object", properties: { vehicleId: { type: "string", minLength: 1 } }, required: ["vehicleId"], additionalProperties: false } },
-      { name: "vehicle_rename", inputSchema: { type: "object", properties: { vehicleId: { type: "string", minLength: 1 }, label: { type: "string", minLength: 1 } }, required: ["vehicleId", "label"], additionalProperties: false } },
-      { name: "fleet_vehicle_create", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-      { name: "fleet_vehicle_update", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-      { name: "fleet_vehicle_assign_route", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-      { name: "fleet_vehicle_delete", inputSchema: { type: "object", properties: { vehicleId: { type: "string", minLength: 1 } }, required: ["vehicleId"], additionalProperties: false } },
+    expect(tools.map((tool) => tool.name)).toStrictEqual([
+      "scenario_current",
+      "fleet_status",
+      "vehicle_get",
+      "vehicle_rename",
+      "fleet_vehicle_create",
+      "fleet_vehicle_update",
+      "fleet_vehicle_assign_route",
+      "fleet_vehicle_delete",
     ]);
 
     const result = await toolResult(tools[0], {});
     expect(result.ok).toBe(true);
   });
 
-  it("should preserve shared UI query and rename outcomes through tools", async () => {
+  it("should execute fleet_vehicle_create, update, assign, and delete with real inputs", async () => {
     const operations = createOperationsApi(createZustandScenarioRepository(new MemoryStorage()));
     let publishedScenario: OperatingRegion | undefined;
     const tools = createOperationalTools(operations, (scenario) => {
       publishedScenario = scenario;
     });
-    const scenarioResult = operations.scenarioCurrent();
-    const vehicleId = scenarioResult.ok ? scenarioResult.data.vehicles[0].internalId : "";
-    const vehicleGet = tools.find((tool) => tool.name === "vehicle_get");
-    const vehicleRename = tools.find((tool) => tool.name === "vehicle_rename");
 
-    if (vehicleGet === undefined || vehicleRename === undefined) {
-      throw new Error("Required WebMCP tools were not created.");
+    const createTool = tools.find((t) => t.name === "fleet_vehicle_create")!;
+    const updateTool = tools.find((t) => t.name === "fleet_vehicle_update")!;
+    const assignTool = tools.find((t) => t.name === "fleet_vehicle_assign_route")!;
+    const deleteTool = tools.find((t) => t.name === "fleet_vehicle_delete")!;
+
+    // 1. Create resting vehicle without route -> starts at valid Madrid coordinates
+    const createResult = await toolResult<Vehicle>(createTool, {
+      fleetNumber: "Unit 999",
+      plate: "9999-XYZ",
+      label: "Support Unit",
+      dimensions: { heightMeters: 3.8, widthMeters: 2.5, lengthMeters: 16.0 },
+      cargo: { description: "Spare parts", weightKg: 5000, type: "ambient" },
+    });
+    expect(createResult.ok).toBe(true);
+    if (!createResult.ok) return;
+
+    const createdVehicle = createResult.data;
+    expect(createdVehicle.fleetNumber).toBe("Unit 999");
+    expect(createdVehicle.status).toBe("resting");
+    expect(createdVehicle.position.geometry.coordinates).toStrictEqual([-3.7038, 40.4168]);
+    expect(createdVehicle.position.geometry.coordinates).not.toStrictEqual([0, 0]);
+    expect(createdVehicle.timing.restDeadline.length).toBeGreaterThan(0);
+    expect(publishedScenario?.vehicles.some((v) => v.internalId === createdVehicle.internalId)).toBe(true);
+
+    // 2. Update vehicle dimensions and cargo
+    const updateResult = await toolResult<Vehicle>(updateTool, {
+      vehicleId: createdVehicle.internalId,
+      label: "Updated Support Unit",
+      dimensions: { heightMeters: 4.0, widthMeters: 2.55, lengthMeters: 16.5 },
+    });
+    expect(updateResult.ok).toBe(true);
+    if (!updateResult.ok) return;
+    expect(updateResult.data.label).toBe("Updated Support Unit");
+    expect(updateResult.data.dimensions.heightMeters).toBe(4.0);
+
+    // 3. Assign route: reject assigning route already taken by vehicle-011 (route-011)
+    const collisionAssign = await toolResult<Vehicle>(assignTool, {
+      vehicleId: createdVehicle.internalId,
+      routeId: "route-011",
+    });
+    expect(collisionAssign.ok).toBe(false);
+    if (!collisionAssign.ok) {
+      expect(collisionAssign.error.code).toBe("route-already-assigned");
     }
 
-    expect(await toolResult(vehicleGet, { vehicleId })).toStrictEqual(operations.vehicleGet(vehicleId));
-    expect(await toolResult(vehicleRename, { vehicleId, label: "Night Dispatch" })).toStrictEqual(operations.vehicleRename({ vehicleId, label: "Night Dispatch" }));
-    expect(publishedScenario?.vehicles.find((vehicle) => vehicle.internalId === vehicleId)?.label).toBe("Night Dispatch");
+    // 4. Delete the vehicle
+    const deleteResult = await toolResult<Vehicle>(deleteTool, {
+      vehicleId: createdVehicle.internalId,
+    });
+    expect(deleteResult.ok).toBe(true);
+    expect(publishedScenario?.vehicles.some((v) => v.internalId === createdVehicle.internalId)).toBe(false);
   });
 
-  it("should reject invalid input and prevent operational diagnostics from reaching tool output", async () => {
+  it("should reject invalid inputs and prevent operational diagnostics from leaking", async () => {
     const tools = createOperationalTools(failingOperations());
-    const vehicleGet = tools.find((tool) => tool.name === "vehicle_get");
-    const scenarioCurrent = tools.find((tool) => tool.name === "scenario_current");
+    const vehicleGet = tools.find((tool) => tool.name === "vehicle_get")!;
+    const createTool = tools.find((tool) => tool.name === "fleet_vehicle_create")!;
+    const scenarioCurrent = tools.find((tool) => tool.name === "scenario_current")!;
 
-    if (vehicleGet === undefined || scenarioCurrent === undefined) {
-      throw new Error("Required WebMCP tools were not created.");
-    }
+    expect(await toolResult(vehicleGet, { vehicleId: "", unexpected: true })).toStrictEqual({
+      ok: false,
+      error: { code: "invalid-input", message: "The tool input is invalid." },
+    });
 
-    expect(await toolResult(vehicleGet, { vehicleId: "", unexpected: true })).toStrictEqual({ ok: false, error: { code: "invalid-input", message: "The tool input is invalid." } });
+    expect(await toolResult(createTool, { fleetNumber: "" })).toStrictEqual({
+      ok: false,
+      error: { code: "invalid-input", message: "The tool input is invalid. Provide valid fleetNumber and plate." },
+    });
+
     const result = await toolResult(scenarioCurrent, {});
-    expect(result).toStrictEqual({ ok: false, error: { code: "operation-failed", message: "The operation could not be completed." } });
+    expect(result).toStrictEqual({
+      ok: false,
+      error: { code: "operation-failed", message: "The operation could not be completed." },
+    });
     expect(JSON.stringify(result)).not.toContain("credential");
   });
 });

@@ -57,15 +57,6 @@ export function FilterRail({ isTablet = false, locale, onInteraction, scenario, 
             </Tooltip.Root>
           );
         })}
-        {isRailExpanded && (
-          <div style={{ padding: '1rem', borderTop: '1px solid var(--theme-base-border)', marginTop: '1rem', textAlign: 'center' }}>
-            {useUiCoordinationStore.getState().avoidanceArea ? (
-              <button onClick={() => useUiCoordinationStore.getState().setAvoidanceArea(null)} style={{ background: 'var(--theme-danger-bg)', color: '#fff', border: 'none', padding: '0.5rem', borderRadius: '4px', cursor: 'pointer' }}>Remove Avoid Area</button>
-            ) : (
-              <button onClick={() => useUiCoordinationStore.getState().setAvoidanceArea({ radiusMeters: 5000, coordinates: [scenario.routes[0]?.geometry.geometry.coordinates[1][0] || 0, scenario.routes[0]?.geometry.geometry.coordinates[1][1] || 0] })} style={{ background: 'var(--theme-primary-bg)', color: '#fff', border: 'none', padding: '0.5rem', borderRadius: '4px', cursor: 'pointer' }}>Set Avoid Area</button>
-            )}
-          </div>
-        )}
       </aside>
     </Tooltip.Provider>
   );

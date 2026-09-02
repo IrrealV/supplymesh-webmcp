@@ -3,6 +3,7 @@ import { deepDetachAndFreeze } from "../deepDetach";
 import type { ScenarioRepository } from "../ports/ScenarioRepository";
 import { createAssessAuthoritativeVerticalClearance, type AssessAuthoritativeVerticalClearance } from "./authoritativeVerticalAssessment";
 import { createUnit211PreDispatchContext, type Unit211PreDispatchContextResult } from "./unit211PreDispatchContext";
+import { geoPoint, type Coordinates } from "../../scenario/geometry";
 
 type OperationsApiOptions = { readAlternativeCatalog(): unknown; admittedAlternativeCatalog: unknown };
 
@@ -69,31 +70,135 @@ export function createOperationsApi(repository: ScenarioRepository, options?: Op
     },
     vehicleDelete: (vehicleId) => vehicleResult(repository.vehicleDelete(vehicleId), vehicleId),
     vehicleCreate: (command) => {
-      const internalId = `vehicle-${crypto.randomUUID()}`;
+      if (!command.fleetNumber || !command.fleetNumber.trim()) {
+        return failure("invalid-input", "Vehicle fleet number is required.");
+      }
+      if (!command.plate || !command.plate.trim()) {
+        return failure("invalid-input", "Vehicle license plate is required.");
+      }
+
+      const scenario = repository.scenarioCurrent();
+      let startCoords: Coordinates = [-3.7038, 40.4168]; // Hub Central Madrid
+      let originName = "Madrid Logistics Hub";
+      let destName = "Madrid Logistics Hub";
+      let status: Vehicle["status"] = "resting";
+      let assignedRouteId = "";
+
+      if (command.routeId && command.routeId.trim()) {
+        const route = scenario.routes.find((r) => r.id === command.routeId);
+        if (!route) {
+          return failure("route-not-found", `Route '${command.routeId}' does not exist.`);
+        }
+        const existingWithRoute = scenario.vehicles.find((v) => v.routeId === command.routeId);
+        if (existingWithRoute) {
+          return failure("route-already-assigned", `Route '${command.routeId}' is already assigned to vehicle ${existingWithRoute.fleetNumber || existingWithRoute.internalId}.`);
+        }
+        startCoords = route.geometry.geometry.coordinates[0] as Coordinates;
+        originName = route.name.split("→")[0]?.trim() || "Origin";
+        destName = route.name.split("→")[1]?.trim() || "Destination";
+        status = "driving";
+        assignedRouteId = command.routeId;
+      }
+
+      const internalId = `vehicle-${crypto.randomUUID().slice(0, 8)}`;
       const newVehicle: Vehicle = {
         internalId,
-        fleetNumber: command.fleetNumber,
-        label: command.label,
-        plate: command.plate,
-        position: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [0, 0] } },
-        status: command.routeId ? "driving" : "resting",
-        cargo: { ...command.cargo, id: `cargo-${crypto.randomUUID()}` },
-        dimensions: command.dimensions,
-        timing: { remainingDriveMinutes: 0, restDeadline: "", eta: "", delayMinutes: 0 },
-        origin: { id: "origin", name: "Origin", position: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [0, 0] } } },
-        destination: { id: "dest", name: "Destination", position: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [0, 0] } } },
-        currentRoute: command.routeId || "",
-        routeId: command.routeId || "",
+        fleetNumber: command.fleetNumber.trim(),
+        label: (command.label || command.fleetNumber).trim(),
+        plate: command.plate.trim(),
+        position: geoPoint(startCoords),
+        status,
+        cargo: {
+          id: `cargo-${crypto.randomUUID().slice(0, 8)}`,
+          description: command.cargo?.description || "General Freight",
+          refrigeration: command.cargo?.refrigeration || "ambient",
+          priority: command.cargo?.priority || "standard",
+        },
+        dimensions: {
+          vehicleType: command.dimensions?.vehicleType || "Articulated curtain-sider",
+          heightMeters: Number(command.dimensions?.heightMeters) || 3.8,
+          lengthMeters: Number(command.dimensions?.lengthMeters) || 16.5,
+          weightTonnes: Number(command.dimensions?.weightTonnes) || 24,
+        },
+        timing: {
+          remainingDriveMinutes: status === "driving" ? 240 : 0,
+          restDeadline: new Date(Date.now() + 4.5 * 3600 * 1000).toISOString(),
+          eta: new Date(Date.now() + 3.5 * 3600 * 1000).toISOString(),
+          delayMinutes: 0,
+        },
+        origin: { id: `origin-${internalId}`, name: originName, position: geoPoint(startCoords) },
+        destination: { id: `dest-${internalId}`, name: destName, position: geoPoint(startCoords) },
+        currentRoute: assignedRouteId,
+        routeId: assignedRouteId,
         routeProgress: 0,
         riskIds: [],
+        speedKmH: status === "driving" ? 78 : 0,
       };
+
       return vehicleResult(repository.vehicleCreate(newVehicle), internalId);
     },
     vehicleUpdate: (command) => {
       const existing = repository.vehicleGet(command.vehicleId);
-      const cargoId = existing?.cargo.id ?? `cargo-${crypto.randomUUID()}`;
-      return vehicleResult(repository.vehicleUpdate(command.vehicleId, { plate: command.plate, label: command.label, dimensions: command.dimensions, cargo: { ...command.cargo, id: cargoId } }), command.vehicleId);
+      if (!existing) {
+        return failure("vehicle-not-found", `Vehicle '${command.vehicleId}' not found.`);
+      }
+      const cargoId = existing.cargo.id;
+      const updates: Partial<Vehicle> = {
+        plate: command.plate?.trim() || existing.plate,
+        label: command.label?.trim() || existing.label,
+        dimensions: command.dimensions ? {
+          vehicleType: command.dimensions.vehicleType ?? existing.dimensions.vehicleType,
+          heightMeters: Number(command.dimensions.heightMeters) || existing.dimensions.heightMeters,
+          lengthMeters: Number(command.dimensions.lengthMeters) || existing.dimensions.lengthMeters,
+          weightTonnes: Number(command.dimensions.weightTonnes) || existing.dimensions.weightTonnes,
+        } : existing.dimensions,
+        cargo: command.cargo ? {
+          id: cargoId,
+          description: command.cargo.description ?? existing.cargo.description,
+          refrigeration: command.cargo.refrigeration ?? existing.cargo.refrigeration,
+          priority: command.cargo.priority ?? existing.cargo.priority,
+        } : existing.cargo,
+      };
+      return vehicleResult(repository.vehicleUpdate(command.vehicleId, updates), command.vehicleId);
     },
-    vehicleAssignRoute: (command) => vehicleResult(repository.vehicleAssignRoute(command.vehicleId, command.routeId), command.vehicleId),
+    vehicleAssignRoute: (command) => {
+      const existing = repository.vehicleGet(command.vehicleId);
+      if (!existing) {
+        return failure("vehicle-not-found", `Vehicle '${command.vehicleId}' not found.`);
+      }
+      const scenario = repository.scenarioCurrent();
+
+      if (command.routeId && command.routeId.trim()) {
+        const route = scenario.routes.find((r) => r.id === command.routeId);
+        if (!route) {
+          return failure("route-not-found", `Route '${command.routeId}' does not exist.`);
+        }
+        const existingWithRoute = scenario.vehicles.find((v) => v.internalId !== command.vehicleId && v.routeId === command.routeId);
+        if (existingWithRoute) {
+          return failure("route-already-assigned", `Route '${command.routeId}' is already assigned to vehicle ${existingWithRoute.fleetNumber || existingWithRoute.internalId}.`);
+        }
+        const startCoords = route.geometry.geometry.coordinates[0] as Coordinates;
+        const updates: Partial<Vehicle> = {
+          routeId: command.routeId,
+          currentRoute: command.routeId,
+          routeProgress: 0,
+          status: "driving",
+          position: geoPoint(startCoords),
+          speedKmH: 78,
+        };
+        repository.vehicleUpdate(command.vehicleId, updates);
+        return vehicleResult(repository.vehicleAssignRoute(command.vehicleId, command.routeId), command.vehicleId);
+      } else {
+        const updates: Partial<Vehicle> = {
+          routeId: "",
+          currentRoute: "",
+          routeProgress: 0,
+          status: "resting",
+          speedKmH: 0,
+        };
+        repository.vehicleUpdate(command.vehicleId, updates);
+        return vehicleResult(repository.vehicleAssignRoute(command.vehicleId, undefined), command.vehicleId);
+      }
+    },
   };
 }

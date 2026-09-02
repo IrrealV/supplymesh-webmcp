@@ -1,13 +1,77 @@
 import type { DomainResult, OperatingRegion, VehicleAssignRouteCommand, VehicleCreateCommand, VehicleUpdateCommand } from "../../domain/entities";
 import type { OperationsApi } from "../../domain/operations/createOperationsApi";
 import type { JsonSchema, WebMcpTool, WebMcpToolResponse } from "./webMcpTypes";
-import { useUiCoordinationStore } from "../../app/state/useUiCoordinationStore";
 
 type ScenarioChangeHandler = (scenario: OperatingRegion) => void;
 
 const emptyInputSchema: JsonSchema = { type: "object", properties: {}, additionalProperties: false };
 const vehicleGetInputSchema: JsonSchema = { type: "object", properties: { vehicleId: { type: "string", minLength: 1 } }, required: ["vehicleId"], additionalProperties: false };
 const vehicleRenameInputSchema: JsonSchema = { type: "object", properties: { vehicleId: { type: "string", minLength: 1 }, label: { type: "string", minLength: 1 } }, required: ["vehicleId", "label"], additionalProperties: false };
+
+const vehicleCreateInputSchema: JsonSchema = {
+  type: "object",
+  properties: {
+    fleetNumber: { type: "string", minLength: 1 },
+    plate: { type: "string", minLength: 1 },
+    label: { type: "string" },
+    routeId: { type: "string" },
+    cargo: {
+      type: "object",
+      properties: {
+        description: { type: "string" },
+        weightKg: { type: "number" },
+        type: { type: "string", enum: ["ambient", "chilled", "frozen"] },
+      },
+    },
+    dimensions: {
+      type: "object",
+      properties: {
+        heightMeters: { type: "number" },
+        widthMeters: { type: "number" },
+        lengthMeters: { type: "number" },
+      },
+    },
+  },
+  required: ["fleetNumber", "plate"],
+  additionalProperties: false,
+};
+
+const vehicleUpdateInputSchema: JsonSchema = {
+  type: "object",
+  properties: {
+    vehicleId: { type: "string", minLength: 1 },
+    plate: { type: "string" },
+    label: { type: "string" },
+    cargo: {
+      type: "object",
+      properties: {
+        description: { type: "string" },
+        weightKg: { type: "number" },
+        type: { type: "string", enum: ["ambient", "chilled", "frozen"] },
+      },
+    },
+    dimensions: {
+      type: "object",
+      properties: {
+        heightMeters: { type: "number" },
+        widthMeters: { type: "number" },
+        lengthMeters: { type: "number" },
+      },
+    },
+  },
+  required: ["vehicleId"],
+  additionalProperties: false,
+};
+
+const vehicleAssignRouteInputSchema: JsonSchema = {
+  type: "object",
+  properties: {
+    vehicleId: { type: "string", minLength: 1 },
+    routeId: { type: "string" },
+  },
+  required: ["vehicleId"],
+  additionalProperties: false,
+};
 
 function failure<T>(code: string, message: string): DomainResult<T> {
   return { ok: false, error: { code, message } };
@@ -35,6 +99,34 @@ function isVehicleInput(input: unknown): input is { vehicleId: string } {
 
 function isVehicleRenameInput(input: unknown): input is { vehicleId: string; label: string } {
   return isRecord(input) && hasExactKeys(input, ["vehicleId", "label"]) && typeof input.vehicleId === "string" && input.vehicleId.trim().length > 0 && typeof input.label === "string" && input.label.trim().length > 0;
+}
+
+function isVehicleCreateInput(input: unknown): input is VehicleCreateCommand {
+  if (!isRecord(input)) return false;
+  if (typeof input.fleetNumber !== "string" || input.fleetNumber.trim().length === 0) return false;
+  if (typeof input.plate !== "string" || input.plate.trim().length === 0) return false;
+  if (input.label !== undefined && typeof input.label !== "string") return false;
+  if (input.routeId !== undefined && typeof input.routeId !== "string") return false;
+  if (input.dimensions !== undefined && !isRecord(input.dimensions)) return false;
+  if (input.cargo !== undefined && !isRecord(input.cargo)) return false;
+  return true;
+}
+
+function isVehicleUpdateInput(input: unknown): input is VehicleUpdateCommand {
+  if (!isRecord(input)) return false;
+  if (typeof input.vehicleId !== "string" || input.vehicleId.trim().length === 0) return false;
+  if (input.plate !== undefined && typeof input.plate !== "string") return false;
+  if (input.label !== undefined && typeof input.label !== "string") return false;
+  if (input.dimensions !== undefined && !isRecord(input.dimensions)) return false;
+  if (input.cargo !== undefined && !isRecord(input.cargo)) return false;
+  return true;
+}
+
+function isVehicleAssignRouteInput(input: unknown): input is VehicleAssignRouteCommand {
+  if (!isRecord(input)) return false;
+  if (typeof input.vehicleId !== "string" || input.vehicleId.trim().length === 0) return false;
+  if (input.routeId !== undefined && typeof input.routeId !== "string") return false;
+  return true;
 }
 
 function execute<T>(operation: () => DomainResult<T>): WebMcpToolResponse {
@@ -81,40 +173,6 @@ export function createOperationalTools(operations: OperationsApi, onScenarioChan
       execute: (input) => isEmptyInput(input) ? execute(operations.scenarioCurrent) : toolResponse(failure("invalid-input", "The tool input is invalid.")),
     },
     {
-      name: "scenario_region_select",
-      description: "Switches the operational region for the scenario.",
-      inputSchema: { type: "object", properties: { regionId: { type: "string" } }, required: ["regionId"], additionalProperties: false },
-      execute: (input: unknown) => {
-        try {
-          if (!isRecord(input) || typeof input.regionId !== "string") return toolResponse(failure("invalid-input", "Invalid regionId"));
-          const result = operations.scenarioRegionSelect(input.regionId);
-          if (result.ok) publishScenario(operations, onScenarioChange);
-          return toolResponse(result);
-        } catch {
-          return toolResponse(failure("operation-failed", "The operation could not be completed."));
-        }
-      },
-    },
-    {
-      name: "avoidance_area_set",
-      description: "Sets an active avoidance zone constraint.",
-      inputSchema: { type: "object", properties: { radiusMeters: { type: "number" }, coordinates: { type: "array", items: { type: "number" }, minItems: 2, maxItems: 2 }, enabled: { type: "boolean" } }, required: ["enabled"], additionalProperties: false },
-      execute: (input: unknown) => {
-        try {
-          if (!isRecord(input) || typeof input.enabled !== "boolean") return toolResponse(failure("invalid-input", "Invalid input for avoidance area."));
-          if (input.enabled && Array.isArray(input.coordinates) && typeof input.radiusMeters === "number") {
-            const coords = input.coordinates as [number, number];
-            useUiCoordinationStore.getState().setAvoidanceArea({ radiusMeters: input.radiusMeters, coordinates: coords });
-          } else {
-            useUiCoordinationStore.getState().setAvoidanceArea(null);
-          }
-          return toolResponse({ ok: true, data: { success: true } });
-        } catch {
-          return toolResponse(failure("operation-failed", "Could not set avoidance area."));
-        }
-      },
-    },
-    {
       name: "fleet_status",
       description: "Gets the current fleet status summary.",
       inputSchema: emptyInputSchema,
@@ -140,11 +198,14 @@ export function createOperationalTools(operations: OperationsApi, onScenarioChan
     },
     {
       name: "fleet_vehicle_create",
-      description: "Creates a new vehicle.",
-      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      description: "Creates a new vehicle with valid attributes, dimensions, cargo, and initial position.",
+      inputSchema: vehicleCreateInputSchema,
       execute: (input: unknown) => {
+        if (!isVehicleCreateInput(input)) {
+          return toolResponse(failure("invalid-input", "The tool input is invalid. Provide valid fleetNumber and plate."));
+        }
         try {
-          const result = operations.vehicleCreate(input as VehicleCreateCommand);
+          const result = operations.vehicleCreate(input);
           if (result.ok) publishScenario(operations, onScenarioChange);
           return toolResponse(result);
         } catch {
@@ -154,11 +215,14 @@ export function createOperationalTools(operations: OperationsApi, onScenarioChan
     },
     {
       name: "fleet_vehicle_update",
-      description: "Updates an existing vehicle.",
-      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      description: "Updates an existing vehicle's dimensions, cargo, or label.",
+      inputSchema: vehicleUpdateInputSchema,
       execute: (input: unknown) => {
+        if (!isVehicleUpdateInput(input)) {
+          return toolResponse(failure("invalid-input", "The tool input is invalid. Provide valid vehicleId."));
+        }
         try {
-          const result = operations.vehicleUpdate(input as VehicleUpdateCommand);
+          const result = operations.vehicleUpdate(input);
           if (result.ok) publishScenario(operations, onScenarioChange);
           return toolResponse(result);
         } catch {
@@ -168,11 +232,14 @@ export function createOperationalTools(operations: OperationsApi, onScenarioChan
     },
     {
       name: "fleet_vehicle_assign_route",
-      description: "Assigns a route to a vehicle.",
-      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      description: "Assigns or unassigns a route for a vehicle, updating position and checking for collisions.",
+      inputSchema: vehicleAssignRouteInputSchema,
       execute: (input: unknown) => {
+        if (!isVehicleAssignRouteInput(input)) {
+          return toolResponse(failure("invalid-input", "The tool input is invalid. Provide valid vehicleId."));
+        }
         try {
-          const result = operations.vehicleAssignRoute(input as VehicleAssignRouteCommand);
+          const result = operations.vehicleAssignRoute(input);
           if (result.ok) publishScenario(operations, onScenarioChange);
           return toolResponse(result);
         } catch {
@@ -182,7 +249,7 @@ export function createOperationalTools(operations: OperationsApi, onScenarioChan
     },
     {
       name: "fleet_vehicle_delete",
-      description: "Deletes a vehicle.",
+      description: "Deletes a vehicle from the active scenario.",
       inputSchema: vehicleGetInputSchema,
       execute: (input: unknown) => {
         try {

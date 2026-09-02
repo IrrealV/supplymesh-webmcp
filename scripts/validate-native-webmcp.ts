@@ -80,7 +80,7 @@ try {
     if (context === undefined) throw new Error("Native document.modelContext is unavailable.");
     for (let attempt = 0; attempt < 200; attempt += 1) {
       const count = (await context.getTools()).length;
-      if (document.querySelector(".console-shell") !== null) return count !== 7;
+      if (document.querySelector(".console-shell") !== null) return count !== 11;
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
     throw new Error("The console did not render after native registration.");
@@ -89,7 +89,7 @@ try {
 
   const registered = await tools(page);
   const names = registered.map(({ name }) => name).sort();
-  assert(JSON.stringify(names) === JSON.stringify(["fleet_status", "recovery_operations_context", "recovery_options_compare", "recovery_plan_stage", "scenario_current", "vehicle_get", "vehicle_rename"]), `Unexpected native tools: ${names.join(", ")}`);
+  assert(JSON.stringify(names) === JSON.stringify(["fleet_status", "fleet_vehicle_assign_route", "fleet_vehicle_create", "fleet_vehicle_delete", "fleet_vehicle_update", "recovery_operations_context", "recovery_options_compare", "recovery_plan_stage", "scenario_current", "vehicle_get", "vehicle_rename"]), `Unexpected native tools: ${names.join(", ")}`);
   const schemas = Object.fromEntries(registered.map(({ inputSchema, name }) => [name, schema(inputSchema)]));
   assert(isDeepStrictEqual(schemas.scenario_current, { type: "object", properties: {}, additionalProperties: false }), `scenario_current schema changed: ${JSON.stringify(schemas.scenario_current)}`);
   assert(isDeepStrictEqual(schemas.fleet_status, { type: "object", properties: {}, additionalProperties: false }), `fleet_status schema changed: ${JSON.stringify(schemas.fleet_status)}`);
@@ -124,9 +124,9 @@ try {
     for (let attempt = 0; attempt < 100 && (await context.getTools()).length !== 0; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 10));
     return { after: (await context.getTools()).length, before };
   });
-  assert(cleanup.before === 7 && cleanup.after === 0, `Native cleanup was ${cleanup.before}→${cleanup.after}, expected 7→0.`);
+  assert(cleanup.before === 11 && cleanup.after === 0, `Native cleanup was ${cleanup.before}→${cleanup.after}, expected 11→0.`);
   assert(errors.length === 0, `Browser errors: ${errors.join(" | ")}`);
-  console.log(JSON.stringify({ browser: await browser.version(), cleanup: "7→0", errors: 0, registrationBeforeRender: true, schemas: 7, signalIsolation, tools: names }));
+  console.log(JSON.stringify({ browser: await browser.version(), cleanup: "11→0", errors: 0, registrationBeforeRender: true, schemas: 11, signalIsolation, tools: names }));
 } finally {
   await browser.close();
 }

@@ -27,10 +27,17 @@ function DetailList({ locale, tab, vehicle, onOpenHud }: { locale: Locale; tab: 
   if (tab === "driver") return (
     <div className="driver-details">
       <dl className="inspection-detail-list"><div><dt>{copy.remainingDrive}</dt><dd>{formatDuration(vehicle.timing.remainingDriveMinutes, locale, copy.notAvailable)}</dd></div><div><dt>{copy.restDeadline}</dt><dd>{formatDateTime(vehicle.timing.restDeadline, locale, copy.notAvailable)}</dd></div></dl>
-      <section className="driver-privacy-panel" style={{ marginTop: '1rem', padding: '1rem', background: '#f5f5f5', borderRadius: '4px' }}>
-        <h4 style={{ margin: '0 0 0.5rem 0' }}>Driver Telemetry & GDPR Privacy</h4>
-        <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', color: '#555' }}>Driver ID is pseudonymized. Telemetry is limited to operational routing and ephemeral (24h retention policy).</p>
-        <button onClick={onOpenHud} style={{ padding: '0.5rem', background: '#0055ff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Passive Driver HUD / Navigation Handoff</button>
+      <section aria-labelledby="privacy-facts-heading" className="driver-privacy-panel" style={{ marginTop: '1rem', padding: '0.85rem', background: '#f4f7f9', border: '1px solid #d1dbe1', borderRadius: '4px' }}>
+        <h4 id="privacy-facts-heading" style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem' }}>Verifiable Architecture Facts</h4>
+        <ul style={{ margin: '0 0 0.75rem 0', paddingLeft: '1.2rem', fontSize: '0.8rem', color: '#334e68', lineHeight: 1.4 }}>
+          <li>Client-side deterministic routing & clearance assessment</li>
+          <li>Local-only state persistence via browser sessionStorage</li>
+          <li>Zero external telemetry tracking or third-party ad beacons</li>
+          <li>Explicit human approval gates for recovery execution</li>
+        </ul>
+        <button onClick={onOpenHud} style={{ padding: '0.4rem 0.75rem', background: '#193c57', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }} type="button">
+          Preview Driver HUD
+        </button>
       </section>
     </div>
   );
@@ -97,19 +104,24 @@ export function VehicleInspection({ comparison, isFollowing, locale, onBackFromR
       <section aria-labelledby="identity-heading" className="inspection-section"><h2 id="identity-heading">{copy.identity}</h2><div className="identity-heading"><Truck aria-hidden="true" size={22} /><span aria-label={`${copy.status}: ${formatStatus(vehicle.status, copy)}`} className={`identity-status status-${vehicle.status}`} /></div><label htmlFor="vehicle-label">{copy.label}</label><div className="label-edit"><input aria-invalid={hasEdited && !isValid} id="vehicle-label" onChange={(event) => { setLabel(event.target.value); setHasEdited(true); setFeedback("none"); }} value={label} /><button disabled={!canSave} onClick={saveLabel} type="button">{copy.saveLabel}</button></div>{hasEdited && !isValid && <p className="drawer-error" role="alert">{copy.invalidLabel}</p>}{feedback !== "none" && <p className="label-feedback" role={feedback === "saved" ? "status" : "alert"}>{feedback === "saved" ? copy.labelSaved : copy.notAvailable}</p>}<dl className="identity-list"><div><dt>{copy.fleetNumber}</dt><dd>{vehicle.fleetNumber}</dd></div><div><dt>{copy.plate}</dt><dd>{present(vehicle.plate, copy.notAvailable)}</dd></div><div><dt>{copy.vehicleType}</dt><dd>{present(vehicle.dimensions.vehicleType, copy.notAvailable)}</dd></div></dl></section>
       <section aria-labelledby="summary-heading" className="inspection-section operational-summary"><h2 id="summary-heading">{copy.operationalSummary}</h2><dl><div><dt>{copy.status}</dt><dd>{formatStatus(vehicle.status, copy)}</dd></div><div><dt>{copy.route}</dt><dd>{present(vehicle.origin.name, copy.notAvailable)} → {present(vehicle.destination.name, copy.notAvailable)}</dd></div><div><dt>{copy.eta}</dt><dd>{formatDateTime(vehicle.timing.eta, locale, copy.notAvailable)}</dd></div>{vehicle.timing.delayMinutes > 0 && <div><dt>{copy.delay}</dt><dd>{formatDuration(vehicle.timing.delayMinutes, locale, copy.notAvailable)}</dd></div>}<div><dt>{copy.currentRisk}</dt><dd>{highestRisk === undefined ? copy.noCurrentRisk : `${severityLabel(highestRisk.severity, locale)} · ${formatRiskKind(highestRisk.kind, copy)}`}</dd></div></dl></section>
       <section aria-labelledby="risk-heading" className="inspection-section attention-section"><h2 id="risk-heading">{copy.whyAttention}</h2>{risks.length === 0 ? <p>{copy.noCurrentRisk}</p> : risks.map((risk) => <RiskCard key={risk.id} locale={locale} risk={risk} vehicle={vehicle} />)}</section>
-      <section aria-label={copy.vehicleInspection} className="inspection-secondary"><div aria-label={copy.vehicleInspection} className="inspection-tabs" role="tablist">{tabs.map((entry) => <button aria-controls="inspection-tabpanel" aria-selected={tab === entry.id} id={`inspection-tab-${entry.id}`} key={entry.id} onClick={() => setTab(entry.id)} role="tab" type="button">{entry.label}</button>)}</div><div aria-labelledby={`inspection-tab-${tab}`} id="inspection-tabpanel" role="tabpanel"><DetailList locale={locale} tab={tab} vehicle={vehicle} onOpenHud={() => setShowHud(true)} /></div></section>
-      <section aria-labelledby="actions-heading" className="inspection-section inspection-actions"><h2 id="actions-heading">{copy.actions}</h2>{recoveryUnavailableReason && <div aria-labelledby="recovery-unavailable-heading" className="recovery-inline-failure" role="alert"><strong id="recovery-unavailable-heading">{recoveryCopy.failureTitle}</strong><p>{recoveryCopy.failureDescription}</p><code>{recoveryUnavailableReason}</code><p>{recoveryCopy.noRouteChanged}</p></div>}<div><button className="primary-action" onClick={onViewRoute} type="button">{copy.viewOnRoute}</button>{onReviewRecovery && <button id="review-recovery-options" onClick={onReviewRecovery} type="button">{recoveryCopy.reviewOptions}</button>}{!isFollowing && <button className="follow-control" onClick={() => { onRestoreFollow(); requestAnimationFrame(() => inspectionRef.current?.focus()); }} type="button">{interpolate(copy.followVehicle, { label: displayName })}</button>}<EditVehicleDialog locale={locale} operations={operations} scenario={scenario} vehicle={vehicle} onScenarioChange={onScenarioChange} /><DeleteVehicleDialog locale={locale} onConfirm={deleteVehicle} vehicle={{ ...vehicle, label }} /></div></section>
+      <section aria-label={copy.vehicleInspection} className="inspection-secondary"><div aria-label={copy.vehicleInspection} className="inspection-tabs" role="tablist">{tabs.map((entry) => <button aria-controls="inspection-tabpanel" aria-selected={tab === entry.id} id={`inspection-tab-${entry.id}`} key={entry.id} onClick={() => setTab(entry.id)} role="tab" type="button">{entry.label}</button>)}</div><div aria-labelledby={`inspection-tab-${tab}`} id="inspection-tabpanel" role="tabpanel"><DetailList locale={locale} onOpenHud={() => setShowHud(true)} tab={tab} vehicle={vehicle} /></div></section>
+      <section aria-labelledby="actions-heading" className="inspection-section inspection-actions"><h2 id="actions-heading">{copy.actions}</h2>{recoveryUnavailableReason && <div aria-labelledby="recovery-unavailable-heading" className="recovery-inline-failure" role="alert"><strong id="recovery-unavailable-heading">{recoveryCopy.failureTitle}</strong><p>{recoveryCopy.failureDescription}</p><code>{recoveryUnavailableReason}</code><p>{recoveryCopy.noRouteChanged}</p></div>}<div><button className="primary-action" onClick={onViewRoute} type="button">{copy.viewOnRoute}</button>{onReviewRecovery && <button id="review-recovery-options" onClick={onReviewRecovery} type="button">{recoveryCopy.reviewOptions}</button>}{!isFollowing && <button className="follow-control" onClick={() => { onRestoreFollow(); requestAnimationFrame(() => inspectionRef.current?.focus()); }} type="button">{interpolate(copy.followVehicle, { label: displayName })}</button>}<EditVehicleDialog locale={locale} onScenarioChange={onScenarioChange} operations={operations} scenario={scenario} vehicle={vehicle} /><DeleteVehicleDialog locale={locale} onConfirm={deleteVehicle} vehicle={{ ...vehicle, label }} /></div></section>
     </> : comparison.kind === "ready" ? <RecoveryComparisonPanel locale={locale} model={comparison} workflow={recovery && <RecoveryWorkflowPanel {...recovery} locale={locale} />} /> : <><RecoveryComparisonFailure locale={locale} reasonCode={comparison.reasonCode} />{recovery && <RecoveryWorkflowPanel {...recovery} locale={locale} />}</>}</div>
     {showHud && (
-      <div className="passive-hud-overlay" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 9999, background: '#111', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <button onClick={() => setShowHud(false)} style={{ position: 'absolute', top: 20, right: 20, background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}><X size={32} /></button>
-        <h1 style={{ fontSize: '4rem', margin: 0 }}>85 km/h</h1>
-        <p style={{ fontSize: '1.5rem', color: '#888' }}>{present(vehicle.origin.name, copy.notAvailable)} → {present(vehicle.destination.name, copy.notAvailable)}</p>
-        <div style={{ marginTop: '2rem', padding: '1rem', background: '#333', borderRadius: '8px', textAlign: 'center' }}>
-          <WarningCircle size={48} color="#f5a623" />
-          <h2 style={{ margin: '0.5rem 0' }}>Clearance Warning Ahead</h2>
-          <p style={{ margin: 0 }}>3.9m bridge in 15km</p>
-        </div>
+      <div className="passive-hud-overlay" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 9999, background: '#0a1017', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <button onClick={() => setShowHud(false)} style={{ position: 'absolute', top: 20, right: 20, background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }} type="button"><X size={32} /></button>
+        <span style={{ background: '#1e3851', border: '1px solid #36536c', padding: '4px 12px', borderRadius: '4px', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1.25rem', color: '#90cdf4' }}>🧪 Preview Sintética · Driver HUD</span>
+        <h1 style={{ fontSize: '4.5rem', margin: 0, fontFamily: 'monospace' }}>
+          {vehicle.status === "driving" ? `${Math.round(vehicle.speedKmH || 78)}` : "0"} <span style={{ fontSize: '1.5rem', color: '#88a' }}>km/h</span>
+        </h1>
+        <p style={{ fontSize: '1.25rem', color: '#9fb3c8', marginTop: '0.5rem' }}>{present(vehicle.origin.name, copy.notAvailable)} → {present(vehicle.destination.name, copy.notAvailable)}</p>
+        {highestRisk && (
+          <div style={{ marginTop: '2rem', padding: '1rem 1.5rem', background: '#1c2936', border: '1px solid #d97706', borderRadius: '8px', textAlign: 'center', maxWidth: '420px' }}>
+            <WarningCircle color="#f59e0b" size={40} />
+            <h2 style={{ margin: '0.5rem 0', fontSize: '1.1rem' }}>{formatRiskKind(highestRisk.kind, copy)}</h2>
+            <p style={{ margin: 0, fontSize: '0.9rem', color: '#cbd5e1' }}>{highestRisk.title}</p>
+          </div>
+        )}
       </div>
     )}
   </>;

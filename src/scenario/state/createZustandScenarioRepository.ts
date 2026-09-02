@@ -1,7 +1,6 @@
 import { createStore } from "zustand/vanilla";
 import type { OperatingRegion, Route, Vehicle } from "../../domain/entities";
 import { deepDetachAndFreeze } from "../../domain/deepDetach";
-import { getScenarioForRegion } from "../fixtures/regionalScenarios";
 import type { OperationalRecoveryRepository, SemanticScenarioMutation } from "../../domain/ports/OperationalRecoveryRepository";
 import type { ScenarioRepository } from "../../domain/ports/ScenarioRepository";
 import { browserSha256Crypto, canonicalJson, sha256Fingerprint, type Sha256Crypto } from "../../domain/recovery/canonicalJson";
@@ -124,8 +123,7 @@ function applyRecoveryRoute(scenario: OperatingRegion, route: AdmittedRecoveryRo
 }
 
 function applyOverrides(overrides: ScenarioOverrides, route?: AdmittedRecoveryRoute): OperatingRegion {
-  const regionId = overrides.regionId || "spain-v1";
-  const fixture = getScenarioForRegion(regionId) || createSpainScenario();
+  const fixture = createSpainScenario();
   const deleted = new Set(overrides.deletedVehicleIds);
   const baseVehicles = fixture.vehicles
     .filter((vehicle) => !deleted.has(vehicle.internalId))
@@ -143,7 +141,7 @@ function applyOverrides(overrides: ScenarioOverrides, route?: AdmittedRecoveryRo
       };
     });
 
-  const createdVehicles = overrides.createdVehicles || [];
+  const createdVehicles = (overrides.createdVehicles || []).filter((v) => !deleted.has(v.internalId));
   
   const scenario = {
     ...fixture,
@@ -272,8 +270,8 @@ export function createZustandScenarioRepository(storage: StorageLike = browserSt
         const vehicle = findVehicle(state.scenario, vehicleId);
         if (vehicle === undefined) return state;
         const labels = { ...state.overrides.labels };
-        delete labels[vehicleId];
-        const baseOverrides = { ...state.overrides, labels, deletedVehicleIds: [...new Set([...state.overrides.deletedVehicleIds, vehicleId])] };
+        const createdVehicles = (state.overrides.createdVehicles || []).filter((v) => v.internalId !== vehicleId);
+        const baseOverrides = { ...state.overrides, labels, createdVehicles, deletedVehicleIds: [...new Set([...state.overrides.deletedVehicleIds, vehicleId])] };
         const operational = invalidatedAfterMutation(state.operational);
         const nextOverrides: ScenarioOverrides = state.overrides.recoveryRouteApplied === true ? { ...baseOverrides, operationalSnapshot: operational, recoveryRouteApplied: true } : baseOverrides;
         if (!saveScenarioOverrides(storage, nextOverrides)) return state;
