@@ -63,10 +63,9 @@ test("volumetric trucks remain readable and map-anchored at zoom 14, 15.5, and 1
   await setMapView(page, 13.5);
   await expect(page.locator("[data-three-canvas=shared]")).toHaveCount(0);
 
-  const unit211 = page.locator('[data-vehicle-truck="vehicle-011"]').locator("..");
+  const unit211 = page.locator('.fleet-truck-icon:has([data-vehicle-truck="vehicle-011"])');
   await expect(unit211).toBeVisible();
-  await unit211.focus();
-  await page.keyboard.press("Enter");
+  await unit211.click();
   await expect(page.locator(".vehicle-inspection")).toBeVisible();
 
   await setMapView(page, 14);
