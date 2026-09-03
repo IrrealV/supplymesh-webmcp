@@ -2,6 +2,20 @@
   pointer-events: none;
 }
 
+/* Existing E2E selectors use the weather-fx-* class names on compact risk
+   tokens. Neutralize the retired fixed-pixel effect rules so those tokens stay
+   crisp while the geographic ImageOverlay owns the rich visualization. */
+.risk-marker.weather-fx-heavy-rain,
+.risk-marker.weather-fx-severe-snow,
+.risk-marker.weather-fx-severe-storm,
+.risk-marker.weather-fx-calima {
+  animation: none !important;
+  background: transparent !important;
+  background-image: none !important;
+  filter: none !important;
+  opacity: inherit;
+}
+
 .weather-geographic-overlay {
   filter: saturate(1.08) contrast(1.04);
   image-rendering: auto;
