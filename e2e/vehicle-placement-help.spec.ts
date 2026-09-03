@@ -41,6 +41,7 @@ test.describe("Minibatch B: Map-based vehicle placement, functional Help, and cl
     await expect(helpDialog).toContainText("Alert vs Movement Status");
     await expect(helpDialog).toContainText("Close Range Mode (3D)");
     await expect(helpDialog).toContainText("Vehicle Placement & Routes");
+    await expect(helpDialog).toContainText("More rest from delivery slack");
     await expect(helpDialog).toContainText("Unit 211 Demo");
     await expect(helpDialog).toContainText("Recommended Agent Prompt");
     await expect(helpDialog).toContainText("Human Authority");
@@ -66,6 +67,7 @@ test.describe("Minibatch B: Map-based vehicle placement, functional Help, and cl
     await expect(helpDialogEs).toContainText("Alerta vs movimiento");
     await expect(helpDialogEs).toContainText("Modo Close Range (3D)");
     await expect(helpDialogEs).toContainText("Añadir vehículos y rutas");
+    await expect(helpDialogEs).toContainText("Más descanso usando el margen");
     await expect(helpDialogEs).toContainText("Demo de Unit 211");
     await expect(helpDialogEs).toContainText("Prompt recomendado");
     await expect(helpDialogEs).toContainText("Autoridad y aprobación humana");
@@ -148,9 +150,11 @@ test.describe("Minibatch B: Map-based vehicle placement, functional Help, and cl
       };
       el?._leaflet_map?.setZoom(14);
     });
-    await page.waitForTimeout(400);
 
-    const marker = page.locator(".fleet-marker-label").filter({ hasText: "Valencia Express" });
-    await expect(marker).toBeVisible();
+    const canvas = page.locator("[data-three-canvas=shared]");
+    await expect(canvas).toHaveCount(1);
+    await expect(canvas).toHaveAttribute("data-three-model", "volumetric-v2");
+    await expect.poll(async () => Number(await canvas.getAttribute("data-three-visible-trucks"))).toBeGreaterThan(0);
+    await expect(inspection).toContainText("Valencia Express");
   });
 });
