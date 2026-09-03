@@ -153,7 +153,7 @@ export function EditVehicleDialog({ operations, scenario, vehicle, onScenarioCha
                 <input id="edit-vehicle-cargo" required value={cargoDesc} onChange={(event) => setCargoDesc(event.target.value)} />
               </label>
               <label data-span="full" htmlFor="edit-vehicle-route">Route
-                <select id="edit-vehicle-route" value={routeId} onChange={(event) => setRouteId(event.target.value)}>
+                <select aria-label="Route" id="edit-vehicle-route" value={routeId} onChange={(event) => setRouteId(event.target.value)}>
                   <option value="">None (Resting)</option>
                   {scenario.routes.map((route) => {
                     const assignedElsewhere = route.vehicleId !== "" && route.vehicleId !== vehicle.internalId;
