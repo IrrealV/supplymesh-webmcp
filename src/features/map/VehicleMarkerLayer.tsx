@@ -112,8 +112,8 @@ export function VehicleMarkerLayer({ coordinator, locale, onSelect, routes, vehi
           return;
         }
 
-        let points: Array<{ id: string; x: number; y: number }> = [];
-        let truckObstacles: ScreenRect[] = [];
+        let points: Array<{ id: string; x: number; y: number }>;
+        let truckObstacles: ScreenRect[];
 
         if (zoom < 14) {
           const truckRects = new Map([...container.querySelectorAll<HTMLElement>("[data-vehicle-truck]")].map((node) => [
