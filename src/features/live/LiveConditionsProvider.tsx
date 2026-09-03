@@ -1,6 +1,7 @@
 import { createContext, useContext, useSyncExternalStore, type ReactNode } from "react";
 import type { LiveConditionsSnapshot, LiveConditionsStore } from "../../live/liveConditions";
 import type { Locale } from "../../preferences/i18n/catalog";
+import { LiveConditionsMapBridge } from "./LiveConditionsMapBridge";
 import { LiveConditionsPanel } from "./LiveConditionsPanel";
 
 type LiveConditionsContextValue = Readonly<{
@@ -15,6 +16,7 @@ export function LiveConditionsProvider({ children, locale, store }: { children: 
   return (
     <LiveConditionsContext.Provider value={{ snapshot, store }}>
       {children}
+      <LiveConditionsMapBridge locale={locale} snapshot={snapshot} />
       <LiveConditionsPanel locale={locale} snapshot={snapshot} store={store} />
     </LiveConditionsContext.Provider>
   );
