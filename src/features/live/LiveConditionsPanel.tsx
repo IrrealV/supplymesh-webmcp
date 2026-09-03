@@ -1,5 +1,5 @@
 import { ArrowsClockwise, Broadcast, CaretDown, CaretUp, CloudSun, Power, PowerSlash, TrafficCone } from "@phosphor-icons/react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Locale } from "../../preferences/i18n/catalog";
 import type { LiveConditionSeverity, LiveConditionsSnapshot, LiveConditionsStore, LiveTrafficCategory, LiveWeatherKind } from "../../live/liveConditions";
 import "./liveConditions.css";
@@ -38,8 +38,6 @@ function providerLabel(state: LiveConditionsSnapshot["weather"]["provider"]["sta
 
 export function LiveConditionsPanel({ locale, snapshot, store }: LiveConditionsPanelProps) {
   const [expanded, setExpanded] = useState(false);
-  useEffect(() => { if (snapshot.enabled) setExpanded(true); }, [snapshot.enabled]);
-
   const weather = useMemo(() => [...snapshot.weather.observations]
     .sort((left, right) => severityRank[right.severity] - severityRank[left.severity] || left.vehicleLabel.localeCompare(right.vehicleLabel))
     .slice(0, 4), [snapshot.weather.observations]);
@@ -86,6 +84,15 @@ export function LiveConditionsPanel({ locale, snapshot, store }: LiveConditionsP
     distance: "from route",
   };
 
+  const toggleEnabled = (): void => {
+    if (snapshot.enabled) {
+      store.disable();
+      return;
+    }
+    setExpanded(true);
+    void store.enable();
+  };
+
   return (
     <aside aria-label={copy.title} className={`live-conditions-panel${expanded ? " live-conditions-panel-expanded" : ""}`} data-live-enabled={snapshot.enabled}>
       <header className="live-conditions-header">
@@ -94,7 +101,7 @@ export function LiveConditionsPanel({ locale, snapshot, store }: LiveConditionsP
           <strong>{copy.title}</strong>
         </div>
         <div className="live-conditions-header-actions">
-          <button aria-label={snapshot.enabled ? copy.disable : copy.enable} onClick={() => { if (snapshot.enabled) store.disable(); else void store.enable(); }} type="button">
+          <button aria-label={snapshot.enabled ? copy.disable : copy.enable} onClick={toggleEnabled} type="button">
             {snapshot.enabled ? <PowerSlash aria-hidden="true" size={17} /> : <Power aria-hidden="true" size={17} />}
           </button>
           <button aria-label={expanded ? copy.collapse : copy.expand} onClick={() => setExpanded((value) => !value)} type="button">
