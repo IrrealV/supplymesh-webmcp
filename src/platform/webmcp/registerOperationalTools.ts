@@ -194,15 +194,10 @@ function execute<T>(operation: () => DomainResult<T>): WebMcpToolResponse {
 }
 
 function publishScenario(operations: OperationsApi, onScenarioChange: ScenarioChangeHandler | undefined): void {
-  if (onScenarioChange === undefined) {
-    return;
-  }
-
+  if (onScenarioChange === undefined) return;
   try {
     const result = operations.scenarioCurrent();
-    if (result.ok) {
-      onScenarioChange(result.data);
-    }
+    if (result.ok) onScenarioChange(result.data);
   } catch {
     // Tool output remains safe when an optional UI refresh callback fails.
   }
@@ -211,9 +206,7 @@ function publishScenario(operations: OperationsApi, onScenarioChange: ScenarioCh
 function executeRename(operations: OperationsApi, input: { vehicleId: string; label: string }, onScenarioChange: ScenarioChangeHandler | undefined): WebMcpToolResponse {
   try {
     const result = operations.vehicleRename(input);
-    if (result.ok) {
-      publishScenario(operations, onScenarioChange);
-    }
+    if (result.ok) publishScenario(operations, onScenarioChange);
     return toolResponse(result);
   } catch {
     return toolResponse(failure("operation-failed", "The operation could not be completed."));
@@ -241,14 +234,17 @@ export function createOperationalTools(operations: OperationsApi, onScenarioChan
       execute: (input) => isVehicleInput(input) ? execute(() => operations.vehicleGet(input.vehicleId)) : toolResponse(failure("invalid-input", "The tool input is invalid.")),
     },
     {
+      name: "rest_opportunities_compare",
+      description: "Compares deterministic opportunities to give an eligible driver more rest while preserving the route, mandatory-rest protections, drive window, and delivery tolerance. Scheduling remains exclusively human.",
+      inputSchema: vehicleGetInputSchema,
+      execute: (input) => isVehicleInput(input) ? execute(() => operations.restOpportunitiesCompare(input.vehicleId)) : toolResponse(failure("invalid-input", "The tool input is invalid.")),
+    },
+    {
       name: "vehicle_rename",
       description: "Updates a vehicle label.",
       inputSchema: vehicleRenameInputSchema,
       execute: (input) => {
-        if (!isVehicleRenameInput(input)) {
-          return toolResponse(failure("invalid-input", "The tool input is invalid."));
-        }
-
+        if (!isVehicleRenameInput(input)) return toolResponse(failure("invalid-input", "The tool input is invalid."));
         return executeRename(operations, input, onScenarioChange);
       },
     },
@@ -257,9 +253,7 @@ export function createOperationalTools(operations: OperationsApi, onScenarioChan
       description: "Creates a new vehicle with valid attributes, dimensions, cargo, and initial position.",
       inputSchema: vehicleCreateInputSchema,
       execute: (input: unknown) => {
-        if (!isVehicleCreateInput(input)) {
-          return toolResponse(failure("invalid-input", "The tool input is invalid. Provide valid fleetNumber and plate."));
-        }
+        if (!isVehicleCreateInput(input)) return toolResponse(failure("invalid-input", "The tool input is invalid. Provide valid fleetNumber and plate."));
         try {
           const result = operations.vehicleCreate(input);
           if (result.ok) publishScenario(operations, onScenarioChange);
@@ -274,9 +268,7 @@ export function createOperationalTools(operations: OperationsApi, onScenarioChan
       description: "Updates an existing vehicle's dimensions, cargo, or label.",
       inputSchema: vehicleUpdateInputSchema,
       execute: (input: unknown) => {
-        if (!isVehicleUpdateInput(input)) {
-          return toolResponse(failure("invalid-input", "The tool input is invalid. Provide valid vehicleId."));
-        }
+        if (!isVehicleUpdateInput(input)) return toolResponse(failure("invalid-input", "The tool input is invalid. Provide valid vehicleId."));
         try {
           const result = operations.vehicleUpdate(input);
           if (result.ok) publishScenario(operations, onScenarioChange);
@@ -291,9 +283,7 @@ export function createOperationalTools(operations: OperationsApi, onScenarioChan
       description: "Assigns or unassigns a route for a vehicle, updating position and checking for collisions.",
       inputSchema: vehicleAssignRouteInputSchema,
       execute: (input: unknown) => {
-        if (!isVehicleAssignRouteInput(input)) {
-          return toolResponse(failure("invalid-input", "The tool input is invalid. Provide valid vehicleId."));
-        }
+        if (!isVehicleAssignRouteInput(input)) return toolResponse(failure("invalid-input", "The tool input is invalid. Provide valid vehicleId."));
         try {
           const result = operations.vehicleAssignRoute(input);
           if (result.ok) publishScenario(operations, onScenarioChange);
