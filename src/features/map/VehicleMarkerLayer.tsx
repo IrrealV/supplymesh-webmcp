@@ -14,6 +14,7 @@ import { evaluateVehicleMotion } from "./vehicleMotion";
 import { ThreeFleetOverlay } from "./three/ThreeFleetOverlay";
 
 const LABEL_ZOOM_THRESHOLD = 7.5;
+const TRUCK_OBSTACLE_SIZE = 56;
 
 function escapeHtml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
@@ -105,37 +106,48 @@ export function VehicleMarkerLayer({ coordinator, locale, onSelect, routes, vehi
         const labelRoots = labelNodes.map((node) => node.closest<HTMLElement>(".fleet-label-icon")!).filter(Boolean);
         labelRoots.forEach((root) => { root.style.translate = "0 0"; });
 
-        const allTrucks = new Map([...container.querySelectorAll<HTMLElement>("[data-vehicle-truck]")].map((node) => [
-          node.dataset.vehicleTruck!,
-          node.closest<HTMLElement>(".fleet-truck-icon")!.getBoundingClientRect(),
-        ]));
-        const visibleTrucks = new Map([...allTrucks].filter(([, rect]) => intersectsViewport(rect, containerRect)));
+        if (map.getZoom() < LABEL_ZOOM_THRESHOLD) {
+          labelRoots.forEach((root) => { root.style.visibility = "hidden"; });
+          return;
+        }
 
-        const visibleRisks = [...container.querySelectorAll<HTMLElement>(".risk-marker")]
-          .map((node) => node.getBoundingClientRect())
-          .filter((rect) => intersectsViewport(rect, containerRect));
-        const obstacles: ScreenRect[] = [...visibleTrucks.values(), ...visibleRisks].map(({ height, width, x, y }) => ({
-          height: height + 16,
-          width: width + 16,
-          x: x - 8,
-          y: y - 8,
+        const projectedTrucks = new Map<string, { screenX: number; screenY: number }>();
+        truckMarkers.current.forEach((marker, vehicleId) => {
+          const point = map.latLngToContainerPoint(marker.getLatLng());
+          const margin = TRUCK_OBSTACLE_SIZE / 2;
+          if (point.x < -margin || point.x > container.clientWidth + margin || point.y < -margin || point.y > container.clientHeight + margin) return;
+          projectedTrucks.set(vehicleId, {
+            screenX: containerRect.x + point.x,
+            screenY: containerRect.y + point.y,
+          });
+        });
+
+        const truckObstacles: ScreenRect[] = [...projectedTrucks.values()].map(({ screenX, screenY }) => ({
+          height: TRUCK_OBSTACLE_SIZE,
+          width: TRUCK_OBSTACLE_SIZE,
+          x: screenX - TRUCK_OBSTACLE_SIZE / 2,
+          y: screenY - TRUCK_OBSTACLE_SIZE / 2,
         }));
+        const riskObstacles: ScreenRect[] = [...container.querySelectorAll<HTMLElement>(".risk-marker")]
+          .map((node) => node.getBoundingClientRect())
+          .filter((rect) => intersectsViewport(rect, containerRect))
+          .map(({ height, width, x, y }) => ({ height: height + 16, width: width + 16, x: x - 8, y: y - 8 }));
 
         const points = labelNodes.flatMap((node) => {
           const root = node.closest<HTMLElement>(".fleet-label-icon")!;
-          const truck = visibleTrucks.get(node.dataset.vehicleLabel!);
-          if (truck === undefined) {
+          const projected = projectedTrucks.get(node.dataset.vehicleLabel!);
+          if (projected === undefined) {
             root.style.visibility = "hidden";
             return [];
           }
           root.style.visibility = "visible";
-          return [{ id: node.dataset.vehicleLabel!, x: truck.x + truck.width / 2, y: truck.y + truck.height / 2 }];
+          return [{ id: node.dataset.vehicleLabel!, x: projected.screenX, y: projected.screenY }];
         });
 
         const placements = new Map(placeLabels(
           points,
           { x: containerRect.x + 8, y: containerRect.y + 8, width: containerRect.width - 16, height: containerRect.height - 16 },
-          obstacles,
+          [...truckObstacles, ...riskObstacles],
         ).map((entry) => [entry.id, entry.rect]));
 
         labelNodes.forEach((node) => {
