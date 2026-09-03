@@ -1,4 +1,4 @@
-import { ArrowsClockwise, Broadcast, CaretDown, CaretUp, CloudSun, Power, PowerSlash, TrafficCone } from "@phosphor-icons/react";
+import { ArrowsClockwise, Broadcast, CaretDown, CaretUp, CloudSun, Pause, Power, TrafficCone } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 import type { Locale } from "../../preferences/i18n/catalog";
 import type { LiveConditionSeverity, LiveConditionsSnapshot, LiveConditionsStore, LiveTrafficCategory, LiveWeatherKind } from "../../live/liveConditions";
@@ -102,7 +102,7 @@ export function LiveConditionsPanel({ locale, snapshot, store }: LiveConditionsP
         </div>
         <div className="live-conditions-header-actions">
           <button aria-label={snapshot.enabled ? copy.disable : copy.enable} onClick={toggleEnabled} type="button">
-            {snapshot.enabled ? <PowerSlash aria-hidden="true" size={17} /> : <Power aria-hidden="true" size={17} />}
+            {snapshot.enabled ? <Pause aria-hidden="true" size={17} /> : <Power aria-hidden="true" size={17} />}
           </button>
           <button aria-label={expanded ? copy.collapse : copy.expand} onClick={() => setExpanded((value) => !value)} type="button">
             {expanded ? <CaretUp aria-hidden="true" size={17} /> : <CaretDown aria-hidden="true" size={17} />}
