@@ -15,7 +15,6 @@ type TruckInstance = {
   modelGroup: import("three").Group;
   root: import("three").Group;
   selectionMesh: import("three").Mesh;
-  shadowMesh: import("three").Mesh;
 };
 
 const degreesToRadians = Math.PI / 180;
@@ -47,6 +46,7 @@ export function ThreeFleetOverlay({ vehicles, active, selectedVehicleId }: Three
 
     let isDisposed = false;
     let animationFrameId: number | null = null;
+    let resizeHandler: (() => void) | undefined;
     let renderer: import("three").WebGLRenderer | null = null;
     let scene: import("three").Scene | null = null;
     let camera: import("three").OrthographicCamera | null = null;
@@ -132,7 +132,7 @@ export function ThreeFleetOverlay({ vehicles, active, selectedVehicleId }: Three
         outline: new THREE.LineBasicMaterial({ color: 0x142331, transparent: true, opacity: 0.58 }),
         rearDoor: new THREE.MeshStandardMaterial({ color: 0xc7d2da, metalness: 0.18, roughness: 0.5 }),
         selection: new THREE.MeshBasicMaterial({ color: 0x2687e8, depthWrite: false, opacity: 0.5, side: THREE.DoubleSide, transparent: true }),
-        shadow: new THREE.MeshBasicMaterial({ color: 0x06111a, depthWrite: false, opacity: 0.28, side: THREE.DoubleSide, transparent: true }),
+        shadow: new THREE.MeshBasicMaterial({ color: 0x06111a, depthWrite: false, opacity: 0.26, side: THREE.DoubleSide, transparent: true }),
         stripe: new THREE.MeshStandardMaterial({ color: 0x2182ce, metalness: 0.12, roughness: 0.45 }),
         trailer: new THREE.MeshStandardMaterial({ color: 0xe8eef2, flatShading: true, metalness: 0.18, roughness: 0.42 }),
         trailerRoof: new THREE.MeshStandardMaterial({ color: 0xf8fbfc, metalness: 0.08, roughness: 0.32 }),
@@ -216,27 +216,25 @@ export function ThreeFleetOverlay({ vehicles, active, selectedVehicleId }: Three
         addMesh(modelGroup, geometry.grille, material.darkDetail, [47.6, 0, 17]);
         addMesh(modelGroup, geometry.headlight, material.headlight, [48.1, -8, 13]);
         addMesh(modelGroup, geometry.headlight, material.headlight, [48.1, 8, 13]);
-        addMesh(modelGroup, geometry.doorLine, material.outline, [20.3, 0, 18]);
+        addMesh(modelGroup, geometry.doorLine, material.darkDetail, [20.3, 0, 18]);
         addEdges(modelGroup, edgeGeometry.cabLower, [33, 0, 17]);
         addEdges(modelGroup, edgeGeometry.cabUpper, [31, 0, 31.5]);
 
         for (const y of [-14.6, 14.6]) {
           for (const x of [34, 10, -28, -43]) {
-            const wheel = addMesh(modelGroup, geometry.wheel, material.wheel, [x, y, 6]);
-            wheel.rotation.x = 0;
-            const hub = addMesh(modelGroup, geometry.hub, material.hub, [x, y + (y < 0 ? -2.2 : 2.2), 6]);
-            hub.rotation.x = 0;
+            addMesh(modelGroup, geometry.wheel, material.wheel, [x, y, 6]);
+            addMesh(modelGroup, geometry.hub, material.hub, [x, y + (y < 0 ? -2.2 : 2.2), 6]);
           }
           for (const x of [-8, -28]) addMesh(modelGroup, geometry.sideMarker, material.warningLight, [x, y + (y < 0 ? -0.8 : 0.8), 14]);
         }
 
         scene!.add(root);
-        return { currentYaw: 0, headingGroup, modelGroup, root, selectionMesh, shadowMesh };
+        return { currentYaw: 0, headingGroup, modelGroup, root, selectionMesh };
       };
 
       for (const { vehicle } of vehicles) truckInstances.set(vehicle.internalId, createTruck(vehicle.internalId, vehicle.status));
 
-      const handleResize = (): void => {
+      resizeHandler = (): void => {
         if (renderer === null || camera === null || isDisposed) return;
         const nextWidth = container.clientWidth;
         const nextHeight = container.clientHeight;
@@ -248,7 +246,7 @@ export function ThreeFleetOverlay({ vehicles, active, selectedVehicleId }: Three
         camera.bottom = height;
         camera.updateProjectionMatrix();
       };
-      map.on("resize", handleResize);
+      map.on("resize", resizeHandler);
 
       const renderFrame = (): void => {
         if (isDisposed || renderer === null || scene === null || camera === null) return;
@@ -279,7 +277,6 @@ export function ThreeFleetOverlay({ vehicles, active, selectedVehicleId }: Three
           instance.root.position.set(point.x, point.y + 5, selected ? 30 : 0);
           instance.root.scale.setScalar(scale);
           instance.selectionMesh.visible = selected;
-          instance.shadowMesh.material.opacity = selected ? 0.35 : 0.24;
 
           const targetYaw = normalizeAngle((motion.bearing - 90) * degreesToRadians);
           const difference = normalizeAngle(targetYaw - instance.currentYaw);
@@ -300,7 +297,7 @@ export function ThreeFleetOverlay({ vehicles, active, selectedVehicleId }: Three
     return () => {
       isDisposed = true;
       if (animationFrameId !== null) cancelAnimationFrame(animationFrameId);
-      map.off("resize");
+      if (resizeHandler !== undefined) map.off("resize", resizeHandler);
       truckInstances.forEach(({ root }) => root.clear());
       truckInstances.clear();
       sharedGeometries.forEach((geometry) => geometry.dispose());
