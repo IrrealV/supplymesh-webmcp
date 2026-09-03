@@ -108,7 +108,7 @@ export function WebMcpGate({ children, explicitFlag, liveConditions, locale, onS
               await availableModelContext.registerTool(tool, { signal: controller.signal });
               if (isStopped || controller.signal.aborted) {
                 controller.abort();
-                if (controllers.get(tool.name) === controller) controllers.delete(name);
+                if (controllers.get(tool.name) === controller) controllers.delete(tool.name);
               }
             }
           } catch (error) {
