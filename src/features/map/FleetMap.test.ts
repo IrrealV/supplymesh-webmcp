@@ -62,12 +62,12 @@ describe("FleetMap layers", () => {
     const sources = ["FleetMap.tsx", "layers.ts", "VehicleMarkerLayer.tsx", "closeRangeMode.ts", "closeRangeMotion.ts", "fleetMotionStore.ts", "labelPlacement.ts", "MapLegend.tsx", "MapEventCoordinator.ts"]
       .map((file) => readFileSync(`src/features/map/${file}`, "utf8"))
       .join("\n");
-    const allowedImports = new Set(["zustand", "./fleetMotionStore", "@phosphor-icons/react", "leaflet", "react", "react-leaflet", "../../app/presentation/useTabletViewport", "../../app/state/useUiCoordinationStore", "../../domain/entities", "../../preferences/i18n/catalog", "../fleet/filtering", "../recovery-comparison/RecoveryComparisonLayers", "../recovery-comparison/unit211RecoveryComparisonModel", "./closeRangeMode", "./closeRangeMotion", "./layers", "./labelPlacement", "./MapEventCoordinator", "./MapLegend", "./VehicleMarkerLayer", "./vehicleMotion", "./three/ThreeFleetOverlay", "./weather/WeatherRiskOverlay"]);
+    const allowedImports = new Set(["zustand", "./fleetMotionStore", "@phosphor-icons/react", "leaflet", "react", "react-leaflet", "../../app/presentation/useTabletViewport", "../../app/state/useUiCoordinationStore", "../../domain/entities", "../../preferences/i18n/catalog", "../fleet/filtering", "../recovery-comparison/RecoveryComparisonLayers", "../recovery-comparison/unit211RecoveryComparisonModel", "./closeRangeMode", "./closeRangeMotion", "./layers", "./labelPlacement", "./MapEventCoordinator", "./MapLegend", "./VehicleMarkerLayer", "./vehicleMotion", "./three/ThreeFleetOverlay", "./weather/WeatherRiskOverlay", "./rest/RestOpportunityLayers"]);
     const imports = [...sources.matchAll(/from\s+["']([^"']+)["']/g)].map((match) => match[1]);
     const networkCall = new RegExp(`\\b${["fet", "ch"].join("")}\\s*\\(`);
 
-    const invalid = imports.filter(i => !allowedImports.has(i));
-    if(invalid.length > 0) console.log("INVALID:", invalid);
+    const invalid = imports.filter((entry) => !allowedImports.has(entry));
+    if (invalid.length > 0) console.log("INVALID:", invalid);
     expect(invalid).toEqual([]);
     expect(sources).not.toMatch(networkCall);
     expect(sources).toContain("scenario.routes");
