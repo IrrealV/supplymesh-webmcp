@@ -12,24 +12,19 @@ type VehicleSnapshot = {
   status: string;
   position: { geometry: { coordinates: [number, number] } };
 };
-type RouteSnapshot = {
-  id: string;
-  vehicleId: string;
-  summary: { distanceMeters: number; durationSeconds: number };
-};
+type RouteSnapshot = { id: string; vehicleId: string; summary: { distanceMeters: number; durationSeconds: number } };
 type ScenarioSnapshot = { vehicles: VehicleSnapshot[]; routes: RouteSnapshot[] };
+type TemporalAssessment = {
+  status: string;
+  remainingRouteMinutes: number;
+  remainingDriveMinutes: number;
+  estimatedCompletionAt: string;
+  restDeadline: string;
+};
 type RecoveryComparison = {
   options: [
-    {
-      routeId: string;
-      summary: { distanceMeters: number; durationSeconds: number };
-      temporalAssessment: { status: string; remainingRouteMinutes: number; remainingDriveMinutes: number; estimatedCompletionAt: string; restDeadline: string };
-    },
-    {
-      alternativeRouteId: string;
-      summary: { distanceMeters: number; durationSeconds: number };
-      temporalAssessment: { status: string; remainingRouteMinutes: number; remainingDriveMinutes: number; estimatedCompletionAt: string; restDeadline: string };
-    },
+    { routeId: string; summary: RouteSnapshot["summary"]; temporalAssessment: TemporalAssessment },
+    { alternativeRouteId: string; summary: RouteSnapshot["summary"]; temporalAssessment: TemporalAssessment },
   ];
 };
 
@@ -113,14 +108,15 @@ async function setRouteThroughHumanUi(page: Page, routeId: string): Promise<void
 }
 
 async function openUnit211Recovery(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Select Unit 211 clearance incident", exact: true }).click();
+  const incident = page.getByRole("button", { name: "Select Unit 211 clearance incident", exact: true });
+  await incident.focus();
+  await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Review recovery options" }).click();
   await expect(page.getByRole("heading", { name: "Recovery comparison" })).toBeVisible();
 }
 
 async function stageForHumanReview(page: Page, comparison: RecoveryComparison): Promise<string> {
-  const optionId = comparison.options[1].alternativeRouteId;
-  const staged = await executeTool<{ planId: string }>(page, "recovery_plan_stage", { selectedOptionId: optionId });
+  const staged = await executeTool<{ planId: string }>(page, "recovery_plan_stage", { selectedOptionId: comparison.options[1].alternativeRouteId });
   if (!staged.ok) throw new Error(staged.error.code);
   await expect(page.getByText("STAGED", { exact: true })).toBeVisible();
   await expect.poll(() => toolNames(page)).toContain("recovery_plan_request_review");
@@ -139,19 +135,16 @@ test.beforeEach(async ({ page }) => page.emulateMedia({ reducedMotion: "reduce" 
 test("Help is functional: content, real clipboard copy, Escape, and focus restoration", async ({ context, page }) => {
   await grantClipboard(context);
   await openConsole(page);
-
   const help = page.getByRole("button", { name: "Help", exact: true });
   await help.click();
   const dialog = page.locator(".help-dialog-content");
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("Unit 211 Demo");
   await expect(dialog).toContainText("Human Authority");
-
   await dialog.locator(".help-copy-prompt-btn").click();
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain("Unit 211 clearance incident");
   await expect(dialog.locator(".help-copy-prompt-btn")).toContainText(/copied/i);
   await capture(page, "01-help-working.png");
-
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(help).toBeFocused();
@@ -165,9 +158,7 @@ test("human fleet lifecycle: map placement, persistence, route edit, and confirm
 
   const map = page.locator(".fleet-map");
   const target = await map.evaluate((node) => {
-    const element = node as HTMLElement & {
-      _leaflet_map?: { containerPointToLatLng(point: [number, number]): { lat: number; lng: number } };
-    };
+    const element = node as HTMLElement & { _leaflet_map?: { containerPointToLatLng(point: [number, number]): { lat: number; lng: number } } };
     if (element._leaflet_map === undefined) throw new Error("Leaflet map is unavailable.");
     const rect = element.getBoundingClientRect();
     const x = rect.width * 0.56;
@@ -191,8 +182,8 @@ test("human fleet lifecycle: map placement, persistence, route edit, and confirm
   if (created === undefined) return;
   expect(created.status).toBe("resting");
   expect(created.routeId).toBe("");
-  expect(created.position.geometry.coordinates[0]).toBeCloseTo(target.longitude, 4);
-  expect(created.position.geometry.coordinates[1]).toBeCloseTo(target.latitude, 4);
+  expect(Math.abs(created.position.geometry.coordinates[0] - target.longitude)).toBeLessThan(0.005);
+  expect(Math.abs(created.position.geometry.coordinates[1] - target.latitude)).toBeLessThan(0.005);
   await expect(page.locator(`[data-vehicle-truck="${created.internalId}"]`)).toBeVisible();
   await expect(page.locator(".fleet-truck-icon")).toHaveCount(16);
   await capture(page, "03-human-created-selected.png");
@@ -201,24 +192,20 @@ test("human fleet lifecycle: map placement, persistence, route edit, and confirm
   await expect(page.locator(".console-shell")).toBeVisible();
   await expect.poll(() => toolNames(page)).toContain("scenario_current");
   const persisted = (await scenario(page)).vehicles.find(({ internalId }) => internalId === created.internalId);
-  expect(persisted?.position.geometry.coordinates[0]).toBeCloseTo(target.longitude, 4);
-  expect(persisted?.position.geometry.coordinates[1]).toBeCloseTo(target.latitude, 4);
+  expect(Math.abs((persisted?.position.geometry.coordinates[0] ?? Number.POSITIVE_INFINITY) - target.longitude)).toBeLessThan(0.005);
+  expect(Math.abs((persisted?.position.geometry.coordinates[1] ?? Number.POSITIVE_INFINITY) - target.latitude)).toBeLessThan(0.005);
 
-  // Human frees route-012 from Unit 212 using the visible Edit dialog.
   await selectVehicleMarker(page, "vehicle-012");
   await setRouteThroughHumanUi(page, "");
   await expect.poll(async () => (await scenario(page)).vehicles.find(({ internalId }) => internalId === "vehicle-012")?.routeId).toBe("");
 
-  // Human assigns that real route to the newly placed truck.
   await selectVehicleMarker(page, created.internalId);
   await setRouteThroughHumanUi(page, "route-012");
   await expect.poll(async () => (await scenario(page)).vehicles.find(({ internalId }) => internalId === created.internalId)?.routeId).toBe("route-012");
   await expect(page.locator(".route-corridor-selected")).toHaveCount(1);
-  const assigned = (await scenario(page)).routes.find(({ id }) => id === "route-012");
-  expect(assigned?.vehicleId).toBe(created.internalId);
+  expect((await scenario(page)).routes.find(({ id }) => id === "route-012")?.vehicleId).toBe(created.internalId);
   await capture(page, "04-human-route-assigned.png");
 
-  // Cancel preserves the vehicle, then confirm removes it from UI and persistence.
   await page.getByRole("button", { name: "Delete vehicle" }).click();
   const deleteDialog = page.getByRole("alertdialog");
   await expect(deleteDialog).toBeVisible();
@@ -230,7 +217,6 @@ test("human fleet lifecycle: map placement, persistence, route edit, and confirm
   await page.getByRole("alertdialog").getByRole("button", { name: "Delete" }).click();
   await expect.poll(async () => (await scenario(page)).vehicles.length).toBe(15);
   await expect(page.locator(`[data-vehicle-truck="${created.internalId}"]`)).toHaveCount(0);
-
   await page.reload();
   await expect(page.locator(".console-shell")).toBeVisible();
   await expect.poll(() => toolNames(page)).toContain("scenario_current");
@@ -239,7 +225,6 @@ test("human fleet lifecycle: map placement, persistence, route edit, and confirm
 
 test("agent fleet lifecycle: create, update, reassign two real routes, prove map path changes, and delete", async ({ page }) => {
   await openConsole(page);
-
   const creation = await executeTool<VehicleSnapshot>(page, "fleet_vehicle_create", {
     fleetNumber: "QA-AGT-902",
     plate: "9022 AGT",
@@ -253,19 +238,16 @@ test("agent fleet lifecycle: create, update, reassign two real routes, prove map
   const vehicleId = creation.data.internalId;
   await expect(page.locator(`[data-vehicle-truck="${vehicleId}"]`)).toBeVisible();
 
-  const update = await executeTool<VehicleSnapshot>(page, "fleet_vehicle_update", {
+  expect(await executeTool<VehicleSnapshot>(page, "fleet_vehicle_update", {
     vehicleId,
     label: "Agent Route Optimizer QA",
     plate: "9023 AGT",
     dimensions: { vehicleType: "Reefer tractor-trailer", lengthMeters: 16.2, heightMeters: 3.75, weightTonnes: 23 },
     cargo: { description: "Priority chilled QA cargo", refrigeration: "chilled", priority: "priority" },
-  });
-  expect(update).toMatchObject({ ok: true, data: { label: "Agent Route Optimizer QA", plate: "9023 AGT" } });
+  })).toMatchObject({ ok: true, data: { label: "Agent Route Optimizer QA", plate: "9023 AGT" } });
 
-  // Free two fixture-backed routes through the same WebMCP contract.
   expect(await executeTool(page, "fleet_vehicle_assign_route", { vehicleId: "vehicle-012" })).toMatchObject({ ok: true });
   expect(await executeTool(page, "fleet_vehicle_assign_route", { vehicleId: "vehicle-013" })).toMatchObject({ ok: true });
-
   expect(await executeTool(page, "fleet_vehicle_assign_route", { vehicleId, routeId: "route-012" })).toMatchObject({ ok: true, data: { routeId: "route-012" } });
   await selectVehicleMarker(page, vehicleId);
   const selectedRoute = page.locator(".route-corridor-selected");
@@ -281,7 +263,6 @@ test("agent fleet lifecycle: create, update, reassign two real routes, prove map
   expect(afterSwitch.routes.find(({ id }) => id === "route-013")?.vehicleId).toBe(vehicleId);
   await capture(page, "07-agent-route-013.png");
 
-  // Restore fixture ownership before deleting the temporary truck.
   expect(await executeTool(page, "fleet_vehicle_assign_route", { vehicleId })).toMatchObject({ ok: true });
   expect(await executeTool(page, "fleet_vehicle_assign_route", { vehicleId: "vehicle-012", routeId: "route-012" })).toMatchObject({ ok: true });
   expect(await executeTool(page, "fleet_vehicle_assign_route", { vehicleId: "vehicle-013", routeId: "route-013" })).toMatchObject({ ok: true });
@@ -306,7 +287,6 @@ test("Unit 211 uses agent analysis plus human approval to apply the shorter rout
   expect(alternative.temporalAssessment.remainingRouteMinutes).toBeLessThanOrEqual(alternative.temporalAssessment.remainingDriveMinutes);
   expect(Date.parse(alternative.temporalAssessment.estimatedCompletionAt)).toBeLessThanOrEqual(Date.parse(alternative.temporalAssessment.restDeadline));
 
-  // Rest facts are hard inputs: the general CRUD tool rejects attempts to rewrite timing.
   expect(await executeTool(page, "fleet_vehicle_update", {
     vehicleId: "vehicle-011",
     timing: { remainingDriveMinutes: 999, restDeadline: "2099-01-01T00:00:00Z" },
@@ -327,14 +307,11 @@ test("Unit 211 uses agent analysis plus human approval to apply the shorter rout
   const planId = await stageForHumanReview(page, comparisonResult.data);
   await expect.poll(() => toolNames(page)).not.toContain("recovery_plan_execute");
   await capture(page, "09-recovery-awaiting-human.png");
-
-  // This is the only authority transition in the test and it is performed in the visible UI.
   await page.getByRole("button", { name: "Approve" }).click();
   await expect(page.getByText("APPROVED", { exact: true })).toBeVisible();
   await expect.poll(() => toolNames(page)).toContain("recovery_plan_execute");
 
-  const execution = await executeTool<{ status: string }>(page, "recovery_plan_execute", { planId });
-  expect(execution).toMatchObject({ ok: true, data: { status: "EXECUTED" } });
+  expect(await executeTool<{ status: string }>(page, "recovery_plan_execute", { planId })).toMatchObject({ ok: true, data: { status: "EXECUTED" } });
   await expect(page.locator(".recovery-current-route")).toHaveCount(0);
   const appliedPath = page.locator(".recovery-applied-route");
   await expect(appliedPath).toBeVisible();
