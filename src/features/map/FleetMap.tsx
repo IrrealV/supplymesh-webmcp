@@ -3,7 +3,6 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { MapContainer, Marker, Pane, Polygon, Polyline, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import { useUiCoordinationStore } from "../../app/state/useUiCoordinationStore";
 import type { OperatingRegion, OperationalRisk, RiskSeverity } from "../../domain/entities";
-import { compareRestOpportunities } from "../../domain/operations/restOpportunities";
 import { catalog, operationalCopy, type Locale } from "../../preferences/i18n/catalog";
 import { deriveMapLayers, selectVisibleRisks, type DerivedRisk, type DerivedRoute } from "./layers";
 import { MapEventCoordinator } from "./MapEventCoordinator";
@@ -14,7 +13,7 @@ import type { Unit211RecoveryComparisonModel } from "../recovery-comparison/unit
 import { recoveryComparisonCopy } from "../../preferences/i18n/catalog";
 import { CLOSE_RANGE_FOCUS_ZOOM } from "./closeRangeMode";
 import { isWeatherRiskKind, WeatherRiskOverlay } from "./weather/WeatherRiskOverlay";
-import { RestOpportunityLayers } from "./rest/RestOpportunityLayers";
+import { RestOpportunityLayers, type RestOpportunityMapModel } from "./rest/RestOpportunityLayers";
 
 const severityColors: Record<RiskSeverity, string> = { low: "#657985", medium: "#a66a18", high: "#c4512d", critical: "#b4232d" };
 const WEATHER_RISK_COLOR = "#1268e8";
@@ -246,7 +245,7 @@ function MapPlacementHandler() {
   return <Marker position={[placementCoordinates[1], placementCoordinates[0]]} icon={divIcon({ className: "placement-preview-marker", html: '<div class="placement-preview-pin"></div>', iconSize: [40, 40], iconAnchor: [20, 20] })} pane="fleet-trucks" />;
 }
 
-export function FleetMap({ availableComparison, comparison, locale, recoveryExecuted = false, scenario }: { availableComparison?: Unit211RecoveryComparisonModel; comparison?: Unit211RecoveryComparisonModel; locale: Locale; recoveryExecuted?: boolean; scenario: OperatingRegion }) {
+export function FleetMap({ availableComparison, comparison, locale, recoveryExecuted = false, restOpportunityComparison, scenario }: { availableComparison?: Unit211RecoveryComparisonModel; comparison?: Unit211RecoveryComparisonModel; locale: Locale; recoveryExecuted?: boolean; restOpportunityComparison?: RestOpportunityMapModel; scenario: OperatingRegion }) {
   const activeFilters = useUiCoordinationStore((state) => state.activeFilters);
   const panelContext = useUiCoordinationStore((state) => state.panelContext);
   const selection = useUiCoordinationStore((state) => state.selection);
@@ -256,7 +255,6 @@ export function FleetMap({ availableComparison, comparison, locale, recoveryExec
   const selectedVehicleId = selection.kind === "vehicle" ? selection.vehicleId : "";
   const layers = useMemo(() => deriveMapLayers(scenario, activeFilters, selectedVehicleId), [activeFilters, scenario, selectedVehicleId]);
   const visibleRisks = useMemo(() => selectVisibleRisks(layers.risks, selectedVehicleId).filter(({ risk }) => risk.id !== (comparison ?? availableComparison)?.incident.riskId), [availableComparison, comparison, layers.risks, selectedVehicleId]);
-  const restComparison = useMemo(() => selectedVehicleId === "" ? null : compareRestOpportunities(scenario, selectedVehicleId), [scenario, selectedVehicleId]);
   const coordinator = useMemo(() => new MapEventCoordinator(), []);
   const copy = catalog(locale);
   const cancelManualFollow = (): void => { coordinator.recordManualInteraction(); useUiCoordinationStore.getState().cancelFollow(); };
@@ -271,7 +269,7 @@ export function FleetMap({ availableComparison, comparison, locale, recoveryExec
       <RiskLayers entries={visibleRisks} locale={locale} />
       <CloseRangeBridgeHazard scenario={scenario} />
       <MapPlacementHandler />
-      {restComparison?.ok && <RestOpportunityLayers comparison={restComparison.data} locale={locale} />}
+      {restOpportunityComparison && <RestOpportunityLayers comparison={restOpportunityComparison} locale={locale} />}
       {(comparison ?? availableComparison) && <RecoveryComparisonLayers comparison={comparison !== undefined} executed={hasExecuted} locale={locale} model={(comparison ?? availableComparison)!} onIncidentSelect={comparison ? undefined : (vehicleId) => useUiCoordinationStore.getState().selectVehicle(vehicleId, "operational-map")} />}
       <VehicleMarkerLayer coordinator={coordinator} locale={locale} onSelect={(vehicleId) => useUiCoordinationStore.getState().selectVehicle(vehicleId)} routes={scenario.routes} vehicles={layers.vehicles} />
     </MapContainer>
