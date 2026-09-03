@@ -27,6 +27,12 @@ export function Topbar({ locale, onLocaleChange }: { locale: Locale; onLocaleCha
   const demoPromptText = locale === "es"
     ? "Evalúa alternativas para el incidente de la Unidad 211, prepara el plan óptimo, solicita revisión humana y ejecuta la recuperación tras ser aprobada."
     : "Evaluate alternatives for Unit 211 clearance incident, stage the optimal recovery plan, request human review, and once approved execute recovery.";
+  const vehiclePlacementHelp = locale === "es"
+    ? "Pulsa Añadir vehículo y después haz clic en el mapa para colocarlo. Completa sus datos en el panel lateral. El agente puede crear, editar y asignar rutas mediante fleet_vehicle_create, fleet_vehicle_update y fleet_vehicle_assign_route."
+    : "Choose Add vehicle and then click the map to place it. Complete its details in the side panel. The agent can create, edit, and assign routes through fleet_vehicle_create, fleet_vehicle_update, and fleet_vehicle_assign_route.";
+  const restOpportunityHelp = locale === "es"
+    ? "En Unit 212, el agente puede comparar oportunidades para devolver al conductor más tiempo de descanso usando el margen de entrega. El agente no puede reducir descansos ni programar la parada: la decisión final siempre la toma una persona."
+    : "For Unit 212, the agent can compare opportunities that return more delivery slack to the driver as extra rest. The agent cannot reduce rest or schedule the stop; a person always makes the final choice.";
 
   function handleCopyPrompt(): void {
     if (navigator.clipboard) {
@@ -68,7 +74,7 @@ export function Topbar({ locale, onLocaleChange }: { locale: Locale; onLocaleCha
                 <Dialog.Title className="help-dialog-title">{copy.helpTitle}</Dialog.Title>
                 <Dialog.Close asChild>
                   <button className="help-dialog-close" type="button" aria-label={copy.cancel}>
-                    <X size={20} />
+                    <X aria-hidden="true" size={20} />
                   </button>
                 </Dialog.Close>
               </div>
@@ -90,7 +96,12 @@ export function Topbar({ locale, onLocaleChange }: { locale: Locale; onLocaleCha
 
                 <section className="help-section">
                   <h3>🚛 {locale === "es" ? "Añadir vehículos y rutas" : "Vehicle Placement & Routes"}</h3>
-                  <p>{copy.helpCreateAssign}</p>
+                  <p>{vehiclePlacementHelp}</p>
+                </section>
+
+                <section className="help-section">
+                  <h3>🛏️ {locale === "es" ? "Más descanso usando el margen" : "More rest from delivery slack"}</h3>
+                  <p>{restOpportunityHelp}</p>
                 </section>
 
                 <section className="help-section">
@@ -106,7 +117,7 @@ export function Topbar({ locale, onLocaleChange }: { locale: Locale; onLocaleCha
                     onClick={handleCopyPrompt}
                     type="button"
                   >
-                    {copied ? <Check size={16} /> : <Copy size={16} />}
+                    {copied ? <Check aria-hidden="true" size={16} /> : <Copy aria-hidden="true" size={16} />}
                     <span>{copied ? copy.helpPromptCopied : copy.helpCopyPrompt}</span>
                   </button>
                 </section>
