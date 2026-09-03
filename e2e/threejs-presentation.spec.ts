@@ -17,13 +17,29 @@ async function installWebMcp(page: Page): Promise<void> {
 }
 
 async function setMapView(page: Page, zoom: number): Promise<void> {
+  await expect.poll(() => page.evaluate(() => {
+    const store = (window as unknown as {
+      __fleetMotionStore?: {
+        getState(): { motions: Record<string, { latitude: number; longitude: number }> };
+      };
+    }).__fleetMotionStore;
+    return store?.getState().motions["vehicle-011"] ?? null;
+  })).not.toBeNull();
+
   await page.locator(".fleet-map").evaluate(async (node, targetZoom) => {
     const element = node as HTMLElement & {
       _leaflet_map?: {
         setView(center: [number, number], zoom: number, options: { animate: boolean }): void;
       };
     };
-    element._leaflet_map?.setView([39.862774, -4.027341], targetZoom, { animate: false });
+    const store = (window as unknown as {
+      __fleetMotionStore?: {
+        getState(): { motions: Record<string, { latitude: number; longitude: number }> };
+      };
+    }).__fleetMotionStore;
+    const motion = store?.getState().motions["vehicle-011"];
+    if (motion === undefined) throw new Error("Unit 211 motion state is unavailable.");
+    element._leaflet_map?.setView([motion.latitude, motion.longitude], targetZoom, { animate: false });
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
   }, zoom);
   await expect(page.locator(".fleet-map")).toHaveAttribute("data-close-range-mode", zoom >= 14 ? "active" : "inactive");
@@ -60,8 +76,8 @@ async function visibleLabelCount(page: Page): Promise<number> {
 
 async function selectUnit211(page: Page): Promise<void> {
   const unit211 = page.locator('.fleet-truck-icon:has([data-vehicle-truck="vehicle-011"])');
-  await expect(unit211).toBeAttached();
-  await unit211.evaluate((element) => (element as HTMLElement).click());
+  await expect(unit211).toBeVisible();
+  await unit211.click();
   await expect(page.locator(".vehicle-inspection")).toBeVisible();
 }
 
