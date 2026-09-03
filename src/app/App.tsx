@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { createRecoveryApplication } from "./createApplication";
+import { LiveConditionsProvider } from "../features/live/LiveConditionsProvider";
 import { OperationalShell } from "../features/shell/OperationalShell";
 import type { OperatingRegion } from "../domain/entities";
 import { catalog, type Locale } from "../preferences/i18n/catalog";
@@ -19,6 +20,8 @@ export function App() {
   const copy = catalog(locale);
 
   return <WebMcpGate explicitFlag={import.meta.env.VITE_WEBMCP_LOCAL_BYPASS} liveConditions={liveConditions} locale={locale} onScenarioChange={publishScenario} operational={application.operational} operations={operations} recoveryAgent={application.recoveryAgent} recoveryExecution={application.recoveryExecution}>
-    {!result.ok ? <main className="console-unavailable">{copy.consoleUnavailable}</main> : <OperationalShell liveConditions={liveConditions} locale={locale} onLocaleChange={setLocale} onScenarioChange={publishScenario} operational={application.operational} operations={operations} recoveryAgent={application.recoveryAgent} recoveryExecution={application.recoveryExecution} recoveryHuman={application.recoveryHuman} scenario={result.data} />}
+    <LiveConditionsProvider locale={locale} store={liveConditions}>
+      {!result.ok ? <main className="console-unavailable">{copy.consoleUnavailable}</main> : <OperationalShell locale={locale} onLocaleChange={setLocale} onScenarioChange={publishScenario} operational={application.operational} operations={operations} recoveryAgent={application.recoveryAgent} recoveryExecution={application.recoveryExecution} recoveryHuman={application.recoveryHuman} scenario={result.data} />}
+    </LiveConditionsProvider>
   </WebMcpGate>;
 }
