@@ -49,9 +49,9 @@ export function WebMcpGate({ children, explicitFlag, liveConditions, locale, onS
     const abort = (): void => abortAll();
     window.addEventListener("beforeunload", abort);
 
-    const operationalTools = (): WebMcpTool[] => [
+    const operationalTools = (includeLiveConditions = true): WebMcpTool[] => [
       ...createOperationalTools(operations, onScenarioChange),
-      ...(liveConditions === undefined ? [] : [createLiveConditionsTool(liveConditions)]),
+      ...(includeLiveConditions && liveConditions !== undefined ? [createLiveConditionsTool(liveConditions)] : []),
     ];
 
     async function register(): Promise<void> {
@@ -91,6 +91,7 @@ export function WebMcpGate({ children, explicitFlag, liveConditions, locale, onS
         return;
       }
       const availableModelContext = modelContext;
+      const supportsNativeIntrospection = typeof (availableModelContext as unknown as { getTools?: unknown }).getTools === "function";
 
       setState("registering");
       try {
@@ -152,7 +153,7 @@ export function WebMcpGate({ children, explicitFlag, liveConditions, locale, onS
         const initial = operational.read();
         if (!initial.ok) throw new Error("Recovery state is unavailable.");
         schedule(initial.data);
-        await addTools(operationalTools());
+        await addTools(operationalTools(supportsNativeIntrospection));
         if (isStopped) return;
         isBaseReady = true;
         for (const snapshot of pendingSnapshots.splice(0)) schedule(snapshot);
