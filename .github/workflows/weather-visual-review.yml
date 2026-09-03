@@ -1,9 +1,11 @@
-name: Weather visual review
+name: SupplyMesh release gate
 
 on:
   push:
     branches:
       - fix/pr55-geographic-weather
+      - feat/pr55-driver-rest-opportunities
+      - fix/pr55-threejs-presentation
   workflow_dispatch:
 
 permissions:
@@ -40,11 +42,11 @@ jobs:
           bun run routes:verify
           bun run routes:clearance:verify
 
-      - name: Upload visual evidence
+      - name: Upload release evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: weather-visual-review-${{ github.sha }}
+          name: supplymesh-release-gate-${{ github.sha }}
           if-no-files-found: warn
           retention-days: 3
           path: |
