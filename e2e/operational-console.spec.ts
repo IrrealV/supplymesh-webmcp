@@ -1,7 +1,7 @@
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import path from "node:path";
 
-const expectedToolNames = ["fleet_status", "fleet_vehicle_assign_route", "fleet_vehicle_create", "fleet_vehicle_delete", "fleet_vehicle_update", "recovery_operations_context", "recovery_options_compare", "recovery_plan_stage", "scenario_current", "vehicle_get", "vehicle_rename"];
+const expectedToolNames = ["fleet_status", "fleet_vehicle_assign_route", "fleet_vehicle_create", "fleet_vehicle_delete", "fleet_vehicle_update", "recovery_operations_context", "recovery_options_compare", "recovery_plan_stage", "rest_opportunities_compare", "scenario_current", "vehicle_get", "vehicle_rename"];
 const scenarioTrace = [
   "Render operational desktop", "Exclude unsupported chrome", "Respect reduced motion", "Navigate shell semantics",
   "Change locale", "Switch back to English", "Use the menu by keyboard", "Toggle multiple filters",
@@ -146,11 +146,15 @@ test("should preserve base and initial recovery WebMCP schemas, responses, parit
   expect(tools.find(({ name }) => name === "scenario_current")?.inputSchema).toEqual({ type: "object", properties: {}, additionalProperties: false });
   expect(tools.find(({ name }) => name === "fleet_status")?.inputSchema).toEqual({ type: "object", properties: {}, additionalProperties: false });
   expect(tools.find(({ name }) => name === "vehicle_get")?.inputSchema).toEqual({ type: "object", properties: { vehicleId: { type: "string", minLength: 1 } }, required: ["vehicleId"], additionalProperties: false });
+  expect(tools.find(({ name }) => name === "rest_opportunities_compare")?.inputSchema).toEqual({ type: "object", properties: { vehicleId: { type: "string", minLength: 1 } }, required: ["vehicleId"], additionalProperties: false });
   expect(tools.find(({ name }) => name === "vehicle_rename")?.inputSchema).toEqual({ type: "object", properties: { vehicleId: { type: "string", minLength: 1 }, label: { type: "string", minLength: 1 } }, required: ["vehicleId", "label"], additionalProperties: false });
   expect(tools.find(({ name }) => name === "recovery_operations_context")?.inputSchema).toEqual({ type: "object", properties: {}, additionalProperties: false });
   expect(tools.find(({ name }) => name === "recovery_options_compare")?.inputSchema).toEqual({ type: "object", properties: {}, additionalProperties: false });
   expect(tools.find(({ name }) => name === "recovery_plan_stage")?.inputSchema).toEqual({ type: "object", properties: { selectedOptionId: { type: "string", minLength: 1 } }, required: ["selectedOptionId"], additionalProperties: false });
   await expect.poll(async () => executeTool(page, "fleet_status", {})).toMatchObject({ ok: true, data: { total: 15 } });
+  expect(await executeTool(page, "rest_opportunities_compare", { vehicleId: "vehicle-012" })).toMatchObject({ ok: true, data: { recommendedOptionId: "rest-window-max-55", policy: { mandatoryRestIsNeverReduced: true, humanSchedulesRest: true } } });
+  expect(await executeTool(page, "rest_opportunities_compare", { vehicleId: "vehicle-012", tolerance: 999 })).toMatchObject({ ok: false, error: { code: "invalid-input" } });
+  expect(tools.some(({ name }) => /rest.*schedule|schedule.*rest|rest.*approve/i.test(name))).toBe(false);
   expect(await executeTool(page, "scenario_current", { extra: true })).toMatchObject({ ok: false, error: { code: "invalid-input" } });
   expect(await executeTool(page, "vehicle_rename", { vehicleId: "vehicle-002", label: "" })).toMatchObject({ ok: false, error: { code: "invalid-input" } });
   expect(await executeTool(page, "vehicle_rename", { vehicleId: "vehicle-002", label: "N".repeat(65) })).toMatchObject({ ok: false, error: { code: "invalid-label" } });
