@@ -9,6 +9,7 @@ import { FilterResults } from "../fleet/FilterResults";
 import { OperationalOverview } from "../fleet/OperationalOverview";
 import { VehicleInspection } from "../fleet/VehicleInspection";
 import { FleetMap } from "../map/FleetMap";
+import { RestOpportunityPanel } from "../rest/RestOpportunityPanel";
 import { ContextPanel } from "./ContextPanel";
 import { Topbar } from "./Topbar";
 import { VehiclePlacementDrawer } from "../fleet/CreateVehicleDialog";
@@ -94,17 +95,12 @@ export function OperationalShell({ locale, onLocaleChange, onScenarioChange, ope
         <FilterRail isTablet={isTablet} locale={locale} onInteraction={() => setTabletOverviewOpen(false)} scenario={scenario} operations={operations} onScenarioChange={onScenarioChange} />
         <section aria-describedby={comparison?.kind === "ready" ? "recovery-map-summary" : undefined} aria-label={copy.operationalMap} className="map-workspace" id="operational-map" role="region" tabIndex={-1}>
           <FleetMap availableComparison={availableComparison.kind === "ready" ? availableComparison : undefined} comparison={comparison?.kind === "ready" ? comparison : undefined} locale={locale} recoveryExecuted={snapshot?.executionRecord != null} scenario={scenario} />
+          {!recoveryOpen && selectedVehicle && <RestOpportunityPanel key={`${selectedVehicle.internalId}:${selectedVehicle.scheduledRest?.planId ?? "none"}`} locale={locale} onScenarioChange={onScenarioChange} operations={operations} vehicle={selectedVehicle} />}
         </section>
         {isTablet && inspectionVehicle === undefined && panelContext.mode === "overview" && !tabletOverviewOpen && <button aria-label={panelCopy.openOverview} className="tablet-overview-trigger" onClick={openTabletOverview} type="button"><ChartPieSlice aria-hidden="true" size={19} /><span>{panelCopy.operationalOverview}</span></button>}
         {inspectionVehicle === undefined ? (
           placementCoordinates ? (
-            <VehiclePlacementDrawer
-              coordinates={placementCoordinates}
-              locale={locale}
-              onClose={cancelPlacement}
-              onScenarioChange={onScenarioChange}
-              operations={operations}
-            />
+            <VehiclePlacementDrawer coordinates={placementCoordinates} locale={locale} onClose={cancelPlacement} onScenarioChange={onScenarioChange} operations={operations} />
           ) : (
             <ContextPanel closeLabel={panelContext.mode === "overview" ? panelCopy.closeOverview : copy.closeResults} label={panelContext.mode === "overview" ? panelCopy.operationalOverview : copy.fleetFilters} mode={panelContext.mode} onClose={panelContext.mode === "overview" ? () => setTabletOverviewOpen(false) : closeResults} tabletOpen={panelContext.mode === "results" || tabletOverviewOpen}>
               {panelContext.mode === "overview" ? <OperationalOverview locale={locale} scenario={scenario} /> : <FilterResults locale={locale} scenario={scenario} />}
