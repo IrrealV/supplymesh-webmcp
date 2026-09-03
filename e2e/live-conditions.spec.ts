@@ -92,6 +92,7 @@ test("live weather and DGT traffic remain advisory, visible and API-key free", a
   await expect(panel).toBeVisible();
   const enabled = await executeLiveTool(page, true) as { ok?: boolean; data?: { advisoryOnly?: boolean; enabled?: boolean } };
   expect(enabled).toMatchObject({ ok: true, data: { advisoryOnly: true, enabled: true } });
+  await panel.getByRole("button", { name: "Expand live data" }).click();
 
   await expect(panel.locator('[data-provider-state="ready"]')).toHaveCount(2);
   await expect(panel.locator("[data-live-weather-summary]")).toHaveCount(4);
