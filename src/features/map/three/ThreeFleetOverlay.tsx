@@ -9,301 +9,325 @@ type ThreeFleetOverlayProps = {
   selectedVehicleId: string;
 };
 
+type TruckInstance = {
+  currentYaw: number;
+  headingGroup: import("three").Group;
+  modelGroup: import("three").Group;
+  root: import("three").Group;
+  selectionMesh: import("three").Mesh;
+  shadowMesh: import("three").Mesh;
+};
+
+const degreesToRadians = Math.PI / 180;
+
+function normalizeAngle(angle: number): number {
+  let normalized = angle;
+  while (normalized > Math.PI) normalized -= Math.PI * 2;
+  while (normalized < -Math.PI) normalized += Math.PI * 2;
+  return normalized;
+}
+
+function presentationScale(zoom: number, selected: boolean): number {
+  const zoomProgress = Math.min(3, Math.max(0, zoom - 14));
+  const base = 0.88 + zoomProgress * 0.08;
+  return base * (selected ? 1.12 : 1);
+}
+
 export function ThreeFleetOverlay({ vehicles, active, selectedVehicleId }: ThreeFleetOverlayProps) {
   const map = useMap();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const selectedVehicleRef = useRef(selectedVehicleId);
+
+  useEffect(() => {
+    selectedVehicleRef.current = selectedVehicleId;
+  }, [selectedVehicleId]);
 
   useEffect(() => {
     if (!active) return;
 
     let isDisposed = false;
-    let animFrameId: number | null = null;
+    let animationFrameId: number | null = null;
     let renderer: import("three").WebGLRenderer | null = null;
     let scene: import("three").Scene | null = null;
     let camera: import("three").OrthographicCamera | null = null;
-
-    // Track meshes per vehicle
-    type TruckInstance = {
-      root: import("three").Group;
-      pitchGroup: import("three").Group;
-      yawGroup: import("three").Group;
-      cabMesh: import("three").Mesh;
-      trailerMesh: import("three").Mesh;
-      chassisMesh: import("three").Mesh;
-      wheels: import("three").Mesh[];
-      shadowMesh: import("three").Mesh;
-      selectionMesh: import("three").Mesh;
-    };
-
     const truckInstances = new Map<string, TruckInstance>();
     const sharedGeometries: import("three").BufferGeometry[] = [];
     const sharedMaterials: import("three").Material[] = [];
+    const container = map.getContainer();
 
-    // Dynamically import Three.js only when close-range is active (zoom >= 14)
-    import("three").then((THREE) => {
-      if (isDisposed || !canvasRef.current) return;
+    void import("three").then((THREE) => {
+      if (isDisposed || canvasRef.current === null) return;
 
       const canvas = canvasRef.current;
-      const container = map.getContainer();
       let width = container.clientWidth;
       let height = container.clientHeight;
 
-      // Single WebGL renderer for all vehicles
       try {
         renderer = new THREE.WebGLRenderer({
-          canvas,
           alpha: true,
           antialias: true,
+          canvas,
           powerPreference: "high-performance",
+          premultipliedAlpha: true,
         });
-        renderer.setSize(width, height, false);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      } catch (err) {
-        console.warn("Failed to initialize WebGL for ThreeFleetOverlay", err);
+      } catch (error) {
+        console.warn("Failed to initialize WebGL for ThreeFleetOverlay", error);
+        container.dataset.closeRangeRenderer = "2d-fallback";
         return;
       }
 
-      scene = new THREE.Scene();
+      renderer.setClearColor(0x000000, 0);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+      renderer.setSize(width, height, false);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.08;
 
-      // Orthographic camera mapping 1:1 to container pixels
+      scene = new THREE.Scene();
       camera = new THREE.OrthographicCamera(0, width, 0, height, -2000, 2000);
-      camera.position.set(0, 0, 500);
+      camera.position.set(0, 0, 650);
       camera.lookAt(0, 0, 0);
 
-      // Lighting
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
-      scene.add(ambientLight);
+      scene.add(new THREE.HemisphereLight(0xf4fbff, 0x24313d, 1.55));
+      const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
+      keyLight.position.set(-180, -220, 420);
+      scene.add(keyLight);
+      const fillLight = new THREE.DirectionalLight(0x9fd6ff, 0.7);
+      fillLight.position.set(220, 120, 180);
+      scene.add(fillLight);
 
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 1.4);
-      directionalLight.position.set(-150, -200, 350);
-      scene.add(directionalLight);
+      const geometry = {
+        bumper: new THREE.BoxGeometry(5, 28, 6),
+        cabLower: new THREE.BoxGeometry(25, 27, 18),
+        cabUpper: new THREE.BoxGeometry(21, 25, 13),
+        chassis: new THREE.BoxGeometry(104, 20, 5),
+        doorLine: new THREE.BoxGeometry(1, 25, 19),
+        grille: new THREE.BoxGeometry(1.8, 16, 7),
+        headlight: new THREE.BoxGeometry(2.1, 4.5, 3.4),
+        hub: new THREE.CylinderGeometry(2.2, 2.2, 4.4, 16),
+        rearDoor: new THREE.BoxGeometry(1.5, 24, 24),
+        roof: new THREE.BoxGeometry(19, 23, 2.2),
+        selection: new THREE.RingGeometry(47, 54, 44),
+        shadow: new THREE.CircleGeometry(1, 40),
+        sideMarker: new THREE.BoxGeometry(3.2, 1.4, 2.1),
+        sideWindow: new THREE.BoxGeometry(10, 1.4, 7.5),
+        stripe: new THREE.BoxGeometry(63, 1.2, 4),
+        trailer: new THREE.BoxGeometry(65, 27, 28),
+        trailerRoof: new THREE.BoxGeometry(63, 25, 1.8),
+        wheel: new THREE.CylinderGeometry(5.3, 5.3, 4.2, 20),
+        windshield: new THREE.BoxGeometry(1.5, 19, 9),
+      };
+      sharedGeometries.push(...Object.values(geometry));
 
-      // Shared Geometries
-      const cabGeo = new THREE.BoxGeometry(18, 20, 18);
-      const trailerGeo = new THREE.BoxGeometry(46, 20, 22);
-      const chassisGeo = new THREE.BoxGeometry(70, 18, 5);
-      const wheelGeo = new THREE.CylinderGeometry(4.5, 4.5, 3.5, 12);
-      const shadowGeo = new THREE.PlaneGeometry(76, 28);
-      const windshieldGeo = new THREE.BoxGeometry(3, 16, 9);
-      const selectionGeo = new THREE.PlaneGeometry(86, 36);
+      const material = {
+        cabAttention: new THREE.MeshStandardMaterial({ color: 0xe69016, flatShading: true, metalness: 0.16, roughness: 0.48 }),
+        cabCritical: new THREE.MeshStandardMaterial({ color: 0xdd3444, flatShading: true, metalness: 0.16, roughness: 0.48 }),
+        cabDriving: new THREE.MeshStandardMaterial({ color: 0x0878c9, flatShading: true, metalness: 0.22, roughness: 0.42 }),
+        cabResting: new THREE.MeshStandardMaterial({ color: 0x16835c, flatShading: true, metalness: 0.16, roughness: 0.5 }),
+        chassis: new THREE.MeshStandardMaterial({ color: 0x172433, metalness: 0.45, roughness: 0.62 }),
+        darkDetail: new THREE.MeshStandardMaterial({ color: 0x101923, metalness: 0.5, roughness: 0.36 }),
+        glass: new THREE.MeshStandardMaterial({ color: 0x153b57, emissive: 0x061925, emissiveIntensity: 0.35, metalness: 0.72, roughness: 0.12 }),
+        headlight: new THREE.MeshBasicMaterial({ color: 0xffefb0 }),
+        hub: new THREE.MeshStandardMaterial({ color: 0x8ea2ae, metalness: 0.72, roughness: 0.25 }),
+        outline: new THREE.LineBasicMaterial({ color: 0x142331, transparent: true, opacity: 0.58 }),
+        rearDoor: new THREE.MeshStandardMaterial({ color: 0xc7d2da, metalness: 0.18, roughness: 0.5 }),
+        selection: new THREE.MeshBasicMaterial({ color: 0x2687e8, depthWrite: false, opacity: 0.5, side: THREE.DoubleSide, transparent: true }),
+        shadow: new THREE.MeshBasicMaterial({ color: 0x06111a, depthWrite: false, opacity: 0.28, side: THREE.DoubleSide, transparent: true }),
+        stripe: new THREE.MeshStandardMaterial({ color: 0x2182ce, metalness: 0.12, roughness: 0.45 }),
+        trailer: new THREE.MeshStandardMaterial({ color: 0xe8eef2, flatShading: true, metalness: 0.18, roughness: 0.42 }),
+        trailerRoof: new THREE.MeshStandardMaterial({ color: 0xf8fbfc, metalness: 0.08, roughness: 0.32 }),
+        warningLight: new THREE.MeshBasicMaterial({ color: 0xffa424 }),
+        wheel: new THREE.MeshStandardMaterial({ color: 0x111820, metalness: 0.08, roughness: 0.92 }),
+      };
+      sharedMaterials.push(...Object.values(material));
 
-      sharedGeometries.push(cabGeo, trailerGeo, chassisGeo, wheelGeo, shadowGeo, windshieldGeo, selectionGeo);
+      const edgeGeometry = {
+        cabLower: new THREE.EdgesGeometry(geometry.cabLower, 28),
+        cabUpper: new THREE.EdgesGeometry(geometry.cabUpper, 28),
+        trailer: new THREE.EdgesGeometry(geometry.trailer, 28),
+      };
+      sharedGeometries.push(...Object.values(edgeGeometry));
 
-      // Shared Materials
-      const trailerMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.35, metalness: 0.2 });
-      const cabMatDefault = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.3, metalness: 0.3 });
-      const cabMatCritical = new THREE.MeshStandardMaterial({ color: 0xd9383a, roughness: 0.3, metalness: 0.3 });
-      const cabMatAttention = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.3, metalness: 0.3 });
-      const chassisMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 });
-      const wheelMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.9 });
-      const windshieldMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.1, metalness: 0.8 });
-      const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32 });
-      const selectionMat = new THREE.MeshBasicMaterial({ color: 0x2563a6, transparent: true, opacity: 0.35 });
+      const addMesh = (
+        parent: import("three").Object3D,
+        meshGeometry: import("three").BufferGeometry,
+        meshMaterial: import("three").Material,
+        position: readonly [number, number, number],
+      ): import("three").Mesh => {
+        const mesh = new THREE.Mesh(meshGeometry, meshMaterial);
+        mesh.position.set(...position);
+        parent.add(mesh);
+        return mesh;
+      };
 
-      sharedMaterials.push(
-        trailerMat,
-        cabMatDefault,
-        cabMatCritical,
-        cabMatAttention,
-        chassisMat,
-        wheelMat,
-        windshieldMat,
-        shadowMat,
-        selectionMat
-      );
+      const addEdges = (
+        parent: import("three").Object3D,
+        edges: import("three").EdgesGeometry,
+        position: readonly [number, number, number],
+      ): void => {
+        const line = new THREE.LineSegments(edges, material.outline);
+        line.position.set(...position);
+        line.renderOrder = 3;
+        parent.add(line);
+      };
 
-      // Function to create one truck group
-      function createTruck(vehicleId: string, status: string): TruckInstance {
+      const cabMaterial = (status: string): import("three").MeshStandardMaterial => {
+        if (status === "critical") return material.cabCritical;
+        if (status === "needs-attention") return material.cabAttention;
+        if (status === "resting") return material.cabResting;
+        return material.cabDriving;
+      };
+
+      const createTruck = (vehicleId: string, status: string): TruckInstance => {
         const root = new THREE.Group();
         root.name = `truck-${vehicleId}`;
 
-        const pitchGroup = new THREE.Group();
-        // Fixed isometric downward pitch of 55 degrees
-        pitchGroup.rotation.x = -55 * (Math.PI / 180);
-        root.add(pitchGroup);
+        const shadowMesh = addMesh(root, geometry.shadow, material.shadow, [0, 5, -18]);
+        shadowMesh.scale.set(59, 18, 1);
+        shadowMesh.renderOrder = 0;
 
-        const yawGroup = new THREE.Group();
-        pitchGroup.add(yawGroup);
-
-        // Ground shadow
-        const shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
-        shadowMesh.position.set(0, 0, 0.2);
-        yawGroup.add(shadowMesh);
-
-        // Selection highlight ring
-        const selectionMesh = new THREE.Mesh(selectionGeo, selectionMat);
-        selectionMesh.position.set(0, 0, 0.1);
+        const selectionMesh = addMesh(root, geometry.selection, material.selection, [0, 4, -16]);
         selectionMesh.visible = false;
-        yawGroup.add(selectionMesh);
+        selectionMesh.renderOrder = 1;
 
-        // Wheels: 4 wheel positions
-        const wheelPositions = [
-          [24, -9.5, 4.5],
-          [24, 9.5, 4.5],
-          [10, -9.5, 4.5],
-          [10, 9.5, 4.5],
-          [-14, -9.5, 4.5],
-          [-14, 9.5, 4.5],
-          [-28, -9.5, 4.5],
-          [-28, 9.5, 4.5],
-        ];
+        const headingGroup = new THREE.Group();
+        root.add(headingGroup);
 
-        const wheels: import("three").Mesh[] = [];
-        for (const [wx, wy, wz] of wheelPositions) {
-          const wMesh = new THREE.Mesh(wheelGeo, wheelMat);
-          wMesh.position.set(wx, wy, wz);
-          wMesh.rotation.x = Math.PI / 2;
-          yawGroup.add(wMesh);
-          wheels.push(wMesh);
+        const modelGroup = new THREE.Group();
+        modelGroup.rotation.x = -52 * degreesToRadians;
+        modelGroup.position.y = -4;
+        headingGroup.add(modelGroup);
+
+        addMesh(modelGroup, geometry.chassis, material.chassis, [-2, 0, 7]);
+        addMesh(modelGroup, geometry.trailer, material.trailer, [-18, 0, 23]);
+        addMesh(modelGroup, geometry.trailerRoof, material.trailerRoof, [-18, 0, 37.3]);
+        addMesh(modelGroup, geometry.rearDoor, material.rearDoor, [-51.2, 0, 23]);
+        addMesh(modelGroup, geometry.stripe, material.stripe, [-18, -14.1, 22]);
+        addMesh(modelGroup, geometry.stripe, material.stripe, [-18, 14.1, 22]);
+        addEdges(modelGroup, edgeGeometry.trailer, [-18, 0, 23]);
+
+        addMesh(modelGroup, geometry.cabLower, cabMaterial(status), [33, 0, 17]);
+        addMesh(modelGroup, geometry.cabUpper, cabMaterial(status), [31, 0, 31.5]);
+        addMesh(modelGroup, geometry.roof, material.trailerRoof, [31, 0, 39]);
+        addMesh(modelGroup, geometry.bumper, material.chassis, [47.3, 0, 8.5]);
+        addMesh(modelGroup, geometry.windshield, material.glass, [42, 0, 31.5]);
+        addMesh(modelGroup, geometry.sideWindow, material.glass, [34, -13, 31.5]);
+        addMesh(modelGroup, geometry.sideWindow, material.glass, [34, 13, 31.5]);
+        addMesh(modelGroup, geometry.grille, material.darkDetail, [47.6, 0, 17]);
+        addMesh(modelGroup, geometry.headlight, material.headlight, [48.1, -8, 13]);
+        addMesh(modelGroup, geometry.headlight, material.headlight, [48.1, 8, 13]);
+        addMesh(modelGroup, geometry.doorLine, material.outline, [20.3, 0, 18]);
+        addEdges(modelGroup, edgeGeometry.cabLower, [33, 0, 17]);
+        addEdges(modelGroup, edgeGeometry.cabUpper, [31, 0, 31.5]);
+
+        for (const y of [-14.6, 14.6]) {
+          for (const x of [34, 10, -28, -43]) {
+            const wheel = addMesh(modelGroup, geometry.wheel, material.wheel, [x, y, 6]);
+            wheel.rotation.x = 0;
+            const hub = addMesh(modelGroup, geometry.hub, material.hub, [x, y + (y < 0 ? -2.2 : 2.2), 6]);
+            hub.rotation.x = 0;
+          }
+          for (const x of [-8, -28]) addMesh(modelGroup, geometry.sideMarker, material.warningLight, [x, y + (y < 0 ? -0.8 : 0.8), 14]);
         }
-
-        // Chassis
-        const chassisMesh = new THREE.Mesh(chassisGeo, chassisMat);
-        chassisMesh.position.set(0, 0, 6);
-        yawGroup.add(chassisMesh);
-
-        // Trailer
-        const trailerMesh = new THREE.Mesh(trailerGeo, trailerMat);
-        trailerMesh.position.set(-11, 0, 18);
-        yawGroup.add(trailerMesh);
-
-        // Cab
-        const cabColorMat = status === "critical" ? cabMatCritical : status === "needs-attention" ? cabMatAttention : cabMatDefault;
-        const cabMesh = new THREE.Mesh(cabGeo, cabColorMat);
-        cabMesh.position.set(24, 0, 16);
-        yawGroup.add(cabMesh);
-
-        // Windshield
-        const windshieldMesh = new THREE.Mesh(windshieldGeo, windshieldMat);
-        windshieldMesh.position.set(32, 0, 19);
-        yawGroup.add(windshieldMesh);
 
         scene!.add(root);
-
-        return {
-          root,
-          pitchGroup,
-          yawGroup,
-          cabMesh,
-          trailerMesh,
-          chassisMesh,
-          wheels,
-          shadowMesh,
-          selectionMesh,
-        };
-      }
-
-      // Sync truck instances with scenario vehicles
-      for (const v of vehicles) {
-        const truck = createTruck(v.vehicle.internalId, v.vehicle.status);
-        truckInstances.set(v.vehicle.internalId, truck);
-      }
-
-      // Resize handler
-      const handleResize = () => {
-        if (!renderer || !camera || isDisposed) return;
-        const newW = container.clientWidth;
-        const newH = container.clientHeight;
-        if (newW !== width || newH !== height) {
-          width = newW;
-          height = newH;
-          renderer.setSize(width, height, false);
-          camera.right = width;
-          camera.bottom = height;
-          camera.updateProjectionMatrix();
-        }
+        return { currentYaw: 0, headingGroup, modelGroup, root, selectionMesh, shadowMesh };
       };
 
+      for (const { vehicle } of vehicles) truckInstances.set(vehicle.internalId, createTruck(vehicle.internalId, vehicle.status));
+
+      const handleResize = (): void => {
+        if (renderer === null || camera === null || isDisposed) return;
+        const nextWidth = container.clientWidth;
+        const nextHeight = container.clientHeight;
+        if (nextWidth === width && nextHeight === height) return;
+        width = nextWidth;
+        height = nextHeight;
+        renderer.setSize(width, height, false);
+        camera.right = width;
+        camera.bottom = height;
+        camera.updateProjectionMatrix();
+      };
       map.on("resize", handleResize);
 
-      // Animation render loop
-      const renderFrame = () => {
-        if (isDisposed || !renderer || !scene || !camera) return;
+      const renderFrame = (): void => {
+        if (isDisposed || renderer === null || scene === null || camera === null) return;
 
         const motions = useFleetMotionStore.getState().motions;
-        const currentSelectedId = selectedVehicleId;
+        const selectedId = selectedVehicleRef.current;
+        const zoom = map.getZoom();
+        let visibleCount = 0;
 
         for (const [vehicleId, instance] of truckInstances) {
           const motion = motions[vehicleId];
-          if (!motion) {
+          if (motion === undefined) {
             instance.root.visible = false;
             continue;
           }
 
-          // Project Leaflet lat/lng to container pixel coordinates
-          const pt = map.latLngToContainerPoint([motion.latitude, motion.longitude]);
-
-          // Render only within viewport
-          const margin = 90;
-          if (pt.x < -margin || pt.x > width + margin || pt.y < -margin || pt.y > height + margin) {
+          const point = map.latLngToContainerPoint([motion.latitude, motion.longitude]);
+          const margin = 145;
+          if (point.x < -margin || point.x > width + margin || point.y < -margin || point.y > height + margin) {
             instance.root.visible = false;
             continue;
           }
 
+          visibleCount += 1;
+          const selected = vehicleId === selectedId;
+          const scale = presentationScale(zoom, selected);
           instance.root.visible = true;
-          instance.root.position.set(pt.x, pt.y, 0);
+          instance.root.position.set(point.x, point.y + 5, selected ? 30 : 0);
+          instance.root.scale.setScalar(scale);
+          instance.selectionMesh.visible = selected;
+          instance.shadowMesh.material.opacity = selected ? 0.35 : 0.24;
 
-          // Apply bearing as yaw only (no pitch or roll on the truck!)
-          // Bearing 0 = North (up, -Y in screen coordinates)
-          // Bearing 90 = East (right, +X in screen coordinates)
-          const yawRad = -((motion.bearing - 90) * (Math.PI / 180));
-          instance.yawGroup.rotation.z = yawRad;
-
-          // Selection aura
-          instance.selectionMesh.visible = vehicleId === currentSelectedId;
+          const targetYaw = normalizeAngle((motion.bearing - 90) * degreesToRadians);
+          const difference = normalizeAngle(targetYaw - instance.currentYaw);
+          instance.currentYaw = normalizeAngle(instance.currentYaw + difference * 0.24);
+          instance.headingGroup.rotation.z = instance.currentYaw;
         }
 
+        canvas.dataset.threeVisibleTrucks = String(visibleCount);
+        canvas.dataset.threeZoom = zoom.toFixed(2);
+        container.dataset.threeModel = "volumetric-v2";
         renderer.render(scene, camera);
-        animFrameId = requestAnimationFrame(renderFrame);
+        animationFrameId = requestAnimationFrame(renderFrame);
       };
 
-      animFrameId = requestAnimationFrame(renderFrame);
+      animationFrameId = requestAnimationFrame(renderFrame);
     });
 
     return () => {
       isDisposed = true;
-      if (animFrameId !== null) {
-        cancelAnimationFrame(animFrameId);
-      }
-
-      // Dispose all Three.js resources
-      for (const instance of truckInstances.values()) {
-        instance.root.clear();
-      }
+      if (animationFrameId !== null) cancelAnimationFrame(animationFrameId);
+      map.off("resize");
+      truckInstances.forEach(({ root }) => root.clear());
       truckInstances.clear();
-
-      for (const geo of sharedGeometries) {
-        geo.dispose();
-      }
-      for (const mat of sharedMaterials) {
-        mat.dispose();
-      }
-
-      if (scene) {
-        scene.clear();
-      }
-
-      if (renderer) {
-        renderer.dispose();
-        renderer.forceContextLoss();
-      }
+      sharedGeometries.forEach((geometry) => geometry.dispose());
+      sharedMaterials.forEach((material) => material.dispose());
+      scene?.clear();
+      renderer?.dispose();
+      renderer?.forceContextLoss();
+      delete container.dataset.threeModel;
     };
-  }, [active, map, vehicles, selectedVehicleId]);
+  }, [active, map, vehicles]);
 
   if (!active) return null;
 
   return (
     <canvas
       ref={canvasRef}
+      aria-hidden="true"
       className="threejs-fleet-canvas"
       data-three-canvas="shared"
+      data-three-model="volumetric-v2"
       style={{
+        height: "100%",
+        left: 0,
+        pointerEvents: "none",
         position: "absolute",
         top: 0,
-        left: 0,
         width: "100%",
-        height: "100%",
-        pointerEvents: "none",
         zIndex: 645,
       }}
     />
