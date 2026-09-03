@@ -214,7 +214,7 @@ function executeRename(operations: OperationsApi, input: { vehicleId: string; la
 }
 
 export function createOperationalTools(operations: OperationsApi, onScenarioChange?: ScenarioChangeHandler): WebMcpTool[] {
-  return [
+  const tools: WebMcpTool[] = [
     {
       name: "scenario_current",
       description: "Gets the current operating region.",
@@ -309,4 +309,8 @@ export function createOperationalTools(operations: OperationsApi, onScenarioChan
       },
     },
   ];
+
+  return onScenarioChange === undefined
+    ? tools.filter(({ name }) => name !== "rest_opportunities_compare")
+    : tools;
 }
