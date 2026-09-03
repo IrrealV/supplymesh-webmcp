@@ -1,0 +1,27 @@
+.leaflet-weather-effects-pane {
+  pointer-events: none;
+}
+
+.weather-geographic-overlay {
+  filter: saturate(1.08) contrast(1.04);
+  image-rendering: auto;
+  mix-blend-mode: multiply;
+  pointer-events: none !important;
+  transition: opacity 180ms ease;
+  user-select: none;
+}
+
+.weather-geographic-overlay.weather-geographic-close {
+  filter: saturate(1.18) contrast(1.08) drop-shadow(0 3px 7px rgb(15 23 42 / 20%));
+  mix-blend-mode: normal;
+}
+
+.weather-geographic-overlay.weather-geographic-calima {
+  mix-blend-mode: multiply;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .weather-geographic-overlay {
+    transition: none;
+  }
+}
