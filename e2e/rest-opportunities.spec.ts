@@ -183,16 +183,9 @@ test("scheduled extra rest persists, localizes, and can be cleared by the human"
   await page.getByRole("button", { name: "Quitar descanso programado" }).click();
   await expect(page.locator("[data-rest-scheduled]")).toHaveCount(0);
   const restored = await executeTool<Scenario>(page, "scenario_current", {});
-  expect(restored).toMatchObject({
-    ok: true,
-    data: {
-      vehicles: expect.arrayContaining([
-        expect.objectContaining({
-          internalId: "vehicle-012",
-          timing: { eta: "2026-08-28T11:30:00Z" },
-          scheduledRest: null,
-        }),
-      ]),
-    },
-  });
+  expect(restored.ok).toBe(true);
+  if (!restored.ok) return;
+  const restoredVehicle = restored.data.vehicles.find(({ internalId }) => internalId === "vehicle-012");
+  expect(restoredVehicle?.timing.eta).toBe("2026-08-28T11:30:00Z");
+  expect(restoredVehicle?.scheduledRest).toBeNull();
 });
