@@ -103,7 +103,8 @@ async function selectVehicle(page: Page, vehicleId: string): Promise<VehicleSnap
 
   const labelMarker = page.locator(`[data-vehicle-label="${vehicleId}"]`).locator("..");
   await expect(labelMarker).toBeVisible();
-  await labelMarker.click();
+  await labelMarker.focus();
+  await page.keyboard.press("Enter");
   const inspection = page.locator(".vehicle-inspection");
   await expect(inspection).toBeVisible();
   await expect(inspection.locator(".drawer-header strong")).toHaveText(vehicle.label);
