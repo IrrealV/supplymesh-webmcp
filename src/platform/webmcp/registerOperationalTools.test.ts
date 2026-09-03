@@ -40,8 +40,8 @@ function failingOperations(): OperationsApi {
 }
 
 describe("createOperationalTools", () => {
-  it("should expose exactly the 9 operational schemas and JSON text envelopes", async () => {
-    const tools = createOperationalTools(createOperationsApi(createZustandScenarioRepository(new MemoryStorage())));
+  it("should expose exactly the 9 operational schemas and JSON text envelopes on the live UI surface", async () => {
+    const tools = createOperationalTools(createOperationsApi(createZustandScenarioRepository(new MemoryStorage())), () => undefined);
     expect(tools.map((tool) => tool.name)).toStrictEqual([
       "scenario_current",
       "fleet_status",
@@ -57,7 +57,7 @@ describe("createOperationalTools", () => {
   });
 
   it("should compare extra rest without exposing scheduling authority to WebMCP", async () => {
-    const tools = createOperationalTools(createOperationsApi(createZustandScenarioRepository(new MemoryStorage())));
+    const tools = createOperationalTools(createOperationsApi(createZustandScenarioRepository(new MemoryStorage())), () => undefined);
     const compareTool = tools.find((tool) => tool.name === "rest_opportunities_compare")!;
     const result = await toolResult<RestOpportunityComparison>(compareTool, { vehicleId: "vehicle-012" });
     expect(result.ok).toBe(true);
