@@ -46,32 +46,42 @@ describe("WeatherRiskOverlay", () => {
     expect(rain).toContain('clip-path="url(#weather-zone)"');
     expect(rain).toContain("weather-rain");
     expect(rain).toContain("<line");
+    expect(rain).toContain('viewBox="0 0 1000 1000"');
     expect(rain).not.toContain("border-radius");
     expect(rain).not.toContain("360px");
-    expect(rain).not.toContain("<circle cx=\"500\" cy=\"500\"");
+    expect(rain).not.toContain('<circle cx="500" cy="500"');
 
     const url = createWeatherOverlayDataUrl("heavy-rain", rectangle, "mid", false);
     expect(url.startsWith("data:image/svg+xml;charset=UTF-8,")).toBe(true);
     expect(decodeURIComponent(url)).toContain("weather-rain");
   });
 
-  it("should make each weather kind visually distinct and denser at close zoom", () => {
+  it("should keep close-range particle sizes screen-legible with repeating patterns", () => {
     const rain = createWeatherOverlaySvg("heavy-rain", rectangle, "close", false);
     const snow = createWeatherOverlaySvg("severe-snow", rectangle, "close", false);
     const storm = createWeatherOverlaySvg("severe-storm", rectangle, "close", false);
     const calima = createWeatherOverlaySvg("calima", rectangle, "close", false);
 
-    expect(rain.match(/<line/g)?.length).toBe(56);
-    expect(snow.match(/<circle/g)?.length).toBe(66);
-    expect(storm).toContain("weather-lightning");
-    expect(storm).toContain("weather-storm");
-    expect(calima).toContain("weather-haze");
-    expect(calima).toContain("weather-calima");
+    expect(rain).toContain('viewBox="0 0 8000 8000"');
+    expect(rain).toContain('pattern id="weather-rain-pattern"');
+    expect(rain).toContain('width="64" height="88"');
+    expect(snow).toContain('pattern id="weather-snow-pattern"');
+    expect(snow).toContain('width="104" height="104"');
+    expect(storm).toContain('pattern id="weather-storm-pattern"');
+    expect(storm).toContain("weather-close-lightning");
+    expect(calima).toContain('pattern id="weather-calima-pattern"');
+    expect(calima).toContain("weather-calima-base");
     expect(new Set([rain, snow, storm, calima]).size).toBe(4);
+
+    // The previous implementation generated a handful of shapes in a fixed
+    // 1000-unit viewBox, which turned into enormous drops/flakes at close zoom.
+    expect(rain.match(/<line/g)?.length).toBe(2);
+    expect(snow.match(/<circle/g)?.length).toBe(4);
   });
 
   it("should keep reduced-motion weather visible while removing its animation rules", () => {
     const staticRain = createWeatherOverlaySvg("heavy-rain", rectangle, "close", true);
+    expect(staticRain).toContain("weather-rain-pattern");
     expect(staticRain).toContain("<line");
     expect(staticRain).not.toContain("@keyframes");
     expect(staticRain).not.toContain("animation:");
