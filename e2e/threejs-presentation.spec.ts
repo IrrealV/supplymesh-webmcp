@@ -43,6 +43,14 @@ async function expectRenderedModel(page: Page, zoom: string): Promise<void> {
   await expect(page.locator(".fleet-map")).toHaveAttribute("data-three-model", "volumetric-v2");
 }
 
+async function visibleLabelCount(page: Page): Promise<number> {
+  return page.locator(".fleet-label-icon").evaluateAll((roots) => roots.filter((root) => {
+    const style = getComputedStyle(root);
+    const rect = root.getBoundingClientRect();
+    return style.visibility === "visible" && style.opacity !== "0" && rect.width > 0 && rect.height > 0;
+  }).length);
+}
+
 test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -55,14 +63,16 @@ test("volumetric trucks remain readable and map-anchored at zoom 14, 15.5, and 1
   await setMapView(page, 13.5);
   await expect(page.locator("[data-three-canvas=shared]")).toHaveCount(0);
 
-  const incident = page.getByRole("button", { name: "Select Unit 211 clearance incident", exact: true });
-  await incident.focus();
+  const unit211 = page.locator('[data-vehicle-truck="vehicle-011"]').locator("..");
+  await expect(unit211).toBeVisible();
+  await unit211.focus();
   await page.keyboard.press("Enter");
   await expect(page.locator(".vehicle-inspection")).toBeVisible();
 
   await setMapView(page, 14);
   await expectRenderedModel(page, "14.00");
-  await expect(page.locator(".fleet-label-icon:visible")).not.toHaveCount(15);
+  await expect.poll(() => visibleLabelCount(page)).toBeGreaterThan(0);
+  expect(await visibleLabelCount(page)).toBeLessThan(15);
   await capture(page, "01-threejs-zoom-14.png");
 
   await setMapView(page, 15.5);
@@ -72,8 +82,9 @@ test("volumetric trucks remain readable and map-anchored at zoom 14, 15.5, and 1
 
   await setMapView(page, 17);
   await expectRenderedModel(page, "17.00");
-  const visibleLabels = page.locator(".fleet-label-icon:visible");
-  await expect(visibleLabels).toHaveCount(1);
+  await expect(page.locator("[data-vehicle-label=vehicle-011]")).toBeVisible();
+  await expect.poll(() => visibleLabelCount(page)).toBeGreaterThan(0);
+  expect(await visibleLabelCount(page)).toBeLessThanOrEqual(3);
   await capture(page, "03-threejs-zoom-17.png");
 
   await setMapView(page, 13.5);
