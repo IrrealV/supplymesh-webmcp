@@ -51,6 +51,7 @@ export function ThreeFleetOverlay({ vehicles, active, selectedVehicleId }: Three
     let scene: import("three").Scene | null = null;
     let camera: import("three").OrthographicCamera | null = null;
     const truckInstances = new Map<string, TruckInstance>();
+    const vehicleById = new Map(vehicles.map(({ vehicle }) => [vehicle.internalId, vehicle]));
     const sharedGeometries: import("three").BufferGeometry[] = [];
     const sharedMaterials: import("three").Material[] = [];
     const container = map.getContainer();
@@ -257,13 +258,23 @@ export function ThreeFleetOverlay({ vehicles, active, selectedVehicleId }: Three
         let visibleCount = 0;
 
         for (const [vehicleId, instance] of truckInstances) {
-          const motion = motions[vehicleId];
-          if (motion === undefined) {
+          const vehicle = vehicleById.get(vehicleId);
+          if (vehicle === undefined) {
             instance.root.visible = false;
             continue;
           }
 
-          const point = map.latLngToContainerPoint([motion.latitude, motion.longitude]);
+          const motion = motions[vehicleId];
+          const [fallbackLongitude, fallbackLatitude] = vehicle.position.geometry.coordinates;
+          const latitude = motion?.latitude ?? fallbackLatitude;
+          const longitude = motion?.longitude ?? fallbackLongitude;
+          const bearing = motion?.bearing ?? 0;
+          if (![latitude, longitude, bearing].every(Number.isFinite)) {
+            instance.root.visible = false;
+            continue;
+          }
+
+          const point = map.latLngToContainerPoint([latitude, longitude]);
           const margin = 145;
           if (point.x < -margin || point.x > width + margin || point.y < -margin || point.y > height + margin) {
             instance.root.visible = false;
@@ -278,13 +289,14 @@ export function ThreeFleetOverlay({ vehicles, active, selectedVehicleId }: Three
           instance.root.scale.setScalar(scale);
           instance.selectionMesh.visible = selected;
 
-          const targetYaw = normalizeAngle((motion.bearing - 90) * degreesToRadians);
+          const targetYaw = normalizeAngle((bearing - 90) * degreesToRadians);
           const difference = normalizeAngle(targetYaw - instance.currentYaw);
           instance.currentYaw = normalizeAngle(instance.currentYaw + difference * 0.24);
           instance.headingGroup.rotation.z = instance.currentYaw;
         }
 
         canvas.dataset.threeVisibleTrucks = String(visibleCount);
+        canvas.dataset.threeMotionRecords = String(Object.keys(motions).length);
         canvas.dataset.threeZoom = zoom.toFixed(2);
         container.dataset.threeModel = "volumetric-v2";
         renderer.render(scene, camera);
