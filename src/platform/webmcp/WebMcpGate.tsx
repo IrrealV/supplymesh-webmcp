@@ -2,7 +2,9 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { OperatingRegion } from "../../domain/entities";
 import type { OperationsApi } from "../../domain/operations/createOperationsApi";
 import type { OperationalRecoverySnapshot, RecoveryAgentCapability, RecoveryExecutionCapability, RecoveryResult } from "../../domain/recovery/recoveryContracts";
+import type { LiveConditionsStore } from "../../live/liveConditions";
 import { catalog, type Locale } from "../../preferences/i18n/catalog";
+import { createLiveConditionsTool } from "./registerLiveConditionsTool";
 import { createOperationalTools } from "./registerOperationalTools";
 import { createRecoveryTools } from "./registerRecoveryTools";
 import type { WebMcpTool } from "./webMcpTypes";
@@ -13,6 +15,7 @@ type WebMcpGateState = "checking" | "registering" | "ready" | "simulation" | "un
 type WebMcpGateProps = {
   children: ReactNode;
   explicitFlag: string | undefined;
+  liveConditions?: LiveConditionsStore;
   locale: Locale;
   onScenarioChange?(scenario: OperatingRegion): void;
   operations: OperationsApi;
@@ -21,7 +24,7 @@ type WebMcpGateProps = {
   operational: Readonly<{ read(): RecoveryResult<OperationalRecoverySnapshot>; subscribe(listener: (snapshot: OperationalRecoverySnapshot) => void): () => void }>;
 };
 
-export function WebMcpGate({ children, explicitFlag, locale, onScenarioChange, operations, operational, recoveryAgent, recoveryExecution }: WebMcpGateProps) {
+export function WebMcpGate({ children, explicitFlag, liveConditions, locale, onScenarioChange, operations, operational, recoveryAgent, recoveryExecution }: WebMcpGateProps) {
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<WebMcpGateState>("checking");
   const copy = catalog(locale);
@@ -46,6 +49,11 @@ export function WebMcpGate({ children, explicitFlag, locale, onScenarioChange, o
     const abort = (): void => abortAll();
     window.addEventListener("beforeunload", abort);
 
+    const operationalTools = (): WebMcpTool[] => [
+      ...createOperationalTools(operations, onScenarioChange),
+      ...(liveConditions === undefined ? [] : [createLiveConditionsTool(liveConditions)]),
+    ];
+
     async function register(): Promise<void> {
       if (import.meta.env.DEV && explicitFlag === "true") {
         setState("ready");
@@ -55,7 +63,7 @@ export function WebMcpGate({ children, explicitFlag, locale, onScenarioChange, o
       const modelContext = document.modelContext;
       if (modelContext === undefined) {
         if (import.meta.env.DEV && explicitFlag !== "false") {
-          const opsTools = createOperationalTools(operations, onScenarioChange);
+          const opsTools = operationalTools();
           let recTools: WebMcpTool[] = [];
 
           const updateWindowTools = () => {
@@ -144,13 +152,13 @@ export function WebMcpGate({ children, explicitFlag, locale, onScenarioChange, o
         const initial = operational.read();
         if (!initial.ok) throw new Error("Recovery state is unavailable.");
         schedule(initial.data);
-        await addTools(createOperationalTools(operations, onScenarioChange));
+        await addTools(operationalTools());
         if (isStopped) return;
         isBaseReady = true;
         for (const snapshot of pendingSnapshots.splice(0)) schedule(snapshot);
         let observed = reconcileQueue;
         let isSettled = false;
-        for (let attempt = 0; attempt < 100; attempt += 1) {
+        for (let registrationAttempt = 0; registrationAttempt < 100; registrationAttempt += 1) {
           await observed;
           if (isStopped) return;
           const next = reconcileQueue;
@@ -172,7 +180,7 @@ export function WebMcpGate({ children, explicitFlag, locale, onScenarioChange, o
       window.removeEventListener("beforeunload", abort);
       abortAll();
     };
-  }, [attempt, explicitFlag, onScenarioChange, operational, operations, recoveryAgent, recoveryExecution]);
+  }, [attempt, explicitFlag, liveConditions, onScenarioChange, operational, operations, recoveryAgent, recoveryExecution]);
 
   if (state === "ready" || state === "simulation") {
     return (
