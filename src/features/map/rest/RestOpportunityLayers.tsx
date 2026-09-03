@@ -5,6 +5,8 @@ import type { RestOpportunityComparison, RestOpportunityOption } from "../../../
 import type { Locale } from "../../../preferences/i18n/catalog";
 import "./restOpportunityLayers.css";
 
+export type RestOpportunityMapModel = RestOpportunityComparison;
+
 function position(option: RestOpportunityOption): LatLngTuple {
   const [longitude, latitude] = option.stopPosition.geometry.coordinates;
   return [latitude, longitude];
@@ -20,7 +22,7 @@ function icon(option: RestOpportunityOption, scheduled: boolean) {
   });
 }
 
-export function RestOpportunityLayers({ comparison, locale }: { comparison: RestOpportunityComparison; locale: Locale }) {
+export function RestOpportunityLayers({ comparison, locale }: { comparison: RestOpportunityMapModel; locale: Locale }) {
   const map = useMap();
   const scheduledId = comparison.scheduledRest?.opportunityId;
   return (
