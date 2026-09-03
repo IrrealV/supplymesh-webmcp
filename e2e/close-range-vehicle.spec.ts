@@ -72,12 +72,10 @@ test("selected follow swaps 2D markers for a shared Three.js WebGL canvas and re
 
   await expect(map).toHaveAttribute("data-close-range-vehicle-id", "vehicle-011");
   await expect(page.locator(".fleet-truck-icon.close-range-vehicle-active")).toHaveCount(15);
-  // Shared Three.js canvas exists with exactly 1 renderer
   const threeCanvas = page.locator("[data-three-canvas=shared]");
   await expect(threeCanvas).toHaveCount(1);
   await expect(threeCanvas).toBeVisible();
 
-  // Old CSS markup is completely gone
   await expect(page.locator("[data-close-range-model]")).toHaveCount(0);
   await expect(page.locator(".close-range-truck-rig")).toHaveCount(0);
 
@@ -99,6 +97,8 @@ test("selected follow swaps 2D markers for a shared Three.js WebGL canvas and re
   await expect(page.locator("[data-three-canvas=shared]")).toHaveCount(1);
 
   await page.keyboard.press("Escape");
+  await page.clock.fastForward(100);
+  await expect(page.locator(".vehicle-inspection")).toHaveCount(0);
   await expect(map).toHaveAttribute("data-close-range-mode", "active");
   await expect(page.locator("[data-three-canvas=shared]")).toHaveCount(1);
   await expect(page.getByRole("region", { name: "Operational map" })).toBeFocused();
@@ -108,24 +108,20 @@ test("movement policy: needs-attention and critical vehicles move, stopped vehic
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await openConsole(page, 1440, 900);
 
-  // Unit 211 (pre-dispatch hold)
   const motion211 = await readMotion(page, "vehicle-011");
   expect(motion211.isMoving).toBe(false);
   const stoppedBadge211 = page.locator('[data-stopped-indicator="vehicle-011"]');
   await expect(stoppedBadge211).toBeVisible();
   await expect(stoppedBadge211).toHaveAttribute("title", "Pre-dispatch safety hold");
 
-  // Needs-attention vehicle with route moves (e.g. vehicle-003)
   const motion003 = await readMotion(page, "vehicle-003");
   expect(motion003.isMoving).toBe(true);
   expect(motion003.speed).toBeGreaterThan(20);
 
-  // Critical vehicle with route moves (e.g. vehicle-004)
   const motion004 = await readMotion(page, "vehicle-004");
   expect(motion004.isMoving).toBe(true);
   expect(motion004.speed).toBeGreaterThan(20);
 
-  // Select Unit 211 to inspect stopped reason in operational summary
   await selectUnit211(page);
   const motionStatus = page.locator('[data-vehicle-motion-status="stopped"]');
   await expect(motionStatus).toBeVisible();
@@ -139,21 +135,17 @@ test("2D/3D position continuity: zooming out restores 2D icon at exact coordinat
   await expect(map).toHaveAttribute("data-close-range-mode", "active");
   await expect(page.locator("[data-three-canvas=shared]")).toHaveCount(1);
 
-  // Get Unit 211 position in 3D mode
   const motion3D = await readMotion(page, "vehicle-011");
 
-  // Zoom out to zoom 13
   await page.evaluate(() => {
     const leafletMap = (window as unknown as { __leafletMap?: { setZoom(z: number): void } }).__leafletMap || (document.querySelector(".fleet-map") as unknown as { _leaflet_map?: { setZoom(z: number): void } })?._leaflet_map;
     if (leafletMap) leafletMap.setZoom(13);
   });
   await page.waitForTimeout(300);
 
-  // In zoom 13, close range mode is inactive, 2D pins are restored
   await expect(map).toHaveAttribute("data-close-range-mode", "inactive");
   await expect(page.locator("[data-three-canvas=shared]")).toHaveCount(0);
 
-  // Motion state coordinates are identical
   const motion2D = await readMotion(page, "vehicle-011");
   expect(motion2D.progress).toBeCloseTo(motion3D.progress);
 });
@@ -161,18 +153,15 @@ test("2D/3D position continuity: zooming out restores 2D icon at exact coordinat
 test("weather effects: visible independently of vehicle selection and clickable to focus", async ({ page }) => {
   await openConsole(page, 1440, 900);
 
-  // Weather effects are visible at overview without selecting any vehicle
   await expect(page.locator(".weather-fx-heavy-rain")).toBeVisible();
   await expect(page.locator(".weather-fx-severe-snow")).toBeVisible();
   await expect(page.locator(".weather-fx-severe-storm")).toBeVisible();
   await expect(page.locator(".weather-fx-calima")).toBeVisible();
 
-  // Clicking weather token zooms into that risk zone
   const snowToken = page.locator(".risk-severe-snow").first();
   await snowToken.click();
   await page.waitForTimeout(500);
 
-  // Camera focused on León snow area
   await expect(page.locator(".weather-fx-severe-snow")).toBeVisible();
 });
 
@@ -226,21 +215,18 @@ test("close-range hazards, localized weather, console QA, and screenshots", asyn
     }
   });
 
-  // 1. Initial 2D fleet view on desktop (1440x900)
   await openConsole(page, 1440, 900);
   const map = page.locator(".fleet-map");
   await expect(map).toHaveAttribute("data-close-range-mode", "inactive");
   await expect(page.locator(".fleet-truck-icon")).toHaveCount(15);
   await page.screenshot({ path: "docs/screenshots/01-fleet-2d.png" });
 
-  // 2. 3D Truck in Close Range Operational Mode (focused on Unit 211)
   await selectUnit211(page);
   await expect(map).toHaveAttribute("data-close-range-mode", "active");
   await expect(page.locator("[data-three-canvas=shared]")).toBeVisible();
   await expect(page.locator("[data-three-canvas=shared]")).toHaveCount(1);
   await page.screenshot({ path: "docs/screenshots/02-truck-3d.png" });
 
-  // 3. Red 3D bridge hazard with clearance info (focused on height restriction)
   await setMapView(page, 39.86, -4.02, 15);
   const bridgeHazard = page.locator(".close-range-hazard-bridge");
   await expect(bridgeHazard).toBeVisible();
@@ -249,33 +235,27 @@ test("close-range hazards, localized weather, console QA, and screenshots", asyn
   await expect(clearanceLabel).toContainText("3.90 m available");
   await page.screenshot({ path: "docs/screenshots/03-red-bridge.png" });
 
-  // 4. Localized Weather FX: Rain in Galicia (focused on Galicia region)
   await setMapView(page, 43.32, -8.4, 9.5);
   const rainEffect = page.locator(".weather-fx-heavy-rain");
   await expect(rainEffect).toBeVisible();
   await page.screenshot({ path: "docs/screenshots/04-heavy-rain.png" });
 
-  // 5. Localized Weather FX: Snow in Leon (focused on Leon region)
   await setMapView(page, 42.72, -5.58, 9.5);
   const snowEffect = page.locator(".weather-fx-severe-snow");
   await expect(snowEffect).toBeVisible();
   await page.screenshot({ path: "docs/screenshots/05-severe-snow.png" });
 
-  // 6. Localized Weather FX: Storm & Calima in Andalucia / Granada
   await setMapView(page, 37.1, -3.55, 9.5);
   const calimaEffect = page.locator(".weather-fx-calima");
   await expect(calimaEffect).toBeVisible();
   await page.screenshot({ path: "docs/screenshots/06-wind-calima.png" });
 
-  // 7. Tablet viewport 900x900 QA and screenshot
   await page.setViewportSize({ width: 900, height: 900 });
   await page.waitForTimeout(300);
   await page.screenshot({ path: "docs/screenshots/07-tablet-900x900.png" });
 
-  // Assert zero console errors throughout execution
   expect(consoleErrors).toHaveLength(0);
 
-  // Assert all 7 screenshots exist and their SHA256 hashes are mutually distinct
   const screenshotPaths = [
     "docs/screenshots/01-fleet-2d.png",
     "docs/screenshots/02-truck-3d.png",
