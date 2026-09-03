@@ -6,7 +6,12 @@ type RegisteredTool = { name: string; execute(input: unknown): ToolResponse | Pr
 type Result<T> = { ok: true; data: T } | { ok: false; error: { code: string } };
 type RestComparison = {
   recommendedOptionId: string | null;
-  policy: { mandatoryRestIsNeverReduced: true; humanSchedulesRest: true; routeGeometryUnchanged: true };
+  policy: {
+    objective: "MAXIMIZE_ADDITIONAL_REST";
+    mandatoryRestIsNeverReduced: true;
+    humanSchedulesRest: true;
+    routeGeometryUnchanged: true;
+  };
   options: Array<{
     id: string;
     extraRestMinutes: number;
@@ -79,7 +84,7 @@ async function capture(page: Page, name: string): Promise<void> {
 }
 
 async function selectUnit212(page: Page): Promise<void> {
-  const marker = page.locator('[data-vehicle-truck="vehicle-012"]');
+  const marker = page.locator('[data-vehicle-truck="vehicle-012"]').locator("..");
   await expect(marker).toBeVisible();
   await marker.click();
   await expect(page.getByRole("heading", { name: "Driver rest opportunity" })).toBeVisible();
@@ -87,7 +92,6 @@ async function selectUnit212(page: Page): Promise<void> {
 
 test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.addInitScript(() => localStorage.removeItem("scenario-overrides:v1"));
 });
 
 test("agent compares driver-first rest opportunities while only the human can schedule one", async ({ page }) => {
@@ -102,6 +106,7 @@ test("agent compares driver-first rest opportunities while only the human can sc
   if (!comparison.ok) return;
   expect(comparison.data.recommendedOptionId).toBe("rest-window-max-55");
   expect(comparison.data.policy).toEqual({
+    objective: "MAXIMIZE_ADDITIONAL_REST",
     mandatoryRestIsNeverReduced: true,
     humanSchedulesRest: true,
     routeGeometryUnchanged: true,
@@ -161,9 +166,10 @@ test("scheduled extra rest persists, localizes, and can be cleared by the human"
   await selectUnit212(page);
   await page.getByRole("button", { name: "Compare extra rest" }).click();
   await page.getByRole("button", { name: "Schedule rest: Corridor rest point A" }).click();
-  await expect(page.locator('[data-rest-scheduled="rest-window-early-40"]')).toBeVisible();
+  await expect(page.locator('[data-rest-scheduled="rest-window-early-40"]')).toContainText("40 min");
 
   await page.reload();
+  await expect(page.locator(".console-shell")).toBeVisible();
   await expect.poll(() => toolNames(page)).toContain("rest_opportunities_compare");
   await selectUnit212(page);
   await expect(page.locator('[data-rest-scheduled="rest-window-early-40"]')).toContainText("40 min");
