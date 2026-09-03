@@ -10,6 +10,7 @@ async function installWebMcp(page: Page): Promise<void> {
     Object.defineProperty(document, "modelContext", {
       configurable: true,
       value: {
+        getTools: async () => tools,
         registerTool: async (tool: RegisteredTool, options: { signal: AbortSignal }) => {
           tools.push(tool);
           options.signal.addEventListener("abort", () => {
