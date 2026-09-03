@@ -23,12 +23,12 @@ function isInput(value: unknown): value is { refresh?: boolean } {
 export function createLiveConditionsTool(store: LiveConditionsStore): WebMcpTool {
   return {
     name: "live_conditions_get",
-    description: "Reads current advisory weather across the fleet and route-relevant DGT traffic incidents. Set refresh=true to request the public providers. This tool never changes routes, plans, constraints, or human approvals.",
+    description: "Reads current advisory weather across the fleet and route-relevant DGT traffic incidents. Set refresh=true to enable the live advisory map layer and request the public providers. This tool never changes routes, plans, constraints, or human approvals.",
     inputSchema: liveConditionsInputSchema,
     async execute(input: unknown): Promise<WebMcpToolResponse> {
       if (!isInput(input)) return response({ ok: false, error: { code: "invalid-input", message: "The tool input is invalid." } });
       try {
-        const snapshot = input.refresh === true ? await store.refresh(true) : store.read();
+        const snapshot = input.refresh === true ? await store.enable() : store.read();
         return response({ ok: true, data: liveConditionsForAgent(snapshot) });
       } catch {
         return response({ ok: false, error: { code: "provider-unavailable", message: "Live weather and traffic could not be read." } });
