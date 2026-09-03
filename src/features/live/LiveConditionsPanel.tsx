@@ -43,7 +43,9 @@ export function LiveConditionsPanel({ locale, snapshot, store }: LiveConditionsP
     .slice(0, 4), [snapshot.weather.observations]);
   const traffic = snapshot.traffic.incidents.slice(0, 4);
   const copy = locale === "es" ? {
-    title: "Meteorología y tráfico en vivo",
+    accessibleTitle: "Meteorología y tráfico en vivo",
+    title: "Meteorología y tráfico",
+    off: "Datos actuales desactivados",
     enable: "Activar datos en vivo",
     disable: "Pausar datos en vivo",
     refresh: "Actualizar ahora",
@@ -63,7 +65,9 @@ export function LiveConditionsPanel({ locale, snapshot, store }: LiveConditionsP
     route: "ruta",
     distance: "de la ruta",
   } : {
-    title: "Live weather & traffic",
+    accessibleTitle: "Live weather & traffic",
+    title: "Weather & traffic",
+    off: "Current data off",
     enable: "Enable live data",
     disable: "Pause live data",
     refresh: "Refresh now",
@@ -94,7 +98,7 @@ export function LiveConditionsPanel({ locale, snapshot, store }: LiveConditionsP
   };
 
   return (
-    <aside aria-label={copy.title} className={`live-conditions-panel${expanded ? " live-conditions-panel-expanded" : ""}`} data-live-enabled={snapshot.enabled}>
+    <aside aria-label={copy.accessibleTitle} className={`live-conditions-panel${expanded ? " live-conditions-panel-expanded" : ""}`} data-live-enabled={snapshot.enabled}>
       <header className="live-conditions-header">
         <div>
           <span aria-hidden="true" className={`live-pulse live-pulse-${snapshot.refreshing ? "loading" : snapshot.enabled ? "active" : "idle"}`} />
@@ -112,7 +116,7 @@ export function LiveConditionsPanel({ locale, snapshot, store }: LiveConditionsP
 
       {!expanded ? (
         <p className="live-conditions-compact">
-          {snapshot.enabled ? `${snapshot.summary.adverseWeatherVehicles} ${copy.adverse} · ${snapshot.summary.routeRelevantTrafficIncidents} ${copy.relevant}` : copy.enable}
+          {snapshot.enabled ? `${snapshot.summary.adverseWeatherVehicles} ${copy.adverse} · ${snapshot.summary.routeRelevantTrafficIncidents} ${copy.relevant}` : copy.off}
         </p>
       ) : (
         <div className="live-conditions-body">
