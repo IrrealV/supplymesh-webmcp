@@ -3,6 +3,7 @@ import type { LiveConditionsSnapshot, LiveConditionsStore } from "../../live/liv
 import type { Locale } from "../../preferences/i18n/catalog";
 import { LiveConditionsMapBridge } from "./LiveConditionsMapBridge";
 import { LiveConditionsPanel } from "./LiveConditionsPanel";
+import "./liveConditionsPosition.css";
 
 type LiveConditionsContextValue = Readonly<{
   snapshot: LiveConditionsSnapshot;
