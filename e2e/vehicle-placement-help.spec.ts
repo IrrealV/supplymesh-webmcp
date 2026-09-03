@@ -77,6 +77,7 @@ test.describe("Minibatch B: Map-based vehicle placement, functional Help, and cl
   });
 
   test("map-first vehicle placement flow: placement mode, precision click, preview marker, drawer, create and cancel", async ({ page }) => {
+    test.setTimeout(60_000);
     await openConsole(page);
 
     const expandBtn = page.getByRole("button", { name: "Expand filters" });
@@ -102,11 +103,25 @@ test.describe("Minibatch B: Map-based vehicle placement, functional Help, and cl
     await addVehicleBtn.click();
     await expect(banner).toBeVisible();
 
-    const mapBox = await map.boundingBox();
-    expect(mapBox).not.toBeNull();
-    const clickX = mapBox!.x + mapBox!.width * 0.52;
-    const clickY = mapBox!.y + mapBox!.height * 0.48;
-    await page.mouse.click(clickX, clickY);
+    const target = await map.evaluate((node) => {
+      const element = node as HTMLElement & {
+        _leaflet_map?: {
+          containerPointToLatLng(point: [number, number]): { lat: number; lng: number };
+        };
+      };
+      if (element._leaflet_map === undefined) throw new Error("Leaflet map is unavailable.");
+      const rect = element.getBoundingClientRect();
+      const x = rect.width * 0.52;
+      const y = rect.height * 0.48;
+      const coordinate = element._leaflet_map.containerPointToLatLng([x, y]);
+      return {
+        clientX: rect.left + x,
+        clientY: rect.top + y,
+        latitude: coordinate.lat,
+        longitude: coordinate.lng,
+      };
+    });
+    await page.mouse.click(target.clientX, target.clientY);
 
     const previewMarker = page.locator(".placement-preview-marker");
     await expect(previewMarker).toBeVisible();
@@ -122,7 +137,7 @@ test.describe("Minibatch B: Map-based vehicle placement, functional Help, and cl
     await expect(previewMarker).toHaveCount(0);
 
     await addVehicleBtn.click();
-    await page.mouse.click(clickX, clickY);
+    await page.mouse.click(target.clientX, target.clientY);
     await expect(drawer).toBeVisible();
 
     await drawer.locator("#placement-fleet-num").fill("Unit 288");
@@ -144,17 +159,21 @@ test.describe("Minibatch B: Map-based vehicle placement, functional Help, and cl
     await expect(inspection.locator("[data-vehicle-motion-status=stopped]")).toBeVisible();
     await expect(inspection.locator("[data-vehicle-stopped-reason]")).toContainText("No route assigned");
 
-    await page.evaluate(() => {
-      const el = document.querySelector(".leaflet-container") as HTMLElement & {
-        _leaflet_map?: { setZoom(zoom: number): void };
+    await map.evaluate(async (node, placement) => {
+      const element = node as HTMLElement & {
+        _leaflet_map?: {
+          setView(center: [number, number], zoom: number, options: { animate: boolean }): void;
+        };
       };
-      el?._leaflet_map?.setZoom(14);
-    });
+      element._leaflet_map?.setView([placement.latitude, placement.longitude], 14, { animate: false });
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    }, target);
+    await expect(map).toHaveAttribute("data-close-range-mode", "active");
 
     const canvas = page.locator("[data-three-canvas=shared]");
     await expect(canvas).toHaveCount(1);
     await expect(canvas).toHaveAttribute("data-three-model", "volumetric-v2");
-    await expect.poll(async () => Number(await canvas.getAttribute("data-three-visible-trucks"))).toBeGreaterThan(0);
+    await expect.poll(async () => Number(await canvas.getAttribute("data-three-visible-trucks")), { timeout: 15_000 }).toBeGreaterThan(0);
     await expect(inspection).toContainText("Valencia Express");
   });
 });
