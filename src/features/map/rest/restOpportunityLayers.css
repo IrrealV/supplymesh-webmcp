@@ -1,0 +1,67 @@
+.rest-opportunity-marker {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: #173b2a;
+  display: flex;
+  filter: drop-shadow(0 2px 3px rgb(11 23 38 / 28%));
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  justify-content: center;
+  position: relative;
+}
+
+.rest-opportunity-marker span {
+  align-items: center;
+  background: #edf8f1;
+  border: 2px solid #2b8058;
+  border-radius: 50%;
+  display: flex;
+  font-size: 15px;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+.rest-opportunity-marker b {
+  background: #173b2a;
+  border: 1px solid #fff;
+  border-radius: 8px;
+  bottom: -7px;
+  color: #fff;
+  font-size: 8px;
+  line-height: 14px;
+  min-width: 19px;
+  padding: 0 3px;
+  position: absolute;
+  right: -5px;
+  text-align: center;
+}
+
+.rest-opportunity-recommended span {
+  background: #d7f2e2;
+  border-color: #147347;
+  box-shadow: 0 0 0 4px rgb(20 115 71 / 14%);
+}
+
+.rest-opportunity-scheduled span {
+  background: #147347;
+  border-color: #fff;
+  color: #fff;
+  box-shadow: 0 0 0 4px rgb(20 115 71 / 22%);
+}
+
+.rest-opportunity-rejected {
+  filter: grayscale(.9) opacity(.62) drop-shadow(0 1px 2px rgb(11 23 38 / 20%));
+}
+
+.rest-opportunity-rejected span {
+  background: #eef1f2;
+  border-color: #82929a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rest-opportunity-marker,
+  .rest-opportunity-marker span {
+    transition: none;
+  }
+}
