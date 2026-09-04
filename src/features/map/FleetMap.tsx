@@ -1,5 +1,5 @@
-import { divIcon, latLngBounds, type LatLngExpression, type Map as LeafletMap } from "leaflet";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { divIcon, latLngBounds, type LatLngExpression, type Map as LeafletMap, type Polyline as LeafletPolyline } from "leaflet";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, Marker, Pane, Polygon, Polyline, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import { useUiCoordinationStore } from "../../app/state/useUiCoordinationStore";
 import type { OperatingRegion, OperationalRisk, RiskSeverity } from "../../domain/entities";
@@ -13,6 +13,7 @@ import type { Unit211RecoveryComparisonModel } from "../recovery-comparison/unit
 import { recoveryComparisonCopy } from "../../preferences/i18n/catalog";
 import { CLOSE_RANGE_FOCUS_ZOOM } from "./closeRangeMode";
 import { isWeatherRiskKind, WeatherRiskOverlay } from "./weather/WeatherRiskOverlay";
+import { RestOpportunityLayers, type RestOpportunityMapModel } from "./rest/RestOpportunityLayers";
 
 const severityColors: Record<RiskSeverity, string> = { low: "#657985", medium: "#a66a18", high: "#c4512d", critical: "#b4232d" };
 const WEATHER_RISK_COLOR = "#1268e8";
@@ -188,6 +189,17 @@ function routeStyle({ state }: DerivedRoute) {
   return { className, color: "#4c9a6a", opacity: 0.66, weight: 2.5 };
 }
 
+function AuthoritativeRouteLayer({ entry }: { entry: DerivedRoute }) {
+  const routeLayer = useRef<LeafletPolyline>(null);
+  useEffect(() => {
+    const element = routeLayer.current?.getElement();
+    if (element === undefined || element === null) return;
+    element.setAttribute("data-route-id", entry.route.id);
+    element.setAttribute("data-route-owner", entry.route.vehicleId);
+  }, [entry.route.id, entry.route.vehicleId]);
+  return <Polyline ref={routeLayer} {...routeStyle(entry)} noClip positions={routePositions(entry.route)} smoothFactor={0} />;
+}
+
 function CloseRangeBridgeHazard({ scenario }: { scenario: OperatingRegion }) {
   const map = useMap();
   const heightRisk = scenario.risks.find((r) => r.id === "restriction-height-3.9");
@@ -220,51 +232,31 @@ function MapPlacementHandler() {
 
   useEffect(() => {
     const container = map.getContainer();
-    if (placementMode) {
-      container.classList.add("placement-mode");
-    } else {
-      container.classList.remove("placement-mode");
-    }
-    return () => {
-      container.classList.remove("placement-mode");
-    };
+    if (placementMode) container.classList.add("placement-mode");
+    else container.classList.remove("placement-mode");
+    return () => { container.classList.remove("placement-mode"); };
   }, [map, placementMode]);
 
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && placementMode) {
-        cancelPlacement();
-      }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && placementMode) cancelPlacement();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [cancelPlacement, placementMode]);
 
   useMapEvents({
-    click(e) {
-      if (useUiCoordinationStore.getState().placementMode) {
-        setPlacementCoordinates([e.latlng.lng, e.latlng.lat]);
-      }
+    click(event) {
+      if (useUiCoordinationStore.getState().placementMode) setPlacementCoordinates([event.latlng.lng, event.latlng.lat]);
     },
   });
 
   if (!placementCoordinates) return null;
 
-  return (
-    <Marker
-      position={[placementCoordinates[1], placementCoordinates[0]]}
-      icon={divIcon({
-        className: "placement-preview-marker",
-        html: '<div class="placement-preview-pin"></div>',
-        iconSize: [40, 40],
-        iconAnchor: [20, 20],
-      })}
-      pane="fleet-trucks"
-    />
-  );
+  return <Marker position={[placementCoordinates[1], placementCoordinates[0]]} icon={divIcon({ className: "placement-preview-marker", html: '<div class="placement-preview-pin"></div>', iconSize: [40, 40], iconAnchor: [20, 20] })} pane="fleet-trucks" />;
 }
 
-export function FleetMap({ availableComparison, comparison, locale, recoveryExecuted = false, scenario }: { availableComparison?: Unit211RecoveryComparisonModel; comparison?: Unit211RecoveryComparisonModel; locale: Locale; recoveryExecuted?: boolean; scenario: OperatingRegion }) {
+export function FleetMap({ availableComparison, comparison, locale, recoveryExecuted = false, restOpportunityComparison, scenario }: { availableComparison?: Unit211RecoveryComparisonModel; comparison?: Unit211RecoveryComparisonModel; locale: Locale; recoveryExecuted?: boolean; restOpportunityComparison?: RestOpportunityMapModel; scenario: OperatingRegion }) {
   const activeFilters = useUiCoordinationStore((state) => state.activeFilters);
   const panelContext = useUiCoordinationStore((state) => state.panelContext);
   const selection = useUiCoordinationStore((state) => state.selection);
@@ -279,25 +271,16 @@ export function FleetMap({ availableComparison, comparison, locale, recoveryExec
   const cancelManualFollow = (): void => { coordinator.recordManualInteraction(); useUiCoordinationStore.getState().cancelFollow(); };
   const layoutSignature = `${panelContext.mode}:${selection.kind}:${selectedVehicleId}:${comparison?.incident.id ?? ""}`; const recoveryCopy = recoveryComparisonCopy(locale); const hasExecuted = recoveryExecuted;
   return <div aria-label={copy.currentRoute} className="map-frame" onKeyDown={(event) => { if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "+", "-", "="].includes(event.key)) cancelManualFollow(); }} onPointerDown={cancelManualFollow} onWheel={cancelManualFollow}>
-    {placementMode && !placementCoordinates && (
-      <div className="map-placement-banner" role="status">
-        <span>🎯 {copy.placementBanner}</span>
-        <button
-          type="button"
-          onClick={() => cancelPlacement()}
-        >
-          {copy.cancel}
-        </button>
-      </div>
-    )}
+    {placementMode && !placementCoordinates && <div className="map-placement-banner" role="status"><span>🎯 {copy.placementBanner}</span><button type="button" onClick={() => cancelPlacement()}>{copy.cancel}</button></div>}
     <MapContainer center={[40.1, -3.55]} className="fleet-map" maxZoom={18} minZoom={5} zoom={6.5} zoomControl zoomSnap={0.5}>
       <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       <Pane name="weather-effects" style={{ pointerEvents: "none", zIndex: 390 }} /><Pane name="risk-tokens" style={{ zIndex: 620 }} /><Pane name="fleet-trucks" style={{ zIndex: 640 }} /><Pane name="fleet-labels" style={{ zIndex: 660 }} /><Pane name="close-range-hazards" style={{ zIndex: 680 }} />
       <MapEvents coordinator={coordinator} /><MapFocus comparison={comparison} coordinator={coordinator} scenario={scenario} /><MapLayout coordinator={coordinator} signature={layoutSignature} />
-      {layers.routes.filter((entry) => entry.route.id !== comparison?.current.id && entry.route.id !== comparison?.alternative.id).map((entry) => <Polyline key={`${entry.route.id}:${entry.state}`} {...routeStyle(entry)} noClip positions={routePositions(entry.route)} smoothFactor={0} />)}
+      {layers.routes.filter((entry) => entry.route.id !== comparison?.current.id && entry.route.id !== comparison?.alternative.id).map((entry) => <AuthoritativeRouteLayer entry={entry} key={`${entry.route.id}:${entry.state}`} />)}
       <RiskLayers entries={visibleRisks} locale={locale} />
       <CloseRangeBridgeHazard scenario={scenario} />
       <MapPlacementHandler />
+      {restOpportunityComparison && <RestOpportunityLayers comparison={restOpportunityComparison} locale={locale} />}
       {(comparison ?? availableComparison) && <RecoveryComparisonLayers comparison={comparison !== undefined} executed={hasExecuted} locale={locale} model={(comparison ?? availableComparison)!} onIncidentSelect={comparison ? undefined : (vehicleId) => useUiCoordinationStore.getState().selectVehicle(vehicleId, "operational-map")} />}
       <VehicleMarkerLayer coordinator={coordinator} locale={locale} onSelect={(vehicleId) => useUiCoordinationStore.getState().selectVehicle(vehicleId)} routes={scenario.routes} vehicles={layers.vehicles} />
     </MapContainer>

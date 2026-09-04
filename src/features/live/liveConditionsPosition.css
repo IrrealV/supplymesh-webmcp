@@ -1,0 +1,10 @@
+.live-conditions-panel {
+  position: fixed;
+  top: 68px;
+}
+
+@media (max-width: 980px) {
+  .live-conditions-panel {
+    top: 66px;
+  }
+}

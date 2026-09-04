@@ -1,8 +1,9 @@
-import { isVehicleLabelValid, type DomainResult, type FleetStatus, type OperatingRegion, type Vehicle, type VehicleRenameCommand, type VehicleStatus, type VehicleCreateCommand, type VehicleUpdateCommand, type VehicleAssignRouteCommand } from "../entities";
+import { isVehicleLabelValid, type DomainResult, type FleetStatus, type OperatingRegion, type RestOpportunityScheduleCommand, type Vehicle, type VehicleRenameCommand, type VehicleStatus, type VehicleCreateCommand, type VehicleUpdateCommand, type VehicleAssignRouteCommand } from "../entities";
 import { deepDetachAndFreeze } from "../deepDetach";
 import type { ScenarioRepository } from "../ports/ScenarioRepository";
 import { createAssessAuthoritativeVerticalClearance, type AssessAuthoritativeVerticalClearance } from "./authoritativeVerticalAssessment";
 import { createUnit211PreDispatchContext, type Unit211PreDispatchContextResult } from "./unit211PreDispatchContext";
+import { compareRestOpportunities, scheduledRestPlanFrom, type RestOpportunityComparison } from "./restOpportunities";
 import { geoPoint, type Coordinates } from "../../scenario/geometry";
 
 type OperationsApiOptions = { readAlternativeCatalog(): unknown; admittedAlternativeCatalog: unknown };
@@ -12,6 +13,9 @@ export type OperationsApi = {
   scenarioRegionSelect(regionId: string): DomainResult<OperatingRegion>;
   assessAuthoritativeVerticalClearance: AssessAuthoritativeVerticalClearance;
   unit211PreDispatchContext(): Unit211PreDispatchContextResult;
+  restOpportunitiesCompare(vehicleId: string): DomainResult<RestOpportunityComparison>;
+  restOpportunitySchedule(command: RestOpportunityScheduleCommand): DomainResult<Vehicle>;
+  restOpportunityClear(vehicleId: string): DomainResult<Vehicle>;
   fleetStatus(): DomainResult<FleetStatus>;
   vehicleGet(vehicleId: string): DomainResult<Vehicle>;
   vehicleRename(command: VehicleRenameCommand): DomainResult<Vehicle>;
@@ -53,6 +57,37 @@ export function createOperationsApi(repository: ScenarioRepository, options?: Op
     },
     assessAuthoritativeVerticalClearance: createAssessAuthoritativeVerticalClearance(repository),
     unit211PreDispatchContext: createUnit211PreDispatchContext(repository, options?.readAlternativeCatalog ?? (() => undefined), options?.admittedAlternativeCatalog),
+    restOpportunitiesCompare: (vehicleId) => {
+      try {
+        return compareRestOpportunities(repository.scenarioCurrent(), vehicleId);
+      } catch {
+        return failure("rest-opportunities-unavailable", "Rest opportunities could not be evaluated safely.");
+      }
+    },
+    restOpportunitySchedule: ({ vehicleId, opportunityId }) => {
+      const existing = repository.vehicleGet(vehicleId);
+      if (existing === undefined) return failure("vehicle-not-found", `Vehicle ${vehicleId} was not found.`);
+      const comparison = compareRestOpportunities(repository.scenarioCurrent(), vehicleId);
+      if (!comparison.ok) return comparison;
+      const option = comparison.data.options.find((candidate) => candidate.id === opportunityId);
+      if (option === undefined) return failure("rest-opportunity-not-found", `Rest opportunity ${opportunityId} was not found.`);
+      if (!option.feasible) return failure("rest-opportunity-infeasible", `Rest opportunity ${opportunityId} violates ${option.reasonCode}.`);
+      const plan = scheduledRestPlanFrom(option);
+      if (existing.scheduledRest?.planId === plan.planId && existing.timing.eta === plan.projectedArrivalAt) return vehicleResult(existing, vehicleId);
+      return vehicleResult(repository.vehicleUpdate(vehicleId, {
+        scheduledRest: plan,
+        timing: { ...existing.timing, eta: plan.projectedArrivalAt },
+      }), vehicleId);
+    },
+    restOpportunityClear: (vehicleId) => {
+      const existing = repository.vehicleGet(vehicleId);
+      if (existing === undefined) return failure("vehicle-not-found", `Vehicle ${vehicleId} was not found.`);
+      if (existing.scheduledRest == null) return vehicleResult(existing, vehicleId);
+      return vehicleResult(repository.vehicleUpdate(vehicleId, {
+        scheduledRest: null,
+        timing: { ...existing.timing, eta: existing.scheduledRest.previousEta },
+      }), vehicleId);
+    },
     fleetStatus: () => {
       const byStatus: Record<VehicleStatus, number> = { driving: 0, resting: 0, "needs-attention": 0, critical: 0 };
       for (const vehicle of repository.scenarioCurrent().vehicles) {
@@ -141,6 +176,7 @@ export function createOperationsApi(repository: ScenarioRepository, options?: Op
         routeProgress: 0,
         riskIds: [],
         speedKmH: status === "driving" ? 78 : 0,
+        scheduledRest: null,
       };
 
       return vehicleResult(repository.vehicleCreate(newVehicle), internalId);
@@ -175,6 +211,7 @@ export function createOperationsApi(repository: ScenarioRepository, options?: Op
         return failure("vehicle-not-found", `Vehicle '${command.vehicleId}' not found.`);
       }
       const scenario = repository.scenarioCurrent();
+      const timing = existing.scheduledRest == null ? existing.timing : { ...existing.timing, eta: existing.scheduledRest.previousEta };
 
       if (command.routeId && command.routeId.trim()) {
         const route = scenario.routes.find((r) => r.id === command.routeId);
@@ -198,20 +235,24 @@ export function createOperationsApi(repository: ScenarioRepository, options?: Op
           origin: { id: `origin-${command.vehicleId}`, name: originName, position: geoPoint(startCoords) },
           destination: { id: `dest-${command.vehicleId}`, name: destName, position: geoPoint(endCoords) },
           speedKmH: 78,
+          scheduledRest: null,
+          timing,
         };
         repository.vehicleUpdate(command.vehicleId, updates);
         return vehicleResult(repository.vehicleAssignRoute(command.vehicleId, command.routeId), command.vehicleId);
-      } else {
-        const updates: Partial<Vehicle> = {
-          routeId: "",
-          currentRoute: "",
-          routeProgress: 0,
-          status: "resting",
-          speedKmH: 0,
-        };
-        repository.vehicleUpdate(command.vehicleId, updates);
-        return vehicleResult(repository.vehicleAssignRoute(command.vehicleId, undefined), command.vehicleId);
       }
+
+      const updates: Partial<Vehicle> = {
+        routeId: "",
+        currentRoute: "",
+        routeProgress: 0,
+        status: "resting",
+        speedKmH: 0,
+        scheduledRest: null,
+        timing,
+      };
+      repository.vehicleUpdate(command.vehicleId, updates);
+      return vehicleResult(repository.vehicleAssignRoute(command.vehicleId, undefined), command.vehicleId);
     },
   };
 }
