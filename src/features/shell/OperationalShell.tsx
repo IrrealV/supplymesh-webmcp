@@ -9,8 +9,10 @@ import { FilterResults } from "../fleet/FilterResults";
 import { OperationalOverview } from "../fleet/OperationalOverview";
 import { VehicleInspection } from "../fleet/VehicleInspection";
 import { FleetMap } from "../map/FleetMap";
+import { RestOpportunityPanel } from "../rest/RestOpportunityPanel";
 import { ContextPanel } from "./ContextPanel";
 import { Topbar } from "./Topbar";
+import { VehiclePlacementDrawer } from "../fleet/CreateVehicleDialog";
 import { useTabletViewport } from "../../app/presentation/useTabletViewport";
 import type { Unit211PreDispatchContextResult } from "../../domain/operations/unit211PreDispatchContext";
 import { createUnit211RecoveryComparisonModel } from "../recovery-comparison/unit211RecoveryComparisonModel";
@@ -42,6 +44,10 @@ export function OperationalShell({ locale, onLocaleChange, onScenarioChange, ope
   const [tabletOverviewOpen, setTabletOverviewOpen] = useState(false);
   const availableResult = useMemo(() => unit211PreDispatchContextForSnapshot(operations, scenario), [operations, scenario]);
   const availableComparison = useMemo(() => createUnit211RecoveryComparisonModel(availableResult, locale), [availableResult, locale]);
+  const restOpportunityResult = useMemo(
+    () => selectedVehicle === undefined ? undefined : operations.restOpportunitiesCompare(selectedVehicle.internalId),
+    [operations, selectedVehicle],
+  );
   const [comparisonRequest, setComparisonRequest] = useState<Readonly<{ result: Unit211PreDispatchContextResult; vehicle: NonNullable<typeof selectedVehicle> }>>();
   const [recoveryOpen, setRecoveryOpen] = useState(false); const [recoveryState, setRecoveryState] = useState(() => operational?.read()); const [actionFailure, setActionFailure] = useState<Extract<RecoveryResult<never>, { ok: false }>["error"]>(); const [refreshFailure, setRefreshFailure] = useState<Readonly<{ code: string; message: string }>>(); const [pending, setPending] = useState<RecoveryWorkflowAction>(); const actionLock = useRef(false); const previousWorkflowStatus = useRef(recoveryState?.ok ? recoveryState.data.workflowStatus : undefined);
   const comparison = useMemo(() => !recoveryOpen || comparisonRequest === undefined ? undefined : createUnit211RecoveryComparisonModel(comparisonRequest.result, locale), [comparisonRequest, locale, recoveryOpen]);
@@ -82,20 +88,35 @@ export function OperationalShell({ locale, onLocaleChange, onScenarioChange, ope
     setTabletOverviewOpen(true);
   }
 
+  const placementCoordinates = useUiCoordinationStore((state) => state.placementCoordinates);
+  const cancelPlacement = useUiCoordinationStore((state) => state.cancelPlacement);
+
   return (
     <div className="console-shell">
       <a className="skip-link" href="#operational-map" onClick={focusMap}>{copy.operationalMap}</a>
       <Topbar locale={locale} onLocaleChange={onLocaleChange} />
       <main className={`console-workspace ${railState === "expanded" ? "rail-is-expanded" : ""}`}>
-        <FilterRail isTablet={isTablet} locale={locale} onInteraction={() => setTabletOverviewOpen(false)} scenario={scenario} />
+        <FilterRail isTablet={isTablet} locale={locale} onInteraction={() => setTabletOverviewOpen(false)} scenario={scenario} operations={operations} onScenarioChange={onScenarioChange} />
         <section aria-describedby={comparison?.kind === "ready" ? "recovery-map-summary" : undefined} aria-label={copy.operationalMap} className="map-workspace" id="operational-map" role="region" tabIndex={-1}>
-          <FleetMap availableComparison={availableComparison.kind === "ready" ? availableComparison : undefined} comparison={comparison?.kind === "ready" ? comparison : undefined} locale={locale} recoveryExecuted={snapshot?.executionRecord != null} scenario={scenario} />
+          <FleetMap
+            availableComparison={availableComparison.kind === "ready" ? availableComparison : undefined}
+            comparison={comparison?.kind === "ready" ? comparison : undefined}
+            locale={locale}
+            recoveryExecuted={snapshot?.executionRecord != null}
+            restOpportunityComparison={restOpportunityResult?.ok ? restOpportunityResult.data : undefined}
+            scenario={scenario}
+          />
+          {!recoveryOpen && selectedVehicle && <RestOpportunityPanel key={`${selectedVehicle.internalId}:${selectedVehicle.scheduledRest?.planId ?? "none"}`} locale={locale} onScenarioChange={onScenarioChange} operations={operations} vehicle={selectedVehicle} />}
         </section>
         {isTablet && inspectionVehicle === undefined && panelContext.mode === "overview" && !tabletOverviewOpen && <button aria-label={panelCopy.openOverview} className="tablet-overview-trigger" onClick={openTabletOverview} type="button"><ChartPieSlice aria-hidden="true" size={19} /><span>{panelCopy.operationalOverview}</span></button>}
         {inspectionVehicle === undefined ? (
-          <ContextPanel closeLabel={panelContext.mode === "overview" ? panelCopy.closeOverview : copy.closeResults} label={panelContext.mode === "overview" ? panelCopy.operationalOverview : copy.fleetFilters} mode={panelContext.mode} onClose={panelContext.mode === "overview" ? () => setTabletOverviewOpen(false) : closeResults} tabletOpen={panelContext.mode === "results" || tabletOverviewOpen}>
-            {panelContext.mode === "overview" ? <OperationalOverview locale={locale} scenario={scenario} /> : <FilterResults locale={locale} scenario={scenario} />}
-          </ContextPanel>
+          placementCoordinates ? (
+            <VehiclePlacementDrawer coordinates={placementCoordinates} locale={locale} onClose={cancelPlacement} onScenarioChange={onScenarioChange} operations={operations} />
+          ) : (
+            <ContextPanel closeLabel={panelContext.mode === "overview" ? panelCopy.closeOverview : copy.closeResults} label={panelContext.mode === "overview" ? panelCopy.operationalOverview : copy.fleetFilters} mode={panelContext.mode} onClose={panelContext.mode === "overview" ? () => setTabletOverviewOpen(false) : closeResults} tabletOpen={panelContext.mode === "results" || tabletOverviewOpen}>
+              {panelContext.mode === "overview" ? <OperationalOverview locale={locale} scenario={scenario} /> : <FilterResults locale={locale} scenario={scenario} />}
+            </ContextPanel>
+          )
         ) : (
           <VehicleInspection comparison={comparison} isFollowing={follow.kind === "vehicle" && follow.vehicleId === inspectionVehicle.internalId} key={inspectionVehicle.internalId} locale={locale} onBackFromRecovery={backFromRecovery} onClose={closeInspection} onDeleted={() => comparisonRequest ? setRecoveryOpen(true) : closeInspection()} onRestoreFollow={() => useUiCoordinationStore.getState().restoreFollow()} onReviewRecovery={inspectionVehicle.internalId === "vehicle-011" && (availableComparison.kind === "ready" || snapshot?.plan != null) ? reviewRecovery : undefined} onScenarioChange={onScenarioChange} onViewRoute={() => useUiCoordinationStore.getState().focusRoute(inspectionVehicle.internalId)} operations={operations} recovery={comparison === undefined || !operational || !recoveryExecution || !recoveryHuman ? undefined : { actionFailure, onAction: (action) => { void runRecoveryAction(action); }, pending, refreshFailure, snapshot, snapshotFailure: recoveryState && !recoveryState.ok ? recoveryState.error : undefined }} recoveryUnavailableReason={availableComparison.kind === "operation-failure" && inspectionVehicle.internalId === "vehicle-011" ? availableComparison.reasonCode : undefined} scenario={scenario} vehicle={inspectionVehicle} />
         )}

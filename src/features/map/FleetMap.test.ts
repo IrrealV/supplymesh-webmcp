@@ -11,7 +11,7 @@ describe("FleetMap layers", () => {
 
     expect(layers.vehicles).toHaveLength(15);
     expect(layers.routes).toHaveLength(15);
-    expect(layers.risks).toHaveLength(19);
+    expect(layers.risks).toHaveLength(23);
     expect(getVehicleDisplayName(scenario.vehicles[0])).toBe("FM-201");
     expect(layers.routes.every((entry, index) => entry.route.geometry.geometry.coordinates === scenario.routes[index].geometry.geometry.coordinates)).toBe(true);
     expect(layers.vehicles.every((entry) => entry.state === "normal")).toBe(true);
@@ -24,7 +24,7 @@ describe("FleetMap layers", () => {
 
     expect(filtered.vehicles.filter((entry) => entry.state === "matched")).toHaveLength(5);
     expect(filtered.vehicles.filter((entry) => entry.state === "muted")).toHaveLength(10);
-    expect(filtered.risks.filter((entry) => entry.state === "matched").every((entry) => entry.risk.kind === "severe-snow")).toBe(true);
+    expect(filtered.risks.filter((entry) => entry.state === "matched").every((entry) => ["severe-snow", "heavy-rain", "severe-storm", "calima"].includes(entry.risk.kind))).toBe(true);
     expect(filtered.risks.filter((entry) => entry.risk.kind === "rest-deadline").every((entry) => entry.state === "muted")).toBe(true);
     expect(selected.vehicles.find((entry) => entry.state === "selected")?.zIndex).toBeGreaterThan(1000);
     expect(selected.routes.at(-1)?.state).toBe("selected");
@@ -50,23 +50,48 @@ describe("FleetMap layers", () => {
     expect(mapSource).not.toContain('risk.kind === "severe-snow" ? "SNOW"');
     expect(mapSource).toContain('const WEATHER_RISK_COLOR = "#1268e8"');
     expect(mapSource).toContain('<Polygon key={shapeKey} {...pathOptions}');
-    expect(mapSource).toContain('key={`${entry.route.id}:${entry.state}`} {...routeStyle(entry)}');
+    expect(mapSource).toContain('<AuthoritativeRouteLayer entry={entry} key={`${entry.route.id}:${entry.state}`} />');
+    expect(mapSource).toContain("<WeatherRiskOverlay risk={risk} zoom={zoom} />");
     expect(styles).toContain(".risk-severe-snow .risk-marker-label { display: none; }");
+    expect(styles).toContain('.fleet-map[data-close-range-mode="active"] .leaflet-tile-pane');
+    expect(styles).toContain('.fleet-map[data-close-range-mode="active"] .route-corridor-selected');
+    expect(styles).toContain('.fleet-map[data-close-range-mode="active"]::after');
   });
 
   it("should allow only presentation and accepted scenario dependencies in visual map files", () => {
-    const sources = ["FleetMap.tsx", "layers.ts", "VehicleMarkerLayer.tsx", "labelPlacement.ts", "MapLegend.tsx", "MapEventCoordinator.ts"]
+    const sources = ["FleetMap.tsx", "layers.ts", "VehicleMarkerLayer.tsx", "closeRangeMode.ts", "closeRangeMotion.ts", "fleetMotionStore.ts", "labelPlacement.ts", "MapLegend.tsx", "MapEventCoordinator.ts"]
       .map((file) => readFileSync(`src/features/map/${file}`, "utf8"))
       .join("\n");
-    const allowedImports = new Set(["@phosphor-icons/react", "leaflet", "react", "react-leaflet", "../../app/presentation/useTabletViewport", "../../app/state/useUiCoordinationStore", "../../domain/entities", "../../preferences/i18n/catalog", "../fleet/filtering", "../recovery-comparison/RecoveryComparisonLayers", "../recovery-comparison/unit211RecoveryComparisonModel", "./layers", "./labelPlacement", "./MapEventCoordinator", "./MapLegend", "./VehicleMarkerLayer"]);
+    const allowedImports = new Set(["zustand", "./fleetMotionStore", "@phosphor-icons/react", "leaflet", "react", "react-leaflet", "../../app/presentation/useTabletViewport", "../../app/state/useUiCoordinationStore", "../../domain/entities", "../../preferences/i18n/catalog", "../fleet/filtering", "../recovery-comparison/RecoveryComparisonLayers", "../recovery-comparison/unit211RecoveryComparisonModel", "./closeRangeMode", "./closeRangeMotion", "./layers", "./labelPlacement", "./MapEventCoordinator", "./MapLegend", "./VehicleMarkerLayer", "./vehicleMotion", "./three/ThreeFleetOverlay", "./weather/WeatherRiskOverlay", "./rest/RestOpportunityLayers"]);
     const imports = [...sources.matchAll(/from\s+["']([^"']+)["']/g)].map((match) => match[1]);
     const networkCall = new RegExp(`\\b${["fet", "ch"].join("")}\\s*\\(`);
 
-    expect(imports.every((dependency) => allowedImports.has(dependency))).toBe(true);
+    const invalid = imports.filter((entry) => !allowedImports.has(entry));
+    if (invalid.length > 0) console.log("INVALID:", invalid);
+    expect(invalid).toEqual([]);
     expect(sources).not.toMatch(networkCall);
     expect(sources).toContain("scenario.routes");
     expect(sources).toContain("duration: 0.85");
     expect(sources).toContain("entry.route.id !== comparison?.alternative.id");
+    expect(sources).toContain('data-route-id');
+    expect(sources).toContain('data-route-owner');
     expect(sources).toContain("(comparison ?? availableComparison)?.incident.riskId");
+    expect(sources).toContain("maxZoom={18}");
+    expect(sources).toContain("CLOSE_RANGE_FOCUS_ZOOM");
+    expect(sources).toContain("}, [coordinator, followedVehicleId, is3DMode, map, routes, vehicles]);");
+  });
+
+  it("should bind 3D bridge hazard strictly to route-011 authoritative snap and prevent routeSnaps[0] regression", () => {
+    const scenario = createSpainScenario();
+    const heightRisk = scenario.risks.find((r) => r.id === "restriction-height-3.9");
+    expect(heightRisk).toBeDefined();
+
+    const route011Snap = heightRisk?.routeSnaps?.find((snap) => snap.routeId === "route-011");
+    expect(route011Snap).toBeDefined();
+    expect(route011Snap?.startCoordinate).toStrictEqual([-3.897481, 40.149232]);
+
+    const mapSource = readFileSync("src/features/map/FleetMap.tsx", "utf8");
+    expect(mapSource).toContain('heightRisk?.routeSnaps?.find((snap) => snap.routeId === "route-011")');
+    expect(mapSource).not.toContain("heightRisk?.routeSnaps?.[0]");
   });
 });

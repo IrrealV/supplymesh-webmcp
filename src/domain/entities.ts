@@ -26,12 +26,35 @@ export type RiskKind =
   | "weight-restriction"
   | "road-closure"
   | "severe-snow"
-  | "rest-deadline";
+  | "heavy-rain"
+  | "severe-storm"
+  | "calima"
+  | "rest-deadline"
+  | "landslide";
 
 export type Place = { id: string; name: string; position: GeoPoint };
 export type Cargo = { id: string; description: string; refrigeration: "ambient" | "chilled" | "frozen"; priority: "standard" | "priority" | "critical" };
 export type Dimensions = { vehicleType: string; lengthMeters: number; heightMeters: number; weightTonnes: number };
 export type Timing = { remainingDriveMinutes: number; restDeadline: string; eta: string; delayMinutes: number };
+export type ScheduledRestPlan = {
+  planId: string;
+  vehicleId: string;
+  routeId: string;
+  opportunityId: string;
+  stopName: string;
+  stopPosition: GeoPoint;
+  stopProgress: number;
+  extraRestMinutes: number;
+  accessMinutes: number;
+  previousEta: string;
+  projectedArrivalAt: string;
+  committedDeliveryAt: string;
+  contractualDelayMinutes: number;
+  maxContractDelayMinutes: number;
+  scheduledAt: string;
+  scheduledBy: "human-ui";
+  status: "SCHEDULED";
+};
 export type Vehicle = {
   internalId: string;
   fleetNumber: string;
@@ -48,6 +71,9 @@ export type Vehicle = {
   routeId: string;
   routeProgress: number;
   riskIds: string[];
+  speedKmH?: number;
+  stoppedReason?: string;
+  scheduledRest?: ScheduledRestPlan | null;
 };
 export type Route = { id: string; vehicleId: string; name: string; geometry: GeoLine; summary: RouteSummary; riskSnaps: RiskRouteSnap[] };
 export type OperationalRisk = {
@@ -67,6 +93,30 @@ export type OperatingRegion = { id: string; name: string; vehicles: Vehicle[]; r
 export type FleetStatus = { total: number; byStatus: Record<VehicleStatus, number> };
 export type DomainResult<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
 export type VehicleRenameCommand = { vehicleId: string; label: string };
+export type VehicleCreateCommand = {
+  fleetNumber: string;
+  plate: string;
+  label?: string;
+  dimensions: Dimensions;
+  cargo: Omit<Cargo, "id">;
+  routeId?: string;
+  initialPosition?: [number, number] | { longitude: number; latitude: number };
+};
+export type VehicleUpdateCommand = {
+  vehicleId: string;
+  plate?: string;
+  label?: string;
+  dimensions?: Dimensions;
+  cargo?: Omit<Cargo, "id">;
+};
+export type VehicleAssignRouteCommand = {
+  vehicleId: string;
+  routeId: string | undefined;
+};
+export type RestOpportunityScheduleCommand = {
+  vehicleId: string;
+  opportunityId: string;
+};
 
 export function getVehicleDisplayName(vehicle: Vehicle): string {
   return vehicle.label.trim() || vehicle.fleetNumber;

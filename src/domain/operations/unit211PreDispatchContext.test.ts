@@ -29,7 +29,16 @@ function routeFrom(scenario: OperatingRegion): Route { return required(scenario.
 function riskFrom(scenario: OperatingRegion): OperationalRisk { return required(scenario.risks.find(({ id }) => id === RISK_ID), "Clearance risk is missing."); }
 function unexpectedMutation(): never { throw new Error("The pre-dispatch operation must be read-only."); }
 function repositoryFor(scenario: OperatingRegion, calls: Calls): ScenarioRepository {
-  return { scenarioCurrent: () => { calls.scenario += 1; return scenario; }, vehicleGet: unexpectedMutation, vehicleRename: unexpectedMutation, vehicleDelete: unexpectedMutation };
+  return {
+    scenarioCurrent: () => { calls.scenario += 1; return scenario; },
+    scenarioRegionSelect: unexpectedMutation,
+    vehicleGet: unexpectedMutation,
+    vehicleRename: unexpectedMutation,
+    vehicleDelete: unexpectedMutation,
+    vehicleCreate: unexpectedMutation,
+    vehicleUpdate: unexpectedMutation,
+    vehicleAssignRoute: unexpectedMutation,
+  };
 }
 function apiFor(scenario: OperatingRegion, read: () => unknown = () => clearanceAlternativeCatalog, admittedAlternativeCatalog: unknown = clearanceAlternativeCatalog): { api: ReturnType<typeof createOperationsApi>; calls: Calls } {
   const calls = { scenario: 0, catalog: 0 };
@@ -127,8 +136,8 @@ describe("unit211PreDispatchContext", () => {
       ],
     });
     expect(data.context.position.coordinates).toStrictEqual([-4.027341, 39.862774]);
-    expect(sourceProgress).toBe(0.7142857142857143); expect(vehicle.routeProgress).toBe(sourceProgress); expect(vehicle.position.geometry.coordinates).toStrictEqual(sourcePosition);
-    expect(data.context.routeProgress).toBe(0); expect(data.context.routeProgress).not.toBe(sourceProgress); expect(data.context.position.coordinates).not.toStrictEqual(sourcePosition);
+    expect(sourceProgress).toBe(0); expect(vehicle.routeProgress).toBe(sourceProgress); expect(vehicle.position.geometry.coordinates).toStrictEqual(sourcePosition);
+    expect(data.context.routeProgress).toBe(sourceProgress); expect(data.context.position.coordinates).toStrictEqual(sourcePosition);
     expect(data.options[0].temporalAssessment.remainingRouteMinutes).toBe(route.summary.durationSeconds / 60);
     expect(data.options[1].provenance.avoidance.minimumClearanceMeters).toBe(5724.858608188861);
   });
@@ -140,6 +149,16 @@ describe("unit211PreDispatchContext", () => {
     expect({ snapIndex: data.incident.snapIndex, point: data.incident.point.coordinates }).toStrictEqual({ snapIndex: 537, point: [-3.897481, 40.149232] });
     expect(data.incident.point.coordinates).not.toStrictEqual(risk.geometry.geometry.coordinates[0]);
     expect(data.incident.exclusionPolygon).toBe(data.options[1].provenance.avoidance.polygon);
+  });
+
+  it("should fail closed instead of fabricating a pre-dispatch position or progress", () => {
+    const advanced = createSpainScenario();
+    vehicleFrom(advanced).routeProgress = 0.01;
+    expect(apiFor(advanced).api.unit211PreDispatchContext()).toStrictEqual({ ok: false, reasonCode: "TEMPORAL_SOURCE_INVALID" });
+
+    const displaced = createSpainScenario();
+    displaced.vehicles[10].position.geometry.coordinates = [-4, 40];
+    expect(apiFor(displaced).api.unit211PreDispatchContext()).toStrictEqual({ ok: false, reasonCode: "UNIT_211_INVALID" });
   });
 
   it("should repeat deeply equal results with independently detached source copies", () => {

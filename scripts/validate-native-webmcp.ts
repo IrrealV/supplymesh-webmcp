@@ -44,10 +44,10 @@ async function verifySignalIsolation(page: Page): Promise<{ leftRetired: boolean
     if (context === undefined) throw new Error("Native document.modelContext is unavailable.");
     const left = new AbortController();
     const right = new AbortController();
-    const schema = { type: "object", properties: {}, additionalProperties: false };
-    const execute = (): ToolResult => ({ content: [{ type: "text", text: "{}" }] });
-    await context.registerTool({ name: "native_signal_left", description: "Temporary signal isolation evidence.", inputSchema: schema, execute }, { signal: left.signal });
-    await context.registerTool({ name: "native_signal_right", description: "Temporary signal isolation evidence.", inputSchema: schema, execute }, { signal: right.signal });
+    const inputSchema = { type: "object", properties: {}, additionalProperties: false };
+    const executeTemporary = (): ToolResult => ({ content: [{ type: "text", text: "{}" }] });
+    await context.registerTool({ name: "native_signal_left", description: "Temporary signal isolation evidence.", inputSchema, execute: executeTemporary }, { signal: left.signal });
+    await context.registerTool({ name: "native_signal_right", description: "Temporary signal isolation evidence.", inputSchema, execute: executeTemporary }, { signal: right.signal });
     left.abort();
     for (let attempt = 0; attempt < 100; attempt += 1) {
       const active = (await context.getTools()).map(({ name }) => name);
@@ -61,6 +61,39 @@ async function verifySignalIsolation(page: Page): Promise<{ leftRetired: boolean
     return { leftRetired: !afterLeft.includes("native_signal_left"), rightSurvived: afterLeft.includes("native_signal_right"), rightRetired: !afterRight.includes("native_signal_right") };
   });
 }
+
+const vehicleInputSchema = {
+  type: "object",
+  properties: { vehicleId: { type: "string", minLength: 1 } },
+  required: ["vehicleId"],
+  additionalProperties: false,
+};
+const liveConditionsInputSchema = {
+  type: "object",
+  properties: { refresh: { type: "boolean" } },
+  additionalProperties: false,
+};
+const dimensionsInputSchema = {
+  type: "object",
+  properties: {
+    vehicleType: { type: "string", minLength: 1 },
+    lengthMeters: { type: "number", exclusiveMinimum: 0 },
+    heightMeters: { type: "number", exclusiveMinimum: 0 },
+    weightTonnes: { type: "number", exclusiveMinimum: 0 },
+  },
+  required: ["vehicleType", "lengthMeters", "heightMeters", "weightTonnes"],
+  additionalProperties: false,
+};
+const cargoInputSchema = {
+  type: "object",
+  properties: {
+    description: { type: "string", minLength: 1 },
+    refrigeration: { type: "string", enum: ["ambient", "chilled", "frozen"] },
+    priority: { type: "string", enum: ["standard", "priority", "critical"] },
+  },
+  required: ["description", "refrigeration", "priority"],
+  additionalProperties: false,
+};
 
 const browser = await chromium.launch({
   args: ["--enable-features=WebMCP"],
@@ -80,7 +113,7 @@ try {
     if (context === undefined) throw new Error("Native document.modelContext is unavailable.");
     for (let attempt = 0; attempt < 200; attempt += 1) {
       const count = (await context.getTools()).length;
-      if (document.querySelector(".console-shell") !== null) return count !== 7;
+      if (document.querySelector(".console-shell") !== null) return count !== 13;
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
     throw new Error("The console did not render after native registration.");
@@ -89,21 +122,107 @@ try {
 
   const registered = await tools(page);
   const names = registered.map(({ name }) => name).sort();
-  assert(JSON.stringify(names) === JSON.stringify(["fleet_status", "recovery_operations_context", "recovery_options_compare", "recovery_plan_stage", "scenario_current", "vehicle_get", "vehicle_rename"]), `Unexpected native tools: ${names.join(", ")}`);
+  const expectedNames = [
+    "fleet_status",
+    "fleet_vehicle_assign_route",
+    "fleet_vehicle_create",
+    "fleet_vehicle_delete",
+    "fleet_vehicle_update",
+    "live_conditions_get",
+    "recovery_operations_context",
+    "recovery_options_compare",
+    "recovery_plan_stage",
+    "rest_opportunities_compare",
+    "scenario_current",
+    "vehicle_get",
+    "vehicle_rename",
+  ];
+  assert(JSON.stringify(names) === JSON.stringify(expectedNames), `Unexpected native tools: ${names.join(", ")}`);
+  assert(!names.some((name) => /rest.*schedule|schedule.*rest|rest.*approve/i.test(name)), "Native WebMCP exposed forbidden rest scheduling authority.");
+
   const schemas = Object.fromEntries(registered.map(({ inputSchema, name }) => [name, schema(inputSchema)]));
   assert(isDeepStrictEqual(schemas.scenario_current, { type: "object", properties: {}, additionalProperties: false }), `scenario_current schema changed: ${JSON.stringify(schemas.scenario_current)}`);
   assert(isDeepStrictEqual(schemas.fleet_status, { type: "object", properties: {}, additionalProperties: false }), `fleet_status schema changed: ${JSON.stringify(schemas.fleet_status)}`);
-  assert(isDeepStrictEqual(schemas.vehicle_get, { type: "object", properties: { vehicleId: { type: "string", minLength: 1 } }, required: ["vehicleId"], additionalProperties: false }), `vehicle_get schema changed: ${JSON.stringify(schemas.vehicle_get)}`);
+  assert(isDeepStrictEqual(schemas.vehicle_get, vehicleInputSchema), `vehicle_get schema changed: ${JSON.stringify(schemas.vehicle_get)}`);
+  assert(isDeepStrictEqual(schemas.rest_opportunities_compare, vehicleInputSchema), `rest_opportunities_compare schema changed: ${JSON.stringify(schemas.rest_opportunities_compare)}`);
+  assert(isDeepStrictEqual(schemas.live_conditions_get, liveConditionsInputSchema), `live_conditions_get schema changed: ${JSON.stringify(schemas.live_conditions_get)}`);
   assert(isDeepStrictEqual(schemas.vehicle_rename, { type: "object", properties: { vehicleId: { type: "string", minLength: 1 }, label: { type: "string", minLength: 1 } }, required: ["vehicleId", "label"], additionalProperties: false }), `vehicle_rename schema changed: ${JSON.stringify(schemas.vehicle_rename)}`);
   assert(isDeepStrictEqual(schemas.recovery_operations_context, { type: "object", properties: {}, additionalProperties: false }), `recovery_operations_context schema changed: ${JSON.stringify(schemas.recovery_operations_context)}`);
   assert(isDeepStrictEqual(schemas.recovery_options_compare, { type: "object", properties: {}, additionalProperties: false }), `recovery_options_compare schema changed: ${JSON.stringify(schemas.recovery_options_compare)}`);
   assert(isDeepStrictEqual(schemas.recovery_plan_stage, { type: "object", properties: { selectedOptionId: { type: "string", minLength: 1 } }, required: ["selectedOptionId"], additionalProperties: false }), `recovery_plan_stage schema changed: ${JSON.stringify(schemas.recovery_plan_stage)}`);
+
+  assert(isDeepStrictEqual(schemas.fleet_vehicle_create, {
+    type: "object",
+    properties: {
+      fleetNumber: { type: "string", minLength: 1 },
+      plate: { type: "string", minLength: 1 },
+      label: { type: "string" },
+      routeId: { type: "string" },
+      dimensions: dimensionsInputSchema,
+      cargo: cargoInputSchema,
+      initialPosition: {
+        type: "object",
+        properties: {
+          longitude: { type: "number", minimum: -180, maximum: 180 },
+          latitude: { type: "number", minimum: -90, maximum: 90 },
+        },
+        required: ["longitude", "latitude"],
+        additionalProperties: false,
+      },
+    },
+    required: ["fleetNumber", "plate", "dimensions", "cargo"],
+    additionalProperties: false,
+  }), `fleet_vehicle_create schema changed: ${JSON.stringify(schemas.fleet_vehicle_create)}`);
+  assert(isDeepStrictEqual(schemas.fleet_vehicle_update, {
+    type: "object",
+    properties: {
+      vehicleId: { type: "string", minLength: 1 },
+      plate: { type: "string", minLength: 1 },
+      label: { type: "string" },
+      dimensions: dimensionsInputSchema,
+      cargo: cargoInputSchema,
+    },
+    required: ["vehicleId"],
+    additionalProperties: false,
+  }), `fleet_vehicle_update schema changed: ${JSON.stringify(schemas.fleet_vehicle_update)}`);
+  assert(isDeepStrictEqual(schemas.fleet_vehicle_assign_route, {
+    type: "object",
+    properties: { vehicleId: { type: "string", minLength: 1 }, routeId: { type: "string" } },
+    required: ["vehicleId"],
+    additionalProperties: false,
+  }), `fleet_vehicle_assign_route schema changed: ${JSON.stringify(schemas.fleet_vehicle_assign_route)}`);
+  assert(isDeepStrictEqual(schemas.fleet_vehicle_delete, vehicleInputSchema), `fleet_vehicle_delete schema changed: ${JSON.stringify(schemas.fleet_vehicle_delete)}`);
+
   const signalIsolation = await verifySignalIsolation(page);
   assert(signalIsolation.leftRetired && signalIsolation.rightSurvived && signalIsolation.rightRetired, `Native AbortSignal isolation failed: ${JSON.stringify(signalIsolation)}`);
-  console.log(JSON.stringify({ nativeSignalIsolation: signalIsolation }));
+
+  const liveConditions = await execute(page, "live_conditions_get", {}) as { data?: { advisoryOnly?: boolean; enabled?: boolean }; ok?: boolean };
+  assert(liveConditions.ok === true && liveConditions.data?.advisoryOnly === true && liveConditions.data?.enabled === false, "Native live conditions did not return the safe initial advisory snapshot.");
+  const invalidLive = await execute(page, "live_conditions_get", { refresh: false, unsafeOverride: true });
+  assert(JSON.stringify(invalidLive).includes('"code":"invalid-input"'), "Native live conditions accepted an unexpected property.");
 
   const fleet = await execute(page, "fleet_status", {});
   assert(JSON.stringify(fleet).includes('"total":15'), "Native fleet query did not return 15 vehicles.");
+
+  const restComparison = await execute(page, "rest_opportunities_compare", { vehicleId: "vehicle-012" }) as {
+    ok?: boolean;
+    data?: {
+      recommendedOptionId?: string;
+      policy?: { humanSchedulesRest?: boolean; mandatoryRestIsNeverReduced?: boolean };
+      options?: Array<{ extraRestMinutes?: number; feasible?: boolean }>;
+    };
+  };
+  assert(restComparison.ok === true, "Native rest-opportunity comparison failed.");
+  assert(restComparison.data?.recommendedOptionId === "rest-window-max-55", "Native rest comparison selected the wrong recommendation.");
+  assert(restComparison.data?.policy?.humanSchedulesRest === true && restComparison.data?.policy?.mandatoryRestIsNeverReduced === true, "Native rest policy lost the human scheduling boundary.");
+  assert(JSON.stringify(restComparison.data?.options?.map(({ extraRestMinutes, feasible }) => ({ extraRestMinutes, feasible }))) === JSON.stringify([
+    { extraRestMinutes: 40, feasible: true },
+    { extraRestMinutes: 55, feasible: true },
+    { extraRestMinutes: 70, feasible: false },
+  ]), "Native rest comparison returned unexpected candidates.");
+  const invalidRest = await execute(page, "rest_opportunities_compare", { vehicleId: "vehicle-012", tolerance: 999 });
+  assert(JSON.stringify(invalidRest).includes('"code":"invalid-input"'), "Native rest comparison accepted agent-supplied tolerance.");
+
   const original = await execute(page, "vehicle_get", { vehicleId: "vehicle-002" }) as { data?: { label?: string }; ok?: boolean };
   assert(original.ok === true && typeof original.data?.label === "string", "Native vehicle query failed.");
   const renamed = await execute(page, "vehicle_rename", { vehicleId: "vehicle-002", label: "Native Release Evidence" });
@@ -116,6 +235,42 @@ try {
   await execute(page, "vehicle_rename", { vehicleId: "vehicle-002", label: original.data.label });
   await page.getByRole("button", { exact: true, name: original.data.label }).waitFor();
 
+  const createResult = await execute(page, "fleet_vehicle_create", {
+    fleetNumber: "FM-900",
+    plate: "9000-NVT",
+    label: "Native Vehicle Unit",
+    dimensions: { vehicleType: "Semi-trailer", heightMeters: 4.0, lengthMeters: 16.5, weightTonnes: 32 },
+    cargo: { description: "High-value electronics", refrigeration: "ambient", priority: "priority" },
+  }) as { data?: { internalId: string; label: string; status: string }; ok?: boolean };
+  assert(createResult.ok === true && typeof createResult.data?.internalId === "string", "Native vehicle creation failed.");
+  const createdId = createResult.data.internalId;
+  await page.getByRole("button", { exact: true, name: "Native Vehicle Unit" }).waitFor();
+  const getCreated = await execute(page, "vehicle_get", { vehicleId: createdId }) as { data?: { status: string; label: string }; ok?: boolean };
+  assert(getCreated.ok === true && getCreated.data?.status === "resting", "Native created vehicle not resting.");
+
+  const updateResult = await execute(page, "fleet_vehicle_update", {
+    vehicleId: createdId,
+    label: "Updated Native Vehicle",
+    dimensions: { vehicleType: "Rigid box truck", heightMeters: 3.5, lengthMeters: 12.0, weightTonnes: 18 },
+  }) as { data?: { label: string }; ok?: boolean };
+  assert(updateResult.ok === true && updateResult.data?.label === "Updated Native Vehicle", "Native vehicle update failed.");
+  await page.getByRole("button", { exact: true, name: "Updated Native Vehicle" }).waitFor();
+
+  const unassignResult = await execute(page, "fleet_vehicle_assign_route", { vehicleId: "vehicle-012", routeId: "" }) as { data?: { status: string; routeId: string }; ok?: boolean };
+  assert(unassignResult.ok === true && unassignResult.data?.status === "resting", "Native route unassign failed.");
+  const assignResult = await execute(page, "fleet_vehicle_assign_route", { vehicleId: createdId, routeId: "route-012" }) as { data?: { status: string; routeId: string }; ok?: boolean };
+  assert(assignResult.ok === true && assignResult.data?.status === "driving" && assignResult.data?.routeId === "route-012", `Native route assignment to new vehicle failed: ${JSON.stringify(assignResult)}`);
+  const scenarioCheck = await execute(page, "scenario_current", {}) as { data?: { routes: Array<{ id: string; vehicleId: string }> }; ok?: boolean };
+  assert(scenarioCheck.ok === true, "Native scenario_current query failed.");
+  const assignedRouteObj = scenarioCheck.data?.routes.find((route) => route.id === "route-012");
+  assert(assignedRouteObj?.vehicleId === createdId, `Route.vehicleId was not updated to ${createdId}, got ${assignedRouteObj?.vehicleId}`);
+
+  const deleteResult = await execute(page, "fleet_vehicle_delete", { vehicleId: createdId }) as { ok?: boolean };
+  assert(deleteResult.ok === true, "Native vehicle deletion failed.");
+  const afterDelete = await execute(page, "vehicle_get", { vehicleId: createdId }) as { ok?: boolean };
+  assert(afterDelete.ok === false, "Deleted vehicle still returned by vehicle_get.");
+  await execute(page, "fleet_vehicle_assign_route", { vehicleId: "vehicle-012", routeId: "route-012" });
+
   const cleanup = await page.evaluate(async () => {
     type Context = { getTools(): Promise<NativeTool[]> };
     const context = (document as unknown as { modelContext: Context }).modelContext;
@@ -124,9 +279,9 @@ try {
     for (let attempt = 0; attempt < 100 && (await context.getTools()).length !== 0; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 10));
     return { after: (await context.getTools()).length, before };
   });
-  assert(cleanup.before === 7 && cleanup.after === 0, `Native cleanup was ${cleanup.before}→${cleanup.after}, expected 7→0.`);
+  assert(cleanup.before === 13 && cleanup.after === 0, `Native cleanup was ${cleanup.before}→${cleanup.after}, expected 13→0.`);
   assert(errors.length === 0, `Browser errors: ${errors.join(" | ")}`);
-  console.log(JSON.stringify({ browser: await browser.version(), cleanup: "7→0", errors: 0, registrationBeforeRender: true, schemas: 7, signalIsolation, tools: names }));
+  console.log(JSON.stringify({ browser: await browser.version(), cleanup: "13→0", errors: 0, registrationBeforeRender: true, schemas: 13, signalIsolation, tools: names }));
 } finally {
   await browser.close();
 }

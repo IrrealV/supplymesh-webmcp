@@ -1,0 +1,62 @@
+.leaflet-weather-effects-pane {
+  pointer-events: none;
+}
+
+/* Existing E2E selectors use the weather-fx-* class names on compact risk
+   tokens. Neutralize the retired fixed-pixel effect rules so those tokens stay
+   crisp while the geographic ImageOverlay owns the rich visualization. */
+.risk-marker.weather-fx-heavy-rain,
+.risk-marker.weather-fx-severe-snow,
+.risk-marker.weather-fx-severe-storm,
+.risk-marker.weather-fx-calima {
+  animation: none !important;
+  background: transparent !important;
+  background-image: none !important;
+  filter: none !important;
+}
+
+.risk-marker.weather-fx-heavy-rain.map-layer-muted,
+.risk-marker.weather-fx-severe-snow.map-layer-muted,
+.risk-marker.weather-fx-severe-storm.map-layer-muted,
+.risk-marker.weather-fx-calima.map-layer-muted {
+  opacity: .3;
+}
+
+.risk-marker.weather-fx-heavy-rain.map-layer-normal,
+.risk-marker.weather-fx-heavy-rain.map-layer-matched,
+.risk-marker.weather-fx-heavy-rain.map-layer-selected,
+.risk-marker.weather-fx-severe-snow.map-layer-normal,
+.risk-marker.weather-fx-severe-snow.map-layer-matched,
+.risk-marker.weather-fx-severe-snow.map-layer-selected,
+.risk-marker.weather-fx-severe-storm.map-layer-normal,
+.risk-marker.weather-fx-severe-storm.map-layer-matched,
+.risk-marker.weather-fx-severe-storm.map-layer-selected,
+.risk-marker.weather-fx-calima.map-layer-normal,
+.risk-marker.weather-fx-calima.map-layer-matched,
+.risk-marker.weather-fx-calima.map-layer-selected {
+  opacity: 1;
+}
+
+.weather-geographic-overlay {
+  filter: saturate(1.08) contrast(1.04);
+  image-rendering: auto;
+  mix-blend-mode: multiply;
+  pointer-events: none !important;
+  transition: opacity 180ms ease;
+  user-select: none;
+}
+
+.weather-geographic-overlay.weather-geographic-close {
+  filter: saturate(1.18) contrast(1.08) drop-shadow(0 3px 7px rgb(15 23 42 / 20%));
+  mix-blend-mode: normal;
+}
+
+.weather-geographic-overlay.weather-geographic-calima {
+  mix-blend-mode: multiply;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .weather-geographic-overlay {
+    transition: none;
+  }
+}

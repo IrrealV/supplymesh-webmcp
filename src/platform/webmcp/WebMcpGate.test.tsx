@@ -40,9 +40,9 @@ describe("WebMcpGate", () => {
     render(<WebMcpGate explicitFlag="false" locale="en" operational={app.operational} operations={app.operations} recoveryAgent={app.recoveryAgent} recoveryExecution={app.recoveryExecution}><div>Operational console</div></WebMcpGate>);
 
     await screen.findByText("Operational console");
-    expect(registrations).toHaveLength(7);
-    expect(registrations.map((registration) => registration.tool.name)).toEqual(["scenario_current", "fleet_status", "vehicle_get", "vehicle_rename", "recovery_operations_context", "recovery_options_compare", "recovery_plan_stage"]);
-    expect(new Set(registrations.map((registration) => registration.signal)).size).toBe(7);
+    expect(registrations).toHaveLength(11);
+    expect(registrations.map((registration) => registration.tool.name)).toEqual(["scenario_current", "fleet_status", "vehicle_get", "vehicle_rename", "fleet_vehicle_create", "fleet_vehicle_update", "fleet_vehicle_assign_route", "fleet_vehicle_delete", "recovery_operations_context", "recovery_options_compare", "recovery_plan_stage"]);
+    expect(new Set(registrations.map((registration) => registration.signal)).size).toBe(11);
   });
 
   it("should block unsupported access with only an accessible explanation and retry", async () => {
@@ -72,9 +72,9 @@ describe("WebMcpGate", () => {
     await user.click(await screen.findByRole("button", { name: "Retry" }));
 
     await screen.findByText("Operational console");
-    expect(registrations).toHaveLength(8);
+    expect(registrations).toHaveLength(12);
     expect(registrations[0].signal.aborted).toBe(true);
-    expect(new Set(registrations.slice(1).map((registration) => registration.signal)).size).toBe(7);
+    expect(new Set(registrations.slice(1).map((registration) => registration.signal)).size).toBe(11);
   });
 
   it("should abort the active registration controller on unload", async () => {
@@ -85,7 +85,7 @@ describe("WebMcpGate", () => {
     const app = application();
     render(<WebMcpGate explicitFlag="false" locale="en" operational={app.operational} operations={app.operations} recoveryAgent={app.recoveryAgent} recoveryExecution={app.recoveryExecution}><div>Operational console</div></WebMcpGate>);
 
-    await waitFor(() => expect(registrations).toHaveLength(7));
+    await waitFor(() => expect(registrations).toHaveLength(11));
     window.dispatchEvent(new Event("beforeunload"));
 
     expect(registrations.every((registration) => registration.signal.aborted)).toBe(true);
@@ -106,7 +106,7 @@ describe("WebMcpGate", () => {
 
     const plan = await app.recoveryAgent.stagePlan({ selectedOptionId: "alternative-route-011-clearance-v1" });
     if (!plan.ok) throw new Error("Plan staging failed.");
-    await waitFor(() => expect([...active.keys()].sort()).toStrictEqual(["fleet_status", "recovery_operations_context", "recovery_plan_request_review", "recovery_plan_status", "recovery_reset", "scenario_current", "vehicle_get", "vehicle_rename"]));
+    await waitFor(() => expect([...active.keys()].sort()).toStrictEqual(["fleet_status", "fleet_vehicle_assign_route", "fleet_vehicle_create", "fleet_vehicle_delete", "fleet_vehicle_update", "recovery_operations_context", "recovery_plan_request_review", "recovery_plan_status", "recovery_reset", "scenario_current", "vehicle_get", "vehicle_rename"]));
     const contextRegistration = registrations.find(({ tool }) => tool.name === "recovery_operations_context");
     const compareRegistration = registrations.find(({ tool }) => tool.name === "recovery_options_compare");
     expect(contextRegistration?.signal.aborted).toBe(false);
@@ -164,7 +164,7 @@ describe("WebMcpGate", () => {
     release();
 
     await screen.findByText("Operational console");
-    await waitFor(() => expect([...active.keys()].sort()).toStrictEqual(["fleet_status", "recovery_operations_context", "recovery_plan_request_review", "recovery_plan_status", "recovery_reset", "scenario_current", "vehicle_get", "vehicle_rename"]));
+    await waitFor(() => expect([...active.keys()].sort()).toStrictEqual(["fleet_status", "fleet_vehicle_assign_route", "fleet_vehicle_create", "fleet_vehicle_delete", "fleet_vehicle_update", "recovery_operations_context", "recovery_plan_request_review", "recovery_plan_status", "recovery_reset", "scenario_current", "vehicle_get", "vehicle_rename"]));
     expect(active.has("recovery_options_compare")).toBe(false);
     expect(active.has("recovery_plan_stage")).toBe(false);
   });
@@ -195,7 +195,7 @@ describe("WebMcpGate", () => {
     app.recoveryHuman.approvePlan({ planId: plan.data.planId });
     release();
 
-    await waitFor(() => expect([...active.keys()].sort()).toStrictEqual(["fleet_status", "recovery_operations_context", "recovery_plan_execute", "recovery_plan_status", "recovery_reset", "scenario_current", "vehicle_get", "vehicle_rename"]));
+    await waitFor(() => expect([...active.keys()].sort()).toStrictEqual(["fleet_status", "fleet_vehicle_assign_route", "fleet_vehicle_create", "fleet_vehicle_delete", "fleet_vehicle_update", "recovery_operations_context", "recovery_plan_execute", "recovery_plan_status", "recovery_reset", "scenario_current", "vehicle_get", "vehicle_rename"]));
     expect(active.has("recovery_plan_request_review")).toBe(false);
   });
 

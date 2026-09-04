@@ -17,6 +17,8 @@ type UiCoordinationState = {
   panelContext: PanelContext;
   railState: RailState;
   selection: Selection;
+  placementMode: boolean;
+  placementCoordinates: [number, number] | null;
   acknowledgeMapFocus(requestId: number): void;
   cancelFollow(): void;
   clearFilters(returnFocusId: string): void;
@@ -27,6 +29,9 @@ type UiCoordinationState = {
   selectVehicle(vehicleId: string, returnFocusId?: string): void;
   setRailState(railState: RailState): void;
   toggleFilter(filter: FleetFilter, returnFocusId: string): void;
+  startPlacement(): void;
+  setPlacementCoordinates(coords: [number, number]): void;
+  cancelPlacement(): void;
 };
 
 const noFollow: Follow = { kind: "none" };
@@ -41,6 +46,11 @@ export const useUiCoordinationStore = create<UiCoordinationState>()((set, get) =
   panelContext: { mode: "overview", returnFocusId: "operational-map" },
   railState: "compact",
   selection: noSelection,
+  placementMode: false,
+  placementCoordinates: null,
+  startPlacement: () => set({ placementMode: true, placementCoordinates: null, selection: noSelection, follow: noFollow }),
+  setPlacementCoordinates: (coords) => set({ placementCoordinates: coords }),
+  cancelPlacement: () => set({ placementMode: false, placementCoordinates: null }),
   acknowledgeMapFocus: (requestId) => set((state) => state.mapFocusTarget.kind !== "none" && state.mapFocusTarget.requestId === requestId ? { mapFocusTarget: noFocus } : {}),
   cancelFollow: () => set({ follow: noFollow }),
   clearFilters: (returnFocusId) => set({ activeFilters: new Set<FleetFilter>(), panelContext: { mode: "overview", returnFocusId } }),
@@ -54,7 +64,15 @@ export const useUiCoordinationStore = create<UiCoordinationState>()((set, get) =
     const requestId = state.focusRequestId + 1;
     return { focusRequestId: requestId, mapFocusTarget: { kind: "route", requestId, vehicleId } };
   }),
-  restoreFollow: () => set((state) => ({ follow: state.selection.kind === "vehicle" ? { kind: "vehicle", vehicleId: state.selection.vehicleId } : noFollow })),
+  restoreFollow: () => set((state) => {
+    if (state.selection.kind !== "vehicle") return { follow: noFollow };
+    const requestId = state.focusRequestId + 1;
+    return {
+      focusRequestId: requestId,
+      follow: { kind: "vehicle", vehicleId: state.selection.vehicleId },
+      mapFocusTarget: { kind: "vehicle", requestId, vehicleId: state.selection.vehicleId },
+    };
+  }),
   selectVehicle: (vehicleId, returnFocusId) => set((state) => {
     const requestId = state.focusRequestId + 1;
     return {

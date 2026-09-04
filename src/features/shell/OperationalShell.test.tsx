@@ -42,9 +42,9 @@ describe("OperationalShell", () => {
 
     const banner = screen.getByRole("banner");
     expect(screen.getByText("SupplyMesh")).not.toBeNull();
-    expect(banner.querySelectorAll("button")).toHaveLength(3);
+    expect(banner.querySelectorAll("button")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Help" })).not.toBeNull();
-    expect(screen.getByRole("button", { name: "Account" })).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Account" })).toBeNull();
     expect(screen.getByRole("main")).not.toBeNull();
     expect(screen.getByRole("complementary", { name: "Fleet filters" })).not.toBeNull();
     expect(screen.getByRole("complementary", { name: "Operational overview" }).getAttribute("data-context-mode")).toBe("overview");
@@ -242,7 +242,7 @@ describe("OperationalShell", () => {
   it("should expose only human authority and focus each authoritative transition", async () => {
     const user = userEvent.setup(); const app = createRecoveryApplication({ storage: new MemoryStorage() }); useUiCoordinationStore.getState().selectVehicle("vehicle-011", "operational-map"); render(<RecoveryHarness app={app} />); await user.click(screen.getByRole("button", { name: "Review recovery options" }));
     expect(screen.queryByRole("button", { name: /Prepare plan|Request human review|Execute|Verify/ })).toBeNull(); let planId = ""; await act(async () => { planId = await stageForHumanReview(app); });
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Awaiting human review" }))); expect(screen.getByText(planId)).not.toBeNull(); expect(screen.getByRole("button", { name: "Approve" })).not.toBeNull(); expect(screen.getByRole("button", { name: "Reject" })).not.toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Approve" }))); expect(screen.getByText(planId)).not.toBeNull(); expect(screen.getByRole("button", { name: "Reject" })).not.toBeNull();
     await user.click(screen.getByRole("button", { name: "Approve" })); await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Approved" }))); expect(document.body.textContent).not.toContain("Agent capability enabled"); expect(document.querySelector(".workflow-capability")?.textContent).toContain("Human approval authorizes agent execution"); expect(screen.queryByRole("button", { name: /Execute|Verify/ })).toBeNull();
   });
 

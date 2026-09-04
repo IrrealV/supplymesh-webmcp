@@ -39,7 +39,7 @@ function dimensions(index: number): Dimensions {
 function vehicleFromSeed(seed: VehicleSeed, index: number): Vehicle {
   const [internalId, fleetNumber, plate, status, originCoordinates, originName, destinationCoordinates, destinationName, cargoId, cargoDescription] = seed;
   const routeId = `route-${String(index + 1).padStart(3, "0")}`;
-  const route = routeCatalog.get(routeId); const routeProgress = index / (vehicleSeeds.length - 1);
+  const route = routeCatalog.get(routeId); const routeProgress = internalId === "vehicle-011" ? 0 : index / (vehicleSeeds.length - 1);
   if (route === undefined) throw new Error(`Missing route fixture ${routeId}.`); assertRouteProgress(routeProgress);
   return {
     internalId, fleetNumber, plate, label: index === 0 ? "" : `Unit ${fleetNumber.slice(-3)}`, position: pointAtRouteProgress(route.geometry.geometry.coordinates, routeProgress), status,
@@ -60,6 +60,10 @@ function createRisks(routes: Route[]): OperationalRisk[] {
     shared("restriction-weight-26", { kind: "weight-restriction", severity: "medium", title: "26 t weight restriction", limitTonnes: 26 }),
     shared("closure-ap-68", { kind: "road-closure", severity: "critical", title: "AP-68 closure segment" }),
     (() => { const routeSnaps = snaps(routes, "severe-snow-leon"); return { id: "severe-snow-leon", kind: "severe-snow" as const, severity: "high" as const, title: "Severe snow advisory", geometry: geoPolygon([[-5.75, 42.62], [-5.42, 42.62], [-5.42, 42.83], [-5.75, 42.83]]), affectedVehicleIds: affected(routes, routeSnaps), routeSnaps }; })(),
+    (() => { const routeSnaps = snaps(routes, "heavy-rain-galicia"); return { id: "heavy-rain-galicia", kind: "heavy-rain" as const, severity: "high" as const, title: "Heavy rain advisory", geometry: geoPolygon([[-8.65, 43.15], [-8.15, 43.15], [-8.15, 43.50], [-8.65, 43.50]]), affectedVehicleIds: affected(routes, routeSnaps), routeSnaps }; })(),
+    (() => { const routeSnaps = snaps(routes, "storm-valle-ebro"); return { id: "storm-valle-ebro", kind: "severe-storm" as const, severity: "high" as const, title: "Severe wind and storm warning", geometry: geoPolygon([[-1.15, 41.45], [-0.60, 41.45], [-0.60, 41.85], [-1.15, 41.85]]), affectedVehicleIds: affected(routes, routeSnaps), routeSnaps }; })(),
+    (() => { const routeSnaps = snaps(routes, "calima-andalucia"); return { id: "calima-andalucia", kind: "calima" as const, severity: "medium" as const, title: "Atmospheric dust / Calima alert", geometry: geoPolygon([[-3.85, 36.85], [-3.25, 36.85], [-3.25, 37.35], [-3.85, 37.35]]), affectedVehicleIds: affected(routes, routeSnaps), routeSnaps }; })(),
+    { id: "landslide-santander", kind: "landslide" as const, severity: "high" as const, title: "Landslide", geometry: geoPolygon([[-3.88, 43.24], [-3.82, 43.24], [-3.82, 43.28], [-3.88, 43.28]]), affectedVehicleIds: [] },
     ...vehicleSeeds.map(([internalId], index) => { const id = `rest-deadline-${internalId}`; const routeSnaps = snaps(routes, id); return { id, kind: "rest-deadline" as const, severity: index % 4 === 3 ? "critical" as const : "high" as const, title: "Driving and rest deadline", geometry: snappedLine(routeSnaps), affectedVehicleIds: [internalId], routeSnaps, vehicleId: internalId, deadline: `2026-08-28T${String(6 + (index % 12)).padStart(2, "0")}:00:00Z` }; }),
   ];
 }

@@ -30,4 +30,11 @@ export default tseslint.config(
       ...reactRefresh.configs.vite.rules,
     },
   },
+  {
+    files: ["src/features/map/weather/WeatherRiskOverlay.tsx"],
+    rules: {
+      "react-refresh/only-export-components": "off",
+      "no-useless-assignment": "off",
+    },
+  },
 );

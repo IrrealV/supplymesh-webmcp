@@ -1,14 +1,14 @@
-import { isVehicleLabelValid } from "../../domain/entities";
+import { isVehicleLabelValid, type Vehicle } from "../../domain/entities";
 import type { OperationalRecoverySnapshot } from "../../domain/recovery/recoveryContracts";
 import { isOperationalRecoverySnapshot } from "../../domain/recovery/recoveryValidation";
 
 export const SCENARIO_OVERRIDES_STORAGE_KEY = "scenario-overrides:v1";
 const SCENARIO_OVERRIDES_VERSION = 1;
 
-export type ScenarioOverrides = { version: 1; labels: Record<string, string>; deletedVehicleIds: string[]; operationalSnapshot?: OperationalRecoverySnapshot; recoveryRouteApplied?: true };
+export type ScenarioOverrides = { version: 1; regionId?: string; labels: Record<string, string>; deletedVehicleIds: string[]; operationalSnapshot?: OperationalRecoverySnapshot; recoveryRouteApplied?: true; createdVehicles?: Vehicle[]; updatedVehicles?: Record<string, Partial<Vehicle>>; assignedRoutes?: Record<string, string | null> };
 export type StorageLike = Pick<Storage, "getItem" | "setItem">;
 
-const emptyOverrides = (): ScenarioOverrides => ({ version: SCENARIO_OVERRIDES_VERSION, labels: {}, deletedVehicleIds: [] });
+const emptyOverrides = (): ScenarioOverrides => ({ version: SCENARIO_OVERRIDES_VERSION, labels: {}, deletedVehicleIds: [], createdVehicles: [], updatedVehicles: {}, assignedRoutes: {} });
 
 function isLabelRecord(value: unknown): value is Record<string, string> {
   return typeof value === "object" && value !== null && Object.values(value).every((entry) => typeof entry === "string" && isVehicleLabelValid(entry));
@@ -16,7 +16,7 @@ function isLabelRecord(value: unknown): value is Record<string, string> {
 
 function isScenarioOverrides(value: unknown): value is ScenarioOverrides {
   if (typeof value !== "object" || value === null) return false;
-  const candidate = value as { version?: unknown; labels?: unknown; deletedVehicleIds?: unknown; operationalSnapshot?: unknown; recoveryRouteApplied?: unknown };
+  const candidate = value as ScenarioOverrides;
   const hasRecovery = candidate.operationalSnapshot !== undefined || candidate.recoveryRouteApplied !== undefined;
   return candidate.version === SCENARIO_OVERRIDES_VERSION
     && isLabelRecord(candidate.labels)
@@ -31,7 +31,14 @@ export function loadScenarioOverrides(storage: StorageLike): ScenarioOverrides {
   try {
     const parsed: unknown = JSON.parse(serialized);
     if (!isScenarioOverrides(parsed)) return emptyOverrides();
-    const normalized: ScenarioOverrides = { version: SCENARIO_OVERRIDES_VERSION, labels: Object.fromEntries(Object.entries(parsed.labels).map(([id, label]) => [id, label.trim()])), deletedVehicleIds: [...new Set(parsed.deletedVehicleIds)] };
+    const normalized: ScenarioOverrides = { 
+      version: SCENARIO_OVERRIDES_VERSION, 
+      labels: Object.fromEntries(Object.entries(parsed.labels).map(([id, label]) => [id, label.trim()])), 
+      deletedVehicleIds: [...new Set(parsed.deletedVehicleIds)],
+      createdVehicles: Array.isArray(parsed.createdVehicles) ? parsed.createdVehicles : [],
+      updatedVehicles: parsed.updatedVehicles ?? {},
+      assignedRoutes: parsed.assignedRoutes ?? {}
+    };
     return parsed.recoveryRouteApplied === true && parsed.operationalSnapshot !== undefined
       ? { ...normalized, recoveryRouteApplied: true, operationalSnapshot: structuredClone(parsed.operationalSnapshot) }
       : normalized;
