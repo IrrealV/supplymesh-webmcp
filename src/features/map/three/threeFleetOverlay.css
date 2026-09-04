@@ -1,0 +1,7 @@
+.fleet-map[data-close-range-mode="active"]
+  .fleet-truck-icon.close-range-vehicle-active
+  .fleet-selection-aura {
+  animation: none !important;
+  display: none !important;
+  opacity: 0 !important;
+}

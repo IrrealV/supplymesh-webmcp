@@ -81,6 +81,7 @@ describe("recovery execution capability", () => {
     expect(after.routes.filter(({ vehicleId }) => vehicleId === "vehicle-011").map(({ id }) => id)).toStrictEqual(["alternative-route-011-clearance-v1"]);
     expect(after.routes.some(({ id }) => id === "route-011")).toBe(false);
     expect(afterUnit).toMatchObject({ routeId: "alternative-route-011-clearance-v1", routeProgress: 0, cargo: beforeUnit?.cargo, destination: beforeUnit?.destination, timing: beforeUnit?.timing });
+    expect(afterUnit?.position.geometry.coordinates).toStrictEqual(beforeUnit?.position.geometry.coordinates);
     expect(after.vehicles.filter(({ internalId }) => internalId !== "vehicle-011")).toStrictEqual(before.vehicles.filter(({ internalId }) => internalId !== "vehicle-011"));
     expect(status).toMatchObject({ workflowStatus: "EXECUTED", scenarioRevision: 2, incident: { status: "RESOLVED" }, approvalGrant: { used: true }, executionEffects: [{ planId: plan.planId }] });
     expect(success(app.recoveryAgent.planStatus()).executionRecord?.executionId).toBe(outcome.execution.executionId);

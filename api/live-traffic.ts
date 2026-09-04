@@ -1,7 +1,11 @@
-import type { ServerResponse } from "node:http";
-import { defineConfig, type Plugin } from "vite";
-import react from "@vitejs/plugin-react";
-import tailwindcss from "@tailwindcss/vite";
+type ApiRequest = Readonly<{ method?: string }>;
+type ApiResponse = {
+  status(code: number): ApiResponse;
+  setHeader(name: string, value: string): void;
+  send(body: string): void;
+  json(body: unknown): void;
+  end(): void;
+};
 
 const DGT_DATEX_SOURCES = [
   "https://infocar.dgt.es/datex2/v3/dgt/SituationPublication/incidencias.xml",
@@ -10,7 +14,20 @@ const DGT_DATEX_SOURCES = [
   "https://nap.dgt.es/datex2/v3/dgt/SituationPublication/datex2_v36.xml",
 ] as const;
 
-async function sendDgtTraffic(response: ServerResponse): Promise<void> {
+export default async function handler(request: ApiRequest, response: ApiResponse): Promise<void> {
+  response.setHeader("Access-Control-Allow-Origin", "*");
+  response.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  response.setHeader("Access-Control-Allow-Headers", "Accept");
+
+  if (request.method === "OPTIONS") {
+    response.status(204).end();
+    return;
+  }
+  if (request.method !== undefined && request.method !== "GET") {
+    response.status(405).json({ error: "method-not-allowed" });
+    return;
+  }
+
   const failures: string[] = [];
   for (const source of DGT_DATEX_SOURCES) {
     try {
@@ -31,34 +48,20 @@ async function sendDgtTraffic(response: ServerResponse): Promise<void> {
         failures.push(`${new URL(source).hostname}:invalid-xml`);
         continue;
       }
-      response.statusCode = 200;
+
       response.setHeader("Content-Type", "application/xml; charset=utf-8");
-      response.setHeader("Cache-Control", "no-store");
+      response.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=240");
       response.setHeader("X-SupplyMesh-Source", source);
-      response.end(xml);
+      response.status(200).send(xml);
       return;
     } catch (error) {
       failures.push(`${new URL(source).hostname}:${error instanceof Error ? error.name : "fetch-error"}`);
     }
   }
 
-  response.statusCode = 502;
-  response.setHeader("Content-Type", "application/json; charset=utf-8");
   response.setHeader("Cache-Control", "no-store");
-  response.end(JSON.stringify({ error: "dgt-live-feed-unavailable", providersTried: failures }));
+  response.status(502).json({
+    error: "dgt-live-feed-unavailable",
+    providersTried: failures,
+  });
 }
-
-function liveTrafficProxy(): Plugin {
-  const install = (server: { middlewares: { use(path: string, handler: (_request: unknown, response: ServerResponse) => void): void } }): void => {
-    server.middlewares.use("/api/live-traffic", (_request, response) => { void sendDgtTraffic(response); });
-  };
-  return {
-    name: "supplymesh-live-traffic-proxy",
-    configureServer: install,
-    configurePreviewServer: install,
-  };
-}
-
-export default defineConfig({
-  plugins: [react(), tailwindcss(), liveTrafficProxy()],
-});

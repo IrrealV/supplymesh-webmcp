@@ -86,8 +86,8 @@ export function VehicleMarkerLayer({ coordinator, locale, onSelect, routes, vehi
     const container = map.getContainer();
     container.dataset.closeRangeMode = is3DMode ? "active" : "inactive";
     container.dataset.closeRangeRenderer = isWebGlAvailable ? "three-webgl" : "2d-fallback";
-    if (!is3DMode) delete container.dataset.closeRangeVehicleId;
-    else if (followedVehicleId) container.dataset.closeRangeVehicleId = followedVehicleId;
+    if (is3DMode && followedVehicleId) container.dataset.closeRangeVehicleId = followedVehicleId;
+    else delete container.dataset.closeRangeVehicleId;
     return () => {
       delete container.dataset.closeRangeMode;
       delete container.dataset.closeRangeRenderer;
