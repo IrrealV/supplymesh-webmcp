@@ -1,6 +1,36 @@
 .fleet-map[data-close-range-mode="active"]
   .fleet-truck-icon.close-range-vehicle-active
-  .fleet-selection-aura {
+  .fleet-status-pin.fleet-vehicle-pin {
   animation: none !important;
-  display: none;
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  opacity: 0 !important;
+  outline: none !important;
+  transform: none !important;
+}
+
+.fleet-map[data-close-range-mode="active"]
+  .fleet-truck-icon.close-range-vehicle-active
+  .fleet-selection-aura,
+.fleet-map[data-close-range-mode="active"]
+  .fleet-truck-icon.close-range-vehicle-active
+  .fleet-selection-aura::before,
+.fleet-map[data-close-range-mode="active"]
+  .fleet-truck-icon.close-range-vehicle-active
+  .fleet-selection-aura::after,
+.fleet-map[data-close-range-mode="active"]
+  .fleet-truck-icon.close-range-vehicle-active
+  .fleet-status-pin.fleet-vehicle-pin::before,
+.fleet-map[data-close-range-mode="active"]
+  .fleet-truck-icon.close-range-vehicle-active
+  .fleet-status-pin.fleet-vehicle-pin::after {
+  animation: none !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  content: none !important;
+  display: none !important;
+  opacity: 0 !important;
+  outline: none !important;
 }
