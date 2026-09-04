@@ -45,9 +45,9 @@ async function verifySignalIsolation(page: Page): Promise<{ leftRetired: boolean
     const left = new AbortController();
     const right = new AbortController();
     const inputSchema = { type: "object", properties: {}, additionalProperties: false };
-    const execute = (): ToolResult => ({ content: [{ type: "text", text: "{}" }] });
-    await context.registerTool({ name: "native_signal_left", description: "Temporary signal isolation evidence.", inputSchema, execute }, { signal: left.signal });
-    await context.registerTool({ name: "native_signal_right", description: "Temporary signal isolation evidence.", inputSchema, execute }, { signal: right.signal });
+    const executeTemporary = (): ToolResult => ({ content: [{ type: "text", text: "{}" }] });
+    await context.registerTool({ name: "native_signal_left", description: "Temporary signal isolation evidence.", inputSchema, execute: executeTemporary }, { signal: left.signal });
+    await context.registerTool({ name: "native_signal_right", description: "Temporary signal isolation evidence.", inputSchema, execute: executeTemporary }, { signal: right.signal });
     left.abort();
     for (let attempt = 0; attempt < 100; attempt += 1) {
       const active = (await context.getTools()).map(({ name }) => name);
@@ -66,6 +66,11 @@ const vehicleInputSchema = {
   type: "object",
   properties: { vehicleId: { type: "string", minLength: 1 } },
   required: ["vehicleId"],
+  additionalProperties: false,
+};
+const liveConditionsInputSchema = {
+  type: "object",
+  properties: { refresh: { type: "boolean" } },
   additionalProperties: false,
 };
 const dimensionsInputSchema = {
@@ -108,7 +113,7 @@ try {
     if (context === undefined) throw new Error("Native document.modelContext is unavailable.");
     for (let attempt = 0; attempt < 200; attempt += 1) {
       const count = (await context.getTools()).length;
-      if (document.querySelector(".console-shell") !== null) return count !== 12;
+      if (document.querySelector(".console-shell") !== null) return count !== 13;
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
     throw new Error("The console did not render after native registration.");
@@ -123,6 +128,7 @@ try {
     "fleet_vehicle_create",
     "fleet_vehicle_delete",
     "fleet_vehicle_update",
+    "live_conditions_get",
     "recovery_operations_context",
     "recovery_options_compare",
     "recovery_plan_stage",
@@ -139,6 +145,7 @@ try {
   assert(isDeepStrictEqual(schemas.fleet_status, { type: "object", properties: {}, additionalProperties: false }), `fleet_status schema changed: ${JSON.stringify(schemas.fleet_status)}`);
   assert(isDeepStrictEqual(schemas.vehicle_get, vehicleInputSchema), `vehicle_get schema changed: ${JSON.stringify(schemas.vehicle_get)}`);
   assert(isDeepStrictEqual(schemas.rest_opportunities_compare, vehicleInputSchema), `rest_opportunities_compare schema changed: ${JSON.stringify(schemas.rest_opportunities_compare)}`);
+  assert(isDeepStrictEqual(schemas.live_conditions_get, liveConditionsInputSchema), `live_conditions_get schema changed: ${JSON.stringify(schemas.live_conditions_get)}`);
   assert(isDeepStrictEqual(schemas.vehicle_rename, { type: "object", properties: { vehicleId: { type: "string", minLength: 1 }, label: { type: "string", minLength: 1 } }, required: ["vehicleId", "label"], additionalProperties: false }), `vehicle_rename schema changed: ${JSON.stringify(schemas.vehicle_rename)}`);
   assert(isDeepStrictEqual(schemas.recovery_operations_context, { type: "object", properties: {}, additionalProperties: false }), `recovery_operations_context schema changed: ${JSON.stringify(schemas.recovery_operations_context)}`);
   assert(isDeepStrictEqual(schemas.recovery_options_compare, { type: "object", properties: {}, additionalProperties: false }), `recovery_options_compare schema changed: ${JSON.stringify(schemas.recovery_options_compare)}`);
@@ -188,6 +195,11 @@ try {
 
   const signalIsolation = await verifySignalIsolation(page);
   assert(signalIsolation.leftRetired && signalIsolation.rightSurvived && signalIsolation.rightRetired, `Native AbortSignal isolation failed: ${JSON.stringify(signalIsolation)}`);
+
+  const liveConditions = await execute(page, "live_conditions_get", {}) as { data?: { advisoryOnly?: boolean; enabled?: boolean }; ok?: boolean };
+  assert(liveConditions.ok === true && liveConditions.data?.advisoryOnly === true && liveConditions.data?.enabled === false, "Native live conditions did not return the safe initial advisory snapshot.");
+  const invalidLive = await execute(page, "live_conditions_get", { refresh: false, unsafeOverride: true });
+  assert(JSON.stringify(invalidLive).includes('"code":"invalid-input"'), "Native live conditions accepted an unexpected property.");
 
   const fleet = await execute(page, "fleet_status", {});
   assert(JSON.stringify(fleet).includes('"total":15'), "Native fleet query did not return 15 vehicles.");
@@ -267,9 +279,9 @@ try {
     for (let attempt = 0; attempt < 100 && (await context.getTools()).length !== 0; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 10));
     return { after: (await context.getTools()).length, before };
   });
-  assert(cleanup.before === 12 && cleanup.after === 0, `Native cleanup was ${cleanup.before}→${cleanup.after}, expected 12→0.`);
+  assert(cleanup.before === 13 && cleanup.after === 0, `Native cleanup was ${cleanup.before}→${cleanup.after}, expected 13→0.`);
   assert(errors.length === 0, `Browser errors: ${errors.join(" | ")}`);
-  console.log(JSON.stringify({ browser: await browser.version(), cleanup: "12→0", errors: 0, registrationBeforeRender: true, schemas: 12, signalIsolation, tools: names }));
+  console.log(JSON.stringify({ browser: await browser.version(), cleanup: "13→0", errors: 0, registrationBeforeRender: true, schemas: 13, signalIsolation, tools: names }));
 } finally {
   await browser.close();
 }

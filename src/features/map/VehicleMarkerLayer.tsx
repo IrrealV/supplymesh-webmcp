@@ -14,9 +14,14 @@ import { evaluateVehicleMotion } from "./vehicleMotion";
 import { ThreeFleetOverlay } from "./three/ThreeFleetOverlay";
 
 const LABEL_ZOOM_THRESHOLD = 7.5;
+const TRUCK_OBSTACLE_SIZE = 56;
 
 function escapeHtml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+}
+
+function intersectsViewport(rect: DOMRect, viewport: DOMRect): boolean {
+  return rect.right >= viewport.left && rect.left <= viewport.right && rect.bottom >= viewport.top && rect.top <= viewport.bottom;
 }
 
 function createVehicleMarkerIcons(
@@ -57,7 +62,7 @@ export function VehicleMarkerLayer({ coordinator, locale, onSelect, routes, vehi
   const [mapZoom, setMapZoom] = useState(() => map.getZoom());
   const [isWebGlAvailable] = useState(() => typeof window.WebGLRenderingContext !== "undefined" && detectWebGlSupport());
   const copy = catalog(locale);
-  const suffix = locale === "es" ? { truck: "camion", label: "etiqueta" } : { truck: "truck", label: "label" };
+  const suffix = locale === "es" ? { label: "etiqueta" } : { label: "label" };
   const is3DMode = isCloseRangeModeActive({ isWebGlAvailable, zoom: mapZoom });
   const followedVehicleId = follow.kind === "vehicle" ? follow.vehicleId : "";
 
@@ -81,8 +86,8 @@ export function VehicleMarkerLayer({ coordinator, locale, onSelect, routes, vehi
     const container = map.getContainer();
     container.dataset.closeRangeMode = is3DMode ? "active" : "inactive";
     container.dataset.closeRangeRenderer = isWebGlAvailable ? "three-webgl" : "2d-fallback";
-    if (!is3DMode) delete container.dataset.closeRangeVehicleId;
-    else if (followedVehicleId) container.dataset.closeRangeVehicleId = followedVehicleId;
+    if (is3DMode && followedVehicleId) container.dataset.closeRangeVehicleId = followedVehicleId;
+    else delete container.dataset.closeRangeVehicleId;
     return () => {
       delete container.dataset.closeRangeMode;
       delete container.dataset.closeRangeRenderer;
@@ -98,15 +103,74 @@ export function VehicleMarkerLayer({ coordinator, locale, onSelect, routes, vehi
         const container = map.getContainer();
         const containerRect = container.getBoundingClientRect();
         const labelNodes = [...container.querySelectorAll<HTMLElement>("[data-vehicle-label]")];
-        const roots = labelNodes.map((node) => node.closest<HTMLElement>(".fleet-label-icon")!).filter(Boolean);
-        roots.forEach((root) => { root.style.translate = "0 0"; });
-        const trucks = new Map([...container.querySelectorAll<HTMLElement>("[data-vehicle-truck]")].map((node) => [node.dataset.vehicleTruck!, node.closest<HTMLElement>(".fleet-truck-icon")!.getBoundingClientRect()]));
-        const obstacles: ScreenRect[] = [...trucks.values(), ...[...container.querySelectorAll<HTMLElement>(".risk-marker")].map((node) => node.getBoundingClientRect())].map(({ height, width, x, y }) => ({ height: height + 16, width: width + 16, x: x - 8, y: y - 8 }));
-        const points = labelNodes.flatMap((node) => {
-          const truck = trucks.get(node.dataset.vehicleLabel!);
-          return truck === undefined ? [] : [{ id: node.dataset.vehicleLabel!, x: truck.x + truck.width / 2, y: truck.y + truck.height / 2 }];
-        });
-        const placements = new Map(placeLabels(points, { x: containerRect.x + 8, y: containerRect.y + 8, width: containerRect.width - 16, height: containerRect.height - 16 }, obstacles).map((entry) => [entry.id, entry.rect]));
+        const labelRoots = labelNodes.map((node) => node.closest<HTMLElement>(".fleet-label-icon")!).filter(Boolean);
+        labelRoots.forEach((root) => { root.style.translate = "0 0"; });
+
+        const zoom = map.getZoom();
+        if (zoom < LABEL_ZOOM_THRESHOLD) {
+          labelRoots.forEach((root) => { root.style.visibility = "hidden"; });
+          return;
+        }
+
+        let points: Array<{ id: string; x: number; y: number }>;
+        let truckObstacles: ScreenRect[];
+
+        if (zoom < 14) {
+          const truckRects = new Map([...container.querySelectorAll<HTMLElement>("[data-vehicle-truck]")].map((node) => [
+            node.dataset.vehicleTruck!,
+            node.closest<HTMLElement>(".fleet-truck-icon")!.getBoundingClientRect(),
+          ]));
+          labelRoots.forEach((root) => { root.style.visibility = "visible"; });
+          truckObstacles = [...truckRects.values()].map(({ height, width, x, y }) => ({
+            height: height + 16,
+            width: width + 16,
+            x: x - 8,
+            y: y - 8,
+          }));
+          points = labelNodes.flatMap((node) => {
+            const truck = truckRects.get(node.dataset.vehicleLabel!);
+            return truck === undefined ? [] : [{ id: node.dataset.vehicleLabel!, x: truck.x + truck.width / 2, y: truck.y + truck.height / 2 }];
+          });
+        } else {
+          const projectedTrucks = new Map<string, { screenX: number; screenY: number }>();
+          truckMarkers.current.forEach((marker, vehicleId) => {
+            const point = map.latLngToContainerPoint(marker.getLatLng());
+            const margin = TRUCK_OBSTACLE_SIZE / 2;
+            if (point.x < -margin || point.x > container.clientWidth + margin || point.y < -margin || point.y > container.clientHeight + margin) return;
+            projectedTrucks.set(vehicleId, {
+              screenX: containerRect.x + point.x,
+              screenY: containerRect.y + point.y,
+            });
+          });
+          truckObstacles = [...projectedTrucks.values()].map(({ screenX, screenY }) => ({
+            height: TRUCK_OBSTACLE_SIZE,
+            width: TRUCK_OBSTACLE_SIZE,
+            x: screenX - TRUCK_OBSTACLE_SIZE / 2,
+            y: screenY - TRUCK_OBSTACLE_SIZE / 2,
+          }));
+          points = labelNodes.flatMap((node) => {
+            const root = node.closest<HTMLElement>(".fleet-label-icon")!;
+            const projected = projectedTrucks.get(node.dataset.vehicleLabel!);
+            if (projected === undefined) {
+              root.style.visibility = "hidden";
+              return [];
+            }
+            root.style.visibility = "visible";
+            return [{ id: node.dataset.vehicleLabel!, x: projected.screenX, y: projected.screenY }];
+          });
+        }
+
+        const riskObstacles: ScreenRect[] = [...container.querySelectorAll<HTMLElement>(".risk-marker")]
+          .map((node) => node.getBoundingClientRect())
+          .filter((rect) => zoom < 14 || intersectsViewport(rect, containerRect))
+          .map(({ height, width, x, y }) => ({ height: height + 16, width: width + 16, x: x - 8, y: y - 8 }));
+
+        const placements = new Map(placeLabels(
+          points,
+          { x: containerRect.x + 8, y: containerRect.y + 8, width: containerRect.width - 16, height: containerRect.height - 16 },
+          [...truckObstacles, ...riskObstacles],
+        ).map((entry) => [entry.id, entry.rect]));
+
         labelNodes.forEach((node) => {
           const root = node.closest<HTMLElement>(".fleet-label-icon")!;
           const target = placements.get(node.dataset.vehicleLabel!);
@@ -125,6 +189,7 @@ export function VehicleMarkerLayer({ coordinator, locale, onSelect, routes, vehi
       cancelAnimationFrame(frame);
       map.off("moveend zoomend resize", place);
       resizeObserver?.disconnect();
+      labelRootsCleanup(map.getContainer());
     };
   }, [is3DMode, map, vehicles]);
 
@@ -252,4 +317,11 @@ export function VehicleMarkerLayer({ coordinator, locale, onSelect, routes, vehi
       })}
     </>
   );
+}
+
+function labelRootsCleanup(container: HTMLElement): void {
+  container.querySelectorAll<HTMLElement>(".fleet-label-icon").forEach((root) => {
+    root.style.translate = "0 0";
+    root.style.visibility = "";
+  });
 }

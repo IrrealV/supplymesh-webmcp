@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { booleanDisjoint, lineString, polygon } from "@turf/turf";
 import { routeCatalog } from "./routeCatalog";
 import { createSpainScenario, getVehicleDisplayName } from "./spain-v1";
+import { clearanceAlternativeCatalog } from "./clearanceAlternativeCatalog";
+import { deriveUnit211RouteCoherence, UNIT_211_ROUTE_JOIN_TOLERANCE_METERS } from "../../domain/operations/unit211RouteCoherence";
 
 describe("Spain scenario fixture", () => {
   it("is repeatable, offline, and contains exactly fifteen unique plausible vehicles", () => {
@@ -91,6 +94,36 @@ describe("Spain scenario fixture", () => {
       expect(route).not.toBeUndefined(); expect(risk.affectedVehicleIds).toContain(route!.vehicleId);
       expect(route!.geometry.geometry.coordinates[snap.startIndex]).toStrictEqual(snap.startCoordinate);
       expect(route!.geometry.geometry.coordinates[snap.endIndex]).toStrictEqual(snap.endCoordinate);
+    }
+  });
+
+  it("places Unit 211 before the geometry-derived diversion and clearance hazard", () => {
+    const scenario = createSpainScenario();
+    const unit = scenario.vehicles.find(({ internalId }) => internalId === "vehicle-011");
+    const route = scenario.routes.find(({ id }) => id === "route-011");
+    const hazard = route?.riskSnaps.find(({ riskId }) => riskId === "restriction-height-3.9");
+    if (unit === undefined || route === undefined || hazard === undefined) throw new Error("Unit 211 route evidence is missing.");
+
+    const coherence = deriveUnit211RouteCoherence({
+      currentCoordinates: route.geometry.geometry.coordinates,
+      alternativeCoordinates: clearanceAlternativeCatalog.geometry.coordinates,
+      vehicleCoordinate: unit.position.geometry.coordinates,
+      hazardIndex: hazard.startIndex,
+      toleranceMeters: UNIT_211_ROUTE_JOIN_TOLERANCE_METERS,
+    });
+
+    expect(unit.routeProgress).toBe(0);
+    expect(unit.position.geometry.coordinates).toStrictEqual(route.geometry.geometry.coordinates[0]);
+    expect(coherence).toMatchObject({ currentDiversionIndex: 56, alternativeDiversionIndex: 56, toleranceMeters: 1 });
+    expect(coherence.vehicleDistanceMeters).toBeLessThan(coherence.diversionDistanceMeters);
+    expect(coherence.diversionDistanceMeters).toBeLessThan(coherence.hazardDistanceMeters);
+    expect(coherence.vehicleToDiversionMeters).toBeGreaterThan(0);
+    expect(coherence.diversionToHazardMeters).toBeGreaterThan(0);
+    const exclusion = clearanceAlternativeCatalog.provenance.avoidance.polygon as { type: "Polygon"; coordinates: number[][][] };
+    expect(booleanDisjoint(lineString(clearanceAlternativeCatalog.geometry.coordinates), polygon(exclusion.coordinates))).toBe(true);
+
+    for (const [index, other] of scenario.vehicles.entries()) {
+      if (other.internalId !== "vehicle-011") expect(other.routeProgress).toBe(index / (scenario.vehicles.length - 1));
     }
   });
 });

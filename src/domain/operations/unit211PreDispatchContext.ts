@@ -1,6 +1,7 @@
 import type { Cargo, OperatingRegion, Route, RouteSummary, Vehicle } from "../entities";
 import type { ScenarioRepository } from "../ports/ScenarioRepository";
 import { createAssessAuthoritativeVerticalClearance, type AuthoritativeVerticalClearanceAssessmentResult } from "./authoritativeVerticalAssessment";
+import { deriveUnit211RouteCoherence, UNIT_211_ROUTE_JOIN_TOLERANCE_METERS } from "./unit211RouteCoherence";
 
 const VEHICLE_ID = "vehicle-011";
 const FLEET_NUMBER = "FM-211";
@@ -8,7 +9,6 @@ const ROUTE_ID = "route-011";
 const RISK_ID = "restriction-height-3.9";
 const ALTERNATIVE_ROUTE_ID = "alternative-route-011-clearance-v1";
 const COORDINATE_COUNT_MAX = 10_000;
-const PRE_DISPATCH_ROUTE_PROGRESS = 0;
 
 type Coordinate = [number, number];
 type PointGeometry = { type: "Point"; coordinates: Coordinate };
@@ -66,7 +66,7 @@ export type Unit211PreDispatchContextResult =
   | { ok: false; reasonCode: Unit211PreDispatchContextFailureReason };
 
 type Validation<T> = { ok: true; data: T } | Extract<Unit211PreDispatchContextResult, { ok: false }>;
-type CurrentSource = { scenario: OperatingRegion; identityIndex: IdentityIndex; vehicleId: string; geometry: LineGeometry; summary: RouteSummary; remainingDriveMinutes: number; restDeadline: string; routeSnaps: unknown };
+type CurrentSource = { scenario: OperatingRegion; identityIndex: IdentityIndex; vehicleId: string; geometry: LineGeometry; summary: RouteSummary; routeProgress: 0; position: Coordinate; remainingDriveMinutes: number; restDeadline: string; routeSnaps: unknown };
 type AlternativeSource = { relation: Unit211AlternativeRelation; geometry: LineGeometry; summary: RouteSummary; provenance: Unit211AlternativeProvenance };
 type SourceValidation = { ok: true } | { ok: false; sourceReasonCode: CargoContinuitySourceReasonCode };
 type CargoContinuityFactsValidation = { ok: true; data: Readonly<Unit211CargoContinuityFacts> } | { ok: false; sourceReasonCode: "VEHICLE_MISSING" };
@@ -276,7 +276,7 @@ function validateCurrentSource(value: unknown): Validation<CurrentSource> {
   if (units.length !== 1) return failure("UNIT_211_INVALID");
   const unit = units[0]; const routes = routesField.value; const risks = risksField.value;
   if (unit.fleetNumber !== FLEET_NUMBER || unit.routeId !== ROUTE_ID || !isRecord(unit.origin) || unit.origin.name !== "Toledo") return failure("UNIT_211_INVALID");
-  if (typeof unit.routeProgress !== "number" || !Number.isFinite(unit.routeProgress) || unit.routeProgress < 0 || unit.routeProgress > 1) return failure("TEMPORAL_SOURCE_INVALID");
+  if (!isZero(unit.routeProgress)) return failure("TEMPORAL_SOURCE_INVALID");
   if (!isRecord(unit.timing) || typeof unit.timing.remainingDriveMinutes !== "number" || !Number.isFinite(unit.timing.remainingDriveMinutes) || unit.timing.remainingDriveMinutes < 0 || !isIsoInstant(unit.timing.restDeadline)) return failure("TEMPORAL_SOURCE_INVALID");
   const currentRoutes = routes.filter((candidate: unknown) => isRecord(candidate) && candidate.id === ROUTE_ID);
   if (currentRoutes.length !== 1) return failure("CURRENT_ROUTE_INVALID");
@@ -285,11 +285,16 @@ function validateCurrentSource(value: unknown): Validation<CurrentSource> {
   const routeVehicleId = routeVehicleIdField.value;
   const geometry = copyLineGeometry(route.geometry.geometry); const summary = copySummary(route.summary);
   if (geometry === false || summary === false) return failure("CURRENT_ROUTE_INVALID");
+  const position = isRecord(unit.position) && unit.position.type === "Feature" && isRecord(unit.position.geometry) && unit.position.geometry.type === "Point" && isCoordinate(unit.position.geometry.coordinates)
+    ? unit.position.geometry.coordinates
+    : false;
+  const origin = geometry.coordinates[0];
+  if (position === false || position[0] !== origin[0] || position[1] !== origin[1]) return failure("UNIT_211_INVALID");
   const currentRisks = risks.filter((candidate: unknown) => isRecord(candidate) && candidate.id === RISK_ID);
   if (currentRisks.length !== 1) return failure("CURRENT_RISK_INVALID");
   const normalizedRoute = new Proxy(route as Route, { get: (target, property, receiver) => property === "vehicleId" ? routeVehicleId : Reflect.get(target, property, receiver) });
   const scenario: OperatingRegion = { id: "spain-v1", name: "", vehicles: identityIndex.normalizedVehicles, routes: routes.map((candidate) => candidate === route ? normalizedRoute : candidate as Route), risks: risks as OperatingRegion["risks"] };
-  return { ok: true, data: { scenario, identityIndex, vehicleId: routeVehicleId, geometry, summary, remainingDriveMinutes: unit.timing.remainingDriveMinutes, restDeadline: unit.timing.restDeadline, routeSnaps: route.riskSnaps } };
+  return { ok: true, data: { scenario, identityIndex, vehicleId: routeVehicleId, geometry, summary, routeProgress: unit.routeProgress, position: [position[0], position[1]], remainingDriveMinutes: unit.timing.remainingDriveMinutes, restDeadline: unit.timing.restDeadline, routeSnaps: route.riskSnaps } };
 }
 
 function validateAlternativeSource(value: unknown): Validation<AlternativeSource> {
@@ -352,8 +357,13 @@ export function createUnit211PreDispatchContext(repository: Pick<ScenarioReposit
     try { alternative = validateAlternativeSource(alternativeValue); } catch { return failure("ALTERNATIVE_SOURCE_UNAVAILABLE"); }
     if (!alternative.ok) return alternative;
     if (alternativeValue !== admittedAlternativeCatalog) return failure("ALTERNATIVE_ADMISSION_INVALID");
-    const firstCoordinate = current.data.geometry.coordinates[0]; const exclusionPolygon = alternative.data.provenance.avoidance.polygon;
-    const context: Unit211PreDispatchContext = { scenarioClock: { instant: "2026-08-28T09:00:00.000Z", mode: "deterministic-demo" }, unit: { vehicleId: VEHICLE_ID, fleetNumber: FLEET_NUMBER }, origin: { name: "Toledo" }, currentRouteId: ROUTE_ID, routeProgress: PRE_DISPATCH_ROUTE_PROGRESS, isRouteStarted: false, position: { type: "Point", coordinates: [firstCoordinate[0], firstCoordinate[1]] }, temporalSource: { remainingDriveMinutes: current.data.remainingDriveMinutes, restDeadline: current.data.restDeadline } };
+    try {
+      deriveUnit211RouteCoherence({ currentCoordinates: current.data.geometry.coordinates, alternativeCoordinates: alternative.data.geometry.coordinates, vehicleCoordinate: current.data.position, hazardIndex: incident.snapIndex, toleranceMeters: UNIT_211_ROUTE_JOIN_TOLERANCE_METERS });
+    } catch {
+      return failure("ALTERNATIVE_GEOMETRY_INVALID");
+    }
+    const exclusionPolygon = alternative.data.provenance.avoidance.polygon;
+    const context: Unit211PreDispatchContext = { scenarioClock: { instant: "2026-08-28T09:00:00.000Z", mode: "deterministic-demo" }, unit: { vehicleId: VEHICLE_ID, fleetNumber: FLEET_NUMBER }, origin: { name: "Toledo" }, currentRouteId: ROUTE_ID, routeProgress: current.data.routeProgress, isRouteStarted: false, position: { type: "Point", coordinates: [current.data.position[0], current.data.position[1]] }, temporalSource: { remainingDriveMinutes: current.data.remainingDriveMinutes, restDeadline: current.data.restDeadline } };
     const referenceFacts = cargoContinuityFacts(current.data.identityIndex, VEHICLE_ID);
     const currentOptionFacts = cargoContinuityFacts(current.data.identityIndex, current.data.vehicleId);
     const alternativeOptionFacts = cargoContinuityFacts(current.data.identityIndex, alternative.data.relation.vehicleId);

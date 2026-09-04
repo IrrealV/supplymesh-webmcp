@@ -39,7 +39,7 @@ function dimensions(index: number): Dimensions {
 function vehicleFromSeed(seed: VehicleSeed, index: number): Vehicle {
   const [internalId, fleetNumber, plate, status, originCoordinates, originName, destinationCoordinates, destinationName, cargoId, cargoDescription] = seed;
   const routeId = `route-${String(index + 1).padStart(3, "0")}`;
-  const route = routeCatalog.get(routeId); const routeProgress = index / (vehicleSeeds.length - 1);
+  const route = routeCatalog.get(routeId); const routeProgress = internalId === "vehicle-011" ? 0 : index / (vehicleSeeds.length - 1);
   if (route === undefined) throw new Error(`Missing route fixture ${routeId}.`); assertRouteProgress(routeProgress);
   return {
     internalId, fleetNumber, plate, label: index === 0 ? "" : `Unit ${fleetNumber.slice(-3)}`, position: pointAtRouteProgress(route.geometry.geometry.coordinates, routeProgress), status,

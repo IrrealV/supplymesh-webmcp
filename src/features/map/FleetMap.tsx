@@ -1,5 +1,5 @@
-import { divIcon, latLngBounds, type LatLngExpression, type Map as LeafletMap } from "leaflet";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { divIcon, latLngBounds, type LatLngExpression, type Map as LeafletMap, type Polyline as LeafletPolyline } from "leaflet";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, Marker, Pane, Polygon, Polyline, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import { useUiCoordinationStore } from "../../app/state/useUiCoordinationStore";
 import type { OperatingRegion, OperationalRisk, RiskSeverity } from "../../domain/entities";
@@ -189,6 +189,17 @@ function routeStyle({ state }: DerivedRoute) {
   return { className, color: "#4c9a6a", opacity: 0.66, weight: 2.5 };
 }
 
+function AuthoritativeRouteLayer({ entry }: { entry: DerivedRoute }) {
+  const routeLayer = useRef<LeafletPolyline>(null);
+  useEffect(() => {
+    const element = routeLayer.current?.getElement();
+    if (element === undefined || element === null) return;
+    element.setAttribute("data-route-id", entry.route.id);
+    element.setAttribute("data-route-owner", entry.route.vehicleId);
+  }, [entry.route.id, entry.route.vehicleId]);
+  return <Polyline ref={routeLayer} {...routeStyle(entry)} noClip positions={routePositions(entry.route)} smoothFactor={0} />;
+}
+
 function CloseRangeBridgeHazard({ scenario }: { scenario: OperatingRegion }) {
   const map = useMap();
   const heightRisk = scenario.risks.find((r) => r.id === "restriction-height-3.9");
@@ -265,7 +276,7 @@ export function FleetMap({ availableComparison, comparison, locale, recoveryExec
       <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       <Pane name="weather-effects" style={{ pointerEvents: "none", zIndex: 390 }} /><Pane name="risk-tokens" style={{ zIndex: 620 }} /><Pane name="fleet-trucks" style={{ zIndex: 640 }} /><Pane name="fleet-labels" style={{ zIndex: 660 }} /><Pane name="close-range-hazards" style={{ zIndex: 680 }} />
       <MapEvents coordinator={coordinator} /><MapFocus comparison={comparison} coordinator={coordinator} scenario={scenario} /><MapLayout coordinator={coordinator} signature={layoutSignature} />
-      {layers.routes.filter((entry) => entry.route.id !== comparison?.current.id && entry.route.id !== comparison?.alternative.id).map((entry) => <Polyline key={`${entry.route.id}:${entry.state}`} {...routeStyle(entry)} noClip positions={routePositions(entry.route)} smoothFactor={0} />)}
+      {layers.routes.filter((entry) => entry.route.id !== comparison?.current.id && entry.route.id !== comparison?.alternative.id).map((entry) => <AuthoritativeRouteLayer entry={entry} key={`${entry.route.id}:${entry.state}`} />)}
       <RiskLayers entries={visibleRisks} locale={locale} />
       <CloseRangeBridgeHazard scenario={scenario} />
       <MapPlacementHandler />

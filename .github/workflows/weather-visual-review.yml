@@ -6,6 +6,8 @@ on:
       - fix/pr55-geographic-weather
       - feat/pr55-driver-rest-opportunities
       - fix/pr55-threejs-presentation
+      - feat/pr55-threejs-presentation-final
+      - feat/pr55-live-weather-traffic
   workflow_dispatch:
 
 permissions:

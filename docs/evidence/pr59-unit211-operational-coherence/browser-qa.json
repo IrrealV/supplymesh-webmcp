@@ -1,0 +1,105 @@
+{
+  "naturalLanguage": {
+    "firstPrompt": "Investigate Unit 211’s clearance issue, find the safest route that preserves the safety margin, the driver’s rest window and the cargo assignment, prepare it for my approval and stop before making any change.",
+    "sequenceToHumanReview": [
+      "recovery_options_compare",
+      "recovery_plan_stage",
+      "recovery_plan_request_review"
+    ],
+    "recommendedOptionId": "alternative-route-011-clearance-v1",
+    "planId": "recovery-plan:vehicle-011:revision-1:alternative-route-011-clearance-v1",
+    "reviewResponse": {
+      "workflowStatus": "REVIEW_REQUESTED",
+      "requiredHumanAction": "Approve or reject from the visible SupplyMesh interface.",
+      "agentCanApprove": false
+    },
+    "secondPrompt": "The dispatcher approved the plan. Apply exactly what was approved, verify the result and show me the receipt.",
+    "sequenceAfterApproval": [
+      "recovery_plan_execute",
+      "recovery_verify",
+      "recovery_receipt_get"
+    ],
+    "receiptId": "recovery-receipt:recovery-execution:recovery-plan:vehicle-011:revision-1:alternative-route-011-clearance-v1"
+  },
+  "initialVehicle": {
+    "routeId": "route-011",
+    "progress": 0,
+    "coordinate": [
+      -4.027341,
+      39.862774
+    ]
+  },
+  "execution": {
+    "beforeCoordinate": [
+      -4.027341,
+      39.862774
+    ],
+    "afterCoordinate": [
+      -4.027341,
+      39.862774
+    ],
+    "noTeleport": true,
+    "routeId": "alternative-route-011-clearance-v1"
+  },
+  "humanControls": {
+    "inViewport": true,
+    "activeText": "Approve",
+    "approveVisible": true,
+    "rejectVisible": true
+  },
+  "routeProof": {
+    "selected": [],
+    "deselected": [
+      {
+        "routeId": "alternative-route-011-clearance-v1",
+        "owner": "vehicle-011",
+        "className": "route-corridor route-corridor-normal leaflet-interactive"
+      }
+    ],
+    "otherVehicleSelected": [
+      {
+        "routeId": "alternative-route-011-clearance-v1",
+        "owner": "vehicle-011",
+        "className": "route-corridor route-corridor-muted leaflet-interactive"
+      }
+    ]
+  },
+  "motion": {
+    "reachingDiversion": {
+      "progress": 0.01866329426679569,
+      "latitude": 39.86944149248745,
+      "longitude": -4.020808111693526,
+      "bearing": 23.96673643267684,
+      "speed": 22.77777777777778,
+      "routeId": "alternative-route-011-clearance-v1",
+      "isMoving": true
+    },
+    "afterDiversion": {
+      "progress": 0.026758050234810198,
+      "latitude": 39.875028725167795,
+      "longitude": -4.02075834871493,
+      "bearing": 2.284885718070825,
+      "speed": 22.77777777777778,
+      "routeId": "alternative-route-011-clearance-v1",
+      "isMoving": true
+    },
+    "progressIncreased": true,
+    "coordinateChanged": true
+  },
+  "dynamicToolsAfterReceipt": [
+    "fleet_status",
+    "fleet_vehicle_assign_route",
+    "fleet_vehicle_create",
+    "fleet_vehicle_delete",
+    "fleet_vehicle_update",
+    "live_conditions_get",
+    "recovery_operations_context",
+    "recovery_plan_status",
+    "recovery_receipt_get",
+    "recovery_reset",
+    "rest_opportunities_compare",
+    "scenario_current",
+    "vehicle_get",
+    "vehicle_rename"
+  ]
+}
