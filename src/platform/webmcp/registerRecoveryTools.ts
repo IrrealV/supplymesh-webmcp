@@ -1,5 +1,6 @@
 import type { OperatingRegion } from "../../domain/entities";
 import type { OperationsApi } from "../../domain/operations/createOperationsApi";
+import type { Unit211PreDispatchData } from "../../domain/operations/unit211PreDispatchContext";
 import { RecoveryWorkflowStatuses, type OperationalRecoverySnapshot, type RecoveryAgentCapability, type RecoveryExecutionCapability, type RecoveryResult, type RecoveryWorkflowStatus } from "../../domain/recovery/recoveryContracts";
 import type { JsonSchema, WebMcpTool, WebMcpToolResponse } from "./webMcpTypes";
 
@@ -26,9 +27,30 @@ function isEmptyInput(value: unknown): boolean {
   return typeof value === "object" && value !== null && !Array.isArray(value) && Reflect.ownKeys(value).length === 0;
 }
 
-async function execute(operation: () => RecoveryResult<unknown> | Promise<RecoveryResult<unknown>>): Promise<WebMcpToolResponse> {
+type Guidance = Readonly<Record<string, unknown>>;
+
+function guided<T extends object>(result: RecoveryResult<T>, guidance: (data: T) => Guidance): RecoveryResult<T & Guidance> {
+  return result.ok ? { ...result, data: { ...result.data, ...guidance(result.data) } } : result;
+}
+
+function statusGuidance(data: OperationalRecoverySnapshot): Guidance {
+  switch (data.workflowStatus) {
+    case RecoveryWorkflowStatuses.idle: return { nextAction: "recovery_options_compare" };
+    case RecoveryWorkflowStatuses.staged: return { nextAction: "recovery_plan_request_review" };
+    case RecoveryWorkflowStatuses.reviewRequested: return { nextAction: "wait_for_human_review", requiredHumanAction: "Approve or reject from the visible SupplyMesh interface.", agentCanApprove: false };
+    case RecoveryWorkflowStatuses.approved: return { nextAction: "recovery_plan_execute" };
+    case RecoveryWorkflowStatuses.rejected:
+    case RecoveryWorkflowStatuses.invalidated: return { nextAction: "recovery_options_compare" };
+    case RecoveryWorkflowStatuses.executed:
+    case RecoveryWorkflowStatuses.verificationFailed: return { nextAction: "recovery_verify" };
+    case RecoveryWorkflowStatuses.verified: return { nextAction: "recovery_receipt_get" };
+  }
+}
+
+async function execute<T extends object>(operation: () => RecoveryResult<T> | Promise<RecoveryResult<T>>, guidance?: (data: T) => Guidance): Promise<WebMcpToolResponse> {
   try {
-    return response(await operation());
+    const result = await operation();
+    return response(guidance === undefined ? result : guided(result, guidance));
   } catch {
     return failed();
   }
@@ -46,11 +68,11 @@ function publishScenario(dependencies: Dependencies, result: RecoveryResult<unkn
   }
 }
 
-async function executeAndPublish(dependencies: Dependencies, operation: () => RecoveryResult<unknown> | Promise<RecoveryResult<unknown>>): Promise<WebMcpToolResponse> {
+async function executeAndPublish<T extends object>(dependencies: Dependencies, operation: () => RecoveryResult<T> | Promise<RecoveryResult<T>>, guidance?: (data: T) => Guidance): Promise<WebMcpToolResponse> {
   try {
     const result = await operation();
     publishScenario(dependencies, result);
-    return response(result);
+    return response(guidance === undefined ? result : guided(result, guidance));
   } catch {
     return failed();
   }
@@ -82,16 +104,17 @@ export function recoveryToolNamesForStatus(status: RecoveryWorkflowStatus): read
 }
 
 export function createRecoveryTools(snapshot: OperationalRecoverySnapshot, dependencies: Dependencies): WebMcpTool[] {
+  const comparisonGuidance = (data: Unit211PreDispatchData): Guidance => ({ recommendedOptionId: data.options[1].alternativeRouteId, nextAction: "recovery_plan_stage" });
   const all: Record<string, WebMcpTool> = {
-    recovery_operations_context: { name: "recovery_operations_context", description: "Gets the authoritative Unit 211 recovery context.", inputSchema: emptyInputSchema, execute: (input) => isEmptyInput(input) ? execute(() => dependencies.recoveryAgent.compareOptions()) : invalid() },
-    recovery_options_compare: { name: "recovery_options_compare", description: "Compares the admitted Unit 211 recovery options.", inputSchema: emptyInputSchema, execute: (input) => isEmptyInput(input) ? execute(() => dependencies.recoveryAgent.compareOptions()) : invalid() },
-    recovery_plan_stage: { name: "recovery_plan_stage", description: "Stages the admitted recovery option for human review.", inputSchema: selectedOptionSchema, execute: (input) => execute(() => dependencies.recoveryAgent.stagePlan(input)) },
-    recovery_plan_request_review: { name: "recovery_plan_request_review", description: "Requests human review of a staged recovery plan.", inputSchema: planIdSchema, execute: (input) => execute(() => dependencies.recoveryAgent.requestReview(input)) },
-    recovery_plan_status: { name: "recovery_plan_status", description: "Gets the current recovery workflow status.", inputSchema: emptyInputSchema, execute: (input) => isEmptyInput(input) ? execute(() => dependencies.recoveryAgent.planStatus()) : invalid() },
-    recovery_plan_execute: { name: "recovery_plan_execute", description: "Executes an exactly approved recovery plan.", inputSchema: planIdSchema, execute: (input) => executeAndPublish(dependencies, () => dependencies.recoveryExecution.executeApprovedPlan(input)) },
-    recovery_verify: { name: "recovery_verify", description: "Independently verifies an executed recovery plan.", inputSchema: planIdSchema, execute: (input) => execute(() => dependencies.recoveryExecution.verifyExecution(input)) },
-    recovery_receipt_get: { name: "recovery_receipt_get", description: "Gets the stable verified recovery receipt.", inputSchema: planIdSchema, execute: (input) => execute(() => dependencies.recoveryExecution.receiptGet(input)) },
-    recovery_reset: { name: "recovery_reset", description: "Resets the deterministic recovery cycle to its operational baseline.", inputSchema: emptyInputSchema, execute: (input) => executeAndPublish(dependencies, () => dependencies.recoveryExecution.reset(input)) },
+    recovery_operations_context: { name: "recovery_operations_context", description: "Reads the authoritative Unit 211 options, recommendedOptionId, and nextAction without changing state.", inputSchema: emptyInputSchema, execute: (input) => isEmptyInput(input) ? execute(() => dependencies.recoveryAgent.compareOptions(), comparisonGuidance) : invalid() },
+    recovery_options_compare: { name: "recovery_options_compare", description: "Compares admitted Unit 211 options and returns recommendedOptionId plus the next agent action.", inputSchema: emptyInputSchema, execute: (input) => isEmptyInput(input) ? execute(() => dependencies.recoveryAgent.compareOptions(), comparisonGuidance) : invalid() },
+    recovery_plan_stage: { name: "recovery_plan_stage", description: "Stages the admitted selectedOptionId and returns its authoritative planId for the review request.", inputSchema: selectedOptionSchema, execute: (input) => execute(() => dependencies.recoveryAgent.stagePlan(input), () => ({ nextAction: "recovery_plan_request_review" })) },
+    recovery_plan_request_review: { name: "recovery_plan_request_review", description: "Requests visible human review; the agent cannot approve or reject the plan.", inputSchema: planIdSchema, execute: (input) => execute(() => dependencies.recoveryAgent.requestReview(input), statusGuidance) },
+    recovery_plan_status: { name: "recovery_plan_status", description: "Reads the authoritative workflowStatus and state-appropriate nextAction.", inputSchema: emptyInputSchema, execute: (input) => isEmptyInput(input) ? execute(() => dependencies.recoveryAgent.planStatus(), statusGuidance) : invalid() },
+    recovery_plan_execute: { name: "recovery_plan_execute", description: "Executes an exactly approved plan once, then directs the agent to verification.", inputSchema: planIdSchema, execute: (input) => executeAndPublish(dependencies, () => dependencies.recoveryExecution.executeApprovedPlan(input), () => ({ nextAction: "recovery_verify" })) },
+    recovery_verify: { name: "recovery_verify", description: "Verifies authoritative execution evidence and directs a passing result to the receipt.", inputSchema: planIdSchema, execute: (input) => execute(() => dependencies.recoveryExecution.verifyExecution(input), (data) => ({ nextAction: data.status === "PASS" ? "recovery_receipt_get" : "recovery_verify" })) },
+    recovery_receipt_get: { name: "recovery_receipt_get", description: "Returns the stable verified recovery receipt and completes the workflow.", inputSchema: planIdSchema, execute: (input) => execute(() => dependencies.recoveryExecution.receiptGet(input), () => ({ nextAction: null })) },
+    recovery_reset: { name: "recovery_reset", description: "Resets the deterministic recovery cycle to its operational baseline.", inputSchema: emptyInputSchema, execute: (input) => executeAndPublish(dependencies, () => dependencies.recoveryExecution.reset(input), statusGuidance) },
   };
   return recoveryToolNamesForStatus(snapshot.workflowStatus).map((name) => all[name]);
 }

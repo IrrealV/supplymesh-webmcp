@@ -19,6 +19,12 @@ function names(app: ReturnType<typeof createRecoveryApplication>): string[] {
   return createRecoveryTools(success(app.recoveryAgent.planStatus()), { operations: app.operations, recoveryAgent: app.recoveryAgent, recoveryExecution: app.recoveryExecution }).map(({ name }) => name);
 }
 
+function tool(app: ReturnType<typeof createRecoveryApplication>, name: string): WebMcpTool {
+  const found = createRecoveryTools(success(app.recoveryAgent.planStatus()), { operations: app.operations, recoveryAgent: app.recoveryAgent, recoveryExecution: app.recoveryExecution }).find((candidate) => candidate.name === name);
+  if (found === undefined) throw new Error(`Missing recovery tool ${name}.`);
+  return found;
+}
+
 async function toolResult(tool: WebMcpTool, input: unknown): Promise<unknown> {
   const response = await tool.execute(input);
   return JSON.parse(response.content[0].text) as unknown;
@@ -78,5 +84,34 @@ describe("recovery WebMCP tools", () => {
 
     expect(await toolResult(context, { extra: true })).toMatchObject({ ok: false, error: { code: "INVALID_INPUT" } });
     expect(await toolResult(stage, { selectedOptionId: "alternative-route-011-clearance-v1", fingerprint: "attacker" })).toMatchObject({ ok: false, error: { code: "INVALID_INPUT" } });
+  });
+
+  it("should project a concise natural agent handoff without exposing approval authority", async () => {
+    const app = createRecoveryApplication({ storage: new MemoryStorage() });
+    const compareTool = tool(app, "recovery_options_compare");
+    expect(compareTool.description).toContain("recommendedOptionId");
+    const comparison = await toolResult(compareTool, {}) as { ok: true; data: { recommendedOptionId: string; nextAction: string } };
+    expect(comparison.data).toMatchObject({ recommendedOptionId: "alternative-route-011-clearance-v1", nextAction: "recovery_plan_stage" });
+
+    const staged = await toolResult(tool(app, "recovery_plan_stage"), { selectedOptionId: comparison.data.recommendedOptionId }) as { ok: true; data: { planId: string; nextAction: string } };
+    expect(staged.data).toMatchObject({ nextAction: "recovery_plan_request_review" });
+    const requested = await toolResult(tool(app, "recovery_plan_request_review"), { planId: staged.data.planId }) as { ok: true; data: Record<string, unknown> };
+    expect(requested.data).toMatchObject({
+      workflowStatus: "REVIEW_REQUESTED",
+      requiredHumanAction: "Approve or reject from the visible SupplyMesh interface.",
+      agentCanApprove: false,
+      nextAction: "wait_for_human_review",
+    });
+    expect(names(app).some((name) => /approve|reject/i.test(name))).toBe(false);
+
+    success(app.recoveryHuman.approvePlan({ planId: staged.data.planId }));
+    const approved = await toolResult(tool(app, "recovery_plan_status"), {}) as { ok: true; data: Record<string, unknown> };
+    expect(approved.data).toMatchObject({ workflowStatus: "APPROVED", nextAction: "recovery_plan_execute" });
+    const executed = await toolResult(tool(app, "recovery_plan_execute"), { planId: staged.data.planId }) as { ok: true; data: Record<string, unknown> };
+    expect(executed.data).toMatchObject({ nextAction: "recovery_verify" });
+    const verified = await toolResult(tool(app, "recovery_verify"), { planId: staged.data.planId }) as { ok: true; data: Record<string, unknown> };
+    expect(verified.data).toMatchObject({ nextAction: "recovery_receipt_get" });
+    const receipt = await toolResult(tool(app, "recovery_receipt_get"), { planId: staged.data.planId }) as { ok: true; data: Record<string, unknown> };
+    expect(receipt.data).toMatchObject({ nextAction: null });
   });
 });
