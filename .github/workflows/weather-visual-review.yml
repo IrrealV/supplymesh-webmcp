@@ -1,0 +1,73 @@
+name: SupplyMesh release gate
+
+on:
+  push:
+    branches:
+      - fix/pr55-geographic-weather
+      - feat/pr55-driver-rest-opportunities
+      - fix/pr55-threejs-presentation
+      - feat/pr55-threejs-presentation-final
+      - feat/pr55-live-weather-traffic
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Chromium
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run quality gate
+        run: bun run check
+
+      - name: Run Playwright and capture evidence
+        run: bun run test:e2e
+
+      - name: Run native WebMCP verification
+        run: |
+          CHROMIUM_PATH="$(bun -e 'import { chromium } from "@playwright/test"; console.log(chromium.executablePath())')"
+          sudo ln -sf "$CHROMIUM_PATH" /usr/bin/chromium
+          bun run preview -- --host 127.0.0.1 --port 4173 --strictPort >/tmp/supplymesh-preview.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill "$PREVIEW_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:4173/ >/dev/null
+          bun run webmcp:verify-native
+
+      - name: Verify route fixtures
+        run: |
+          bun run routes:verify
+          bun run routes:clearance:verify
+
+      - name: Upload release evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: supplymesh-release-gate-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 3
+          path: |
+            docs/screenshots/*.png
+            test-results/**
+            playwright-report/**

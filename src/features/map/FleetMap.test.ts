@@ -50,7 +50,8 @@ describe("FleetMap layers", () => {
     expect(mapSource).not.toContain('risk.kind === "severe-snow" ? "SNOW"');
     expect(mapSource).toContain('const WEATHER_RISK_COLOR = "#1268e8"');
     expect(mapSource).toContain('<Polygon key={shapeKey} {...pathOptions}');
-    expect(mapSource).toContain('key={`${entry.route.id}:${entry.state}`} {...routeStyle(entry)}');
+    expect(mapSource).toContain('<AuthoritativeRouteLayer entry={entry} key={`${entry.route.id}:${entry.state}`} />');
+    expect(mapSource).toContain("<WeatherRiskOverlay risk={risk} zoom={zoom} />");
     expect(styles).toContain(".risk-severe-snow .risk-marker-label { display: none; }");
     expect(styles).toContain('.fleet-map[data-close-range-mode="active"] .leaflet-tile-pane');
     expect(styles).toContain('.fleet-map[data-close-range-mode="active"] .route-corridor-selected');
@@ -61,17 +62,19 @@ describe("FleetMap layers", () => {
     const sources = ["FleetMap.tsx", "layers.ts", "VehicleMarkerLayer.tsx", "closeRangeMode.ts", "closeRangeMotion.ts", "fleetMotionStore.ts", "labelPlacement.ts", "MapLegend.tsx", "MapEventCoordinator.ts"]
       .map((file) => readFileSync(`src/features/map/${file}`, "utf8"))
       .join("\n");
-    const allowedImports = new Set(["zustand", "./fleetMotionStore", "@phosphor-icons/react", "leaflet", "react", "react-leaflet", "../../app/presentation/useTabletViewport", "../../app/state/useUiCoordinationStore", "../../domain/entities", "../../preferences/i18n/catalog", "../fleet/filtering", "../recovery-comparison/RecoveryComparisonLayers", "../recovery-comparison/unit211RecoveryComparisonModel", "./closeRangeMode", "./closeRangeMotion", "./layers", "./labelPlacement", "./MapEventCoordinator", "./MapLegend", "./VehicleMarkerLayer", "./vehicleMotion", "./three/ThreeFleetOverlay"]);
+    const allowedImports = new Set(["zustand", "./fleetMotionStore", "@phosphor-icons/react", "leaflet", "react", "react-leaflet", "../../app/presentation/useTabletViewport", "../../app/state/useUiCoordinationStore", "../../domain/entities", "../../preferences/i18n/catalog", "../fleet/filtering", "../recovery-comparison/RecoveryComparisonLayers", "../recovery-comparison/unit211RecoveryComparisonModel", "./closeRangeMode", "./closeRangeMotion", "./layers", "./labelPlacement", "./MapEventCoordinator", "./MapLegend", "./VehicleMarkerLayer", "./vehicleMotion", "./three/ThreeFleetOverlay", "./weather/WeatherRiskOverlay", "./rest/RestOpportunityLayers"]);
     const imports = [...sources.matchAll(/from\s+["']([^"']+)["']/g)].map((match) => match[1]);
     const networkCall = new RegExp(`\\b${["fet", "ch"].join("")}\\s*\\(`);
 
-    const invalid = imports.filter(i => !allowedImports.has(i));
-    if(invalid.length > 0) console.log("INVALID:", invalid);
+    const invalid = imports.filter((entry) => !allowedImports.has(entry));
+    if (invalid.length > 0) console.log("INVALID:", invalid);
     expect(invalid).toEqual([]);
     expect(sources).not.toMatch(networkCall);
     expect(sources).toContain("scenario.routes");
     expect(sources).toContain("duration: 0.85");
     expect(sources).toContain("entry.route.id !== comparison?.alternative.id");
+    expect(sources).toContain('data-route-id');
+    expect(sources).toContain('data-route-owner');
     expect(sources).toContain("(comparison ?? availableComparison)?.incident.riskId");
     expect(sources).toContain("maxZoom={18}");
     expect(sources).toContain("CLOSE_RANGE_FOCUS_ZOOM");

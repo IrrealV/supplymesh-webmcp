@@ -1,5 +1,5 @@
-import { divIcon, latLngBounds, type LatLngExpression, type Map as LeafletMap } from "leaflet";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { divIcon, latLngBounds, type LatLngExpression, type Map as LeafletMap, type Polyline as LeafletPolyline } from "leaflet";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, Marker, Pane, Polygon, Polyline, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import { useUiCoordinationStore } from "../../app/state/useUiCoordinationStore";
 import type { OperatingRegion, OperationalRisk, RiskSeverity } from "../../domain/entities";
@@ -12,6 +12,8 @@ import { RecoveryComparisonLayers, RecoveryIncidentInset } from "../recovery-com
 import type { Unit211RecoveryComparisonModel } from "../recovery-comparison/unit211RecoveryComparisonModel";
 import { recoveryComparisonCopy } from "../../preferences/i18n/catalog";
 import { CLOSE_RANGE_FOCUS_ZOOM } from "./closeRangeMode";
+import { isWeatherRiskKind, WeatherRiskOverlay } from "./weather/WeatherRiskOverlay";
+import { RestOpportunityLayers, type RestOpportunityMapModel } from "./rest/RestOpportunityLayers";
 
 const severityColors: Record<RiskSeverity, string> = { low: "#657985", medium: "#a66a18", high: "#c4512d", critical: "#b4232d" };
 const WEATHER_RISK_COLOR = "#1268e8";
@@ -19,6 +21,8 @@ const WEATHER_RISK_COLOR = "#1268e8";
 function toPosition([longitude, latitude]: readonly number[]): [number, number] { return [latitude, longitude]; }
 function routePositions(route: DerivedRoute["route"]): LatLngExpression[] { return route.geometry.geometry.coordinates.map(toPosition); }
 function escapeHtml(value: string | undefined): string { if (!value) return ""; return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;"); }
+function riskCoordinates(risk: OperationalRisk): readonly (readonly number[])[] { return risk.geometry.geometry.type === "Polygon" ? risk.geometry.geometry.coordinates[0] : risk.geometry.geometry.coordinates; }
+function riskBounds(risk: OperationalRisk) { return latLngBounds(riskCoordinates(risk).map(toPosition)); }
 
 function MapFocus({ comparison, coordinator, scenario }: { comparison?: Unit211RecoveryComparisonModel; coordinator: MapEventCoordinator; scenario: OperatingRegion }) {
   const map = useMap();
@@ -118,21 +122,30 @@ function riskLabel(risk: OperationalRisk, locale: Locale): string {
 function riskIcon(entry: DerivedRisk, locale: Locale) {
   const { risk, state } = entry; const label = escapeHtml(riskLabel(risk, locale));
   const symbol = risk.kind === "height-restriction" ? `${risk.limitMeters}m` : risk.kind === "weight-restriction" ? `${risk.limitTonnes}t` : risk.kind === "road-closure" ? "×" : risk.kind === "severe-snow" ? String.fromCodePoint(0x2744) : risk.kind === "heavy-rain" ? String.fromCodePoint(0x1F327) : risk.kind === "severe-storm" ? String.fromCodePoint(0x26A1) : risk.kind === "calima" ? String.fromCodePoint(0x1F32B) : `REST ${risk.deadline?.slice(11, 16) ?? ""}`.trim();
-  return divIcon({ className: `risk-marker risk-${risk.kind} map-layer-${state}`, html: `<span class="risk-marker-symbol">${symbol}</span><span class="risk-marker-label">${label}</span>`, iconAnchor: [14, 14], iconSize: [state === "selected" ? 120 : 64, 28] });
+  const weatherClass = isWeatherRiskKind(risk.kind) ? ` weather-fx-${risk.kind}` : "";
+  return divIcon({ className: `risk-marker risk-${risk.kind}${weatherClass} map-layer-${state}`, html: `<span class="risk-marker-symbol">${symbol}</span><span class="risk-marker-label">${label}</span>`, iconAnchor: [14, 14], iconSize: [state === "selected" ? 120 : 64, 28] });
 }
 
 function RiskLayers({ entries, locale }: { entries: readonly DerivedRisk[]; locale: Locale }) {
   const map = useMap();
-  const showWeatherFx = true;
+  const [zoom, setZoom] = useState(() => map.getZoom());
+
+  useEffect(() => {
+    const updateZoom = () => setZoom(map.getZoom());
+    map.on("zoomend", updateZoom);
+    updateZoom();
+    return () => { map.off("zoomend", updateZoom); };
+  }, [map]);
 
   return entries.map((entry) => {
     const { risk, state } = entry;
-    const isWeatherRisk = ["severe-snow", "heavy-rain", "severe-storm", "calima"].includes(risk.kind);
+    const isWeatherRisk = isWeatherRiskKind(risk.kind);
     const color = isWeatherRisk ? WEATHER_RISK_COLOR : severityColors[risk.severity];
     const opacity = state === "muted" ? 0.18 : state === "selected" ? 1 : 0.72;
-    const fillOpacity = isWeatherRisk ? state === "muted" ? 0.12 : state === "selected" ? 0.35 : state === "matched" ? 0.30 : 0.25 : 0;
+    const fillOpacity = isWeatherRisk ? state === "muted" ? 0.035 : state === "selected" ? 0.18 : state === "matched" ? 0.13 : 0.075 : 0;
     const onRiskClick = () => {
-      map.flyTo(riskPosition(risk), 9, { duration: 0.8 });
+      const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+      map.fitBounds(riskBounds(risk), { animate: !reduceMotion, duration: 0.72, maxZoom: isWeatherRisk ? 11 : 13, padding: [56, 56] });
     };
     const pathOptions = {
       className: `risk-overlay risk-overlay-${risk.kind} risk-overlay-${risk.severity} map-path-${state}`,
@@ -140,27 +153,23 @@ function RiskLayers({ entries, locale }: { entries: readonly DerivedRisk[]; loca
       dashArray: risk.kind === "road-closure" ? "8 6" : isWeatherRisk ? "7 5" : undefined,
       fillColor: color,
       fillOpacity,
-      opacity: isWeatherRisk && state !== "muted" ? 0.9 : opacity,
+      opacity: isWeatherRisk && state !== "muted" ? 0.76 : opacity,
       weight: state === "selected" ? 5 : isWeatherRisk ? 2.5 : 3,
     };
     const shapeKey = `${risk.id}:${state}`;
     const shape = risk.geometry.geometry.type === "Polygon"
       ? <Polygon key={shapeKey} {...pathOptions} eventHandlers={{ click: onRiskClick }} positions={risk.geometry.geometry.coordinates[0].map(toPosition)} />
       : <Polyline key={shapeKey} {...pathOptions} eventHandlers={{ click: onRiskClick }} noClip positions={risk.geometry.geometry.coordinates.map(toPosition)} smoothFactor={0} />;
-      
-    const weatherFx = isWeatherRisk && showWeatherFx ? (
-      <Marker key={`fx-${shapeKey}`} alt="" interactive={false} keyboard={false} pane="weather-effects" position={riskPosition(risk)} icon={divIcon({ className: `weather-fx-container`, html: `<div class="weather-fx-zone weather-fx-${risk.kind}"></div>`, iconSize: [360, 360], iconAnchor: [180, 180] })} />
-    ) : null;
-    
+
     return (
       <Fragment key={risk.id}>
         {shape}
-        {weatherFx}
+        {isWeatherRisk && <WeatherRiskOverlay risk={risk} zoom={zoom} />}
         <Marker
           alt={riskLabel(risk, locale)}
           eventHandlers={{ click: onRiskClick }}
           icon={riskIcon(entry, locale)}
-          interactive={true}
+          interactive
           keyboard={false}
           pane="risk-tokens"
           position={riskPosition(risk)}
@@ -178,6 +187,17 @@ function routeStyle({ state }: DerivedRoute) {
   if (state === "matched") return { className, color: "#2f8f5b", opacity: 0.82, weight: 3 };
   if (state === "muted") return { className, color: "#647781", opacity: 0.14, weight: 2 };
   return { className, color: "#4c9a6a", opacity: 0.66, weight: 2.5 };
+}
+
+function AuthoritativeRouteLayer({ entry }: { entry: DerivedRoute }) {
+  const routeLayer = useRef<LeafletPolyline>(null);
+  useEffect(() => {
+    const element = routeLayer.current?.getElement();
+    if (element === undefined || element === null) return;
+    element.setAttribute("data-route-id", entry.route.id);
+    element.setAttribute("data-route-owner", entry.route.vehicleId);
+  }, [entry.route.id, entry.route.vehicleId]);
+  return <Polyline ref={routeLayer} {...routeStyle(entry)} noClip positions={routePositions(entry.route)} smoothFactor={0} />;
 }
 
 function CloseRangeBridgeHazard({ scenario }: { scenario: OperatingRegion }) {
@@ -212,51 +232,31 @@ function MapPlacementHandler() {
 
   useEffect(() => {
     const container = map.getContainer();
-    if (placementMode) {
-      container.classList.add("placement-mode");
-    } else {
-      container.classList.remove("placement-mode");
-    }
-    return () => {
-      container.classList.remove("placement-mode");
-    };
+    if (placementMode) container.classList.add("placement-mode");
+    else container.classList.remove("placement-mode");
+    return () => { container.classList.remove("placement-mode"); };
   }, [map, placementMode]);
 
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && placementMode) {
-        cancelPlacement();
-      }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && placementMode) cancelPlacement();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [cancelPlacement, placementMode]);
 
   useMapEvents({
-    click(e) {
-      if (useUiCoordinationStore.getState().placementMode) {
-        setPlacementCoordinates([e.latlng.lng, e.latlng.lat]);
-      }
+    click(event) {
+      if (useUiCoordinationStore.getState().placementMode) setPlacementCoordinates([event.latlng.lng, event.latlng.lat]);
     },
   });
 
   if (!placementCoordinates) return null;
 
-  return (
-    <Marker
-      position={[placementCoordinates[1], placementCoordinates[0]]}
-      icon={divIcon({
-        className: "placement-preview-marker",
-        html: '<div class="placement-preview-pin"></div>',
-        iconSize: [40, 40],
-        iconAnchor: [20, 20],
-      })}
-      pane="fleet-trucks"
-    />
-  );
+  return <Marker position={[placementCoordinates[1], placementCoordinates[0]]} icon={divIcon({ className: "placement-preview-marker", html: '<div class="placement-preview-pin"></div>', iconSize: [40, 40], iconAnchor: [20, 20] })} pane="fleet-trucks" />;
 }
 
-export function FleetMap({ availableComparison, comparison, locale, recoveryExecuted = false, scenario }: { availableComparison?: Unit211RecoveryComparisonModel; comparison?: Unit211RecoveryComparisonModel; locale: Locale; recoveryExecuted?: boolean; scenario: OperatingRegion }) {
+export function FleetMap({ availableComparison, comparison, locale, recoveryExecuted = false, restOpportunityComparison, scenario }: { availableComparison?: Unit211RecoveryComparisonModel; comparison?: Unit211RecoveryComparisonModel; locale: Locale; recoveryExecuted?: boolean; restOpportunityComparison?: RestOpportunityMapModel; scenario: OperatingRegion }) {
   const activeFilters = useUiCoordinationStore((state) => state.activeFilters);
   const panelContext = useUiCoordinationStore((state) => state.panelContext);
   const selection = useUiCoordinationStore((state) => state.selection);
@@ -271,25 +271,16 @@ export function FleetMap({ availableComparison, comparison, locale, recoveryExec
   const cancelManualFollow = (): void => { coordinator.recordManualInteraction(); useUiCoordinationStore.getState().cancelFollow(); };
   const layoutSignature = `${panelContext.mode}:${selection.kind}:${selectedVehicleId}:${comparison?.incident.id ?? ""}`; const recoveryCopy = recoveryComparisonCopy(locale); const hasExecuted = recoveryExecuted;
   return <div aria-label={copy.currentRoute} className="map-frame" onKeyDown={(event) => { if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "+", "-", "="].includes(event.key)) cancelManualFollow(); }} onPointerDown={cancelManualFollow} onWheel={cancelManualFollow}>
-    {placementMode && !placementCoordinates && (
-      <div className="map-placement-banner" role="status">
-        <span>🎯 {copy.placementBanner}</span>
-        <button
-          type="button"
-          onClick={() => cancelPlacement()}
-        >
-          {copy.cancel}
-        </button>
-      </div>
-    )}
+    {placementMode && !placementCoordinates && <div className="map-placement-banner" role="status"><span>🎯 {copy.placementBanner}</span><button type="button" onClick={() => cancelPlacement()}>{copy.cancel}</button></div>}
     <MapContainer center={[40.1, -3.55]} className="fleet-map" maxZoom={18} minZoom={5} zoom={6.5} zoomControl zoomSnap={0.5}>
       <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      <Pane name="risk-tokens" style={{ zIndex: 620 }} /><Pane name="weather-effects" style={{ zIndex: 615 }} /><Pane name="fleet-trucks" style={{ zIndex: 640 }} /><Pane name="fleet-labels" style={{ zIndex: 660 }} /><Pane name="close-range-hazards" style={{ zIndex: 680 }} />
+      <Pane name="weather-effects" style={{ pointerEvents: "none", zIndex: 390 }} /><Pane name="risk-tokens" style={{ zIndex: 620 }} /><Pane name="fleet-trucks" style={{ zIndex: 640 }} /><Pane name="fleet-labels" style={{ zIndex: 660 }} /><Pane name="close-range-hazards" style={{ zIndex: 680 }} />
       <MapEvents coordinator={coordinator} /><MapFocus comparison={comparison} coordinator={coordinator} scenario={scenario} /><MapLayout coordinator={coordinator} signature={layoutSignature} />
-      {layers.routes.filter((entry) => entry.route.id !== comparison?.current.id && entry.route.id !== comparison?.alternative.id).map((entry) => <Polyline key={`${entry.route.id}:${entry.state}`} {...routeStyle(entry)} noClip positions={routePositions(entry.route)} smoothFactor={0} />)}
+      {layers.routes.filter((entry) => entry.route.id !== comparison?.current.id && entry.route.id !== comparison?.alternative.id).map((entry) => <AuthoritativeRouteLayer entry={entry} key={`${entry.route.id}:${entry.state}`} />)}
       <RiskLayers entries={visibleRisks} locale={locale} />
       <CloseRangeBridgeHazard scenario={scenario} />
       <MapPlacementHandler />
+      {restOpportunityComparison && <RestOpportunityLayers comparison={restOpportunityComparison} locale={locale} />}
       {(comparison ?? availableComparison) && <RecoveryComparisonLayers comparison={comparison !== undefined} executed={hasExecuted} locale={locale} model={(comparison ?? availableComparison)!} onIncidentSelect={comparison ? undefined : (vehicleId) => useUiCoordinationStore.getState().selectVehicle(vehicleId, "operational-map")} />}
       <VehicleMarkerLayer coordinator={coordinator} locale={locale} onSelect={(vehicleId) => useUiCoordinationStore.getState().selectVehicle(vehicleId)} routes={scenario.routes} vehicles={layers.vehicles} />
     </MapContainer>

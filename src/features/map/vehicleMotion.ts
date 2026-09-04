@@ -13,19 +13,19 @@ export type VehicleMotionEvaluation = {
 };
 
 export function evaluateVehicleMotion(vehicle: Vehicle): VehicleMotionEvaluation {
-  if (vehicle.status === "resting") {
-    return {
-      isMoving: false,
-      reasonCode: "mandatory-rest",
-      reasonText: { en: "Mandatory rest", es: "Descanso obligatorio" },
-    };
-  }
-
   if (!vehicle.routeId || vehicle.routeId.trim() === "") {
     return {
       isMoving: false,
       reasonCode: "no-route",
       reasonText: { en: "No route assigned", es: "Sin ruta asignada" },
+    };
+  }
+
+  if (vehicle.status === "resting") {
+    return {
+      isMoving: false,
+      reasonCode: "mandatory-rest",
+      reasonText: { en: "Mandatory rest", es: "Descanso obligatorio" },
     };
   }
 
